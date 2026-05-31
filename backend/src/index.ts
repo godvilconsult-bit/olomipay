@@ -1,7 +1,10 @@
 import express from 'express';
+import { createServer } from 'http';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import { chatRouter } from './routes/chat';
+import { initSocket } from './socket';
 
 // Phase 1 + 2 routes
 import { authRouter }          from './routes/auth';
@@ -92,6 +95,10 @@ app.use('/api/payroll',    payrollRouter);
 app.use('/api/gov',        govRouter);
 app.use('/api/bonds',      bondsRouter);
 app.use('/api/developer',  developerRouter);
+app.use('/api/chat',       chatRouter);
+
+import { mediaRouter } from './routes/media';
+app.use('/api/chat/media', mediaRouter);
 
 // ── One-time DB migration endpoint ───────────────────────────────────────────
 app.get('/setup-db', async (_req, res) => {
@@ -126,8 +133,11 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
   res.status(500).json({ success: false, error: 'Internal server error' });
 });
 
-app.listen(PORT, async () => {
-  console.log(`OlomiPay / Tuma API Phase 4 on :${PORT}`);
+const httpServer = createServer(app);
+initSocket(httpServer);
+
+httpServer.listen(PORT, async () => {
+  console.log(`Tuma API Phase 4 + Chat on :${PORT}`);
   await setupDatabase();
   startScheduler();
 });

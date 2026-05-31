@@ -53,6 +53,26 @@ enum StakeStatus {
   WITHDRAWN
 }
 
+enum ConvType {
+  DIRECT
+  GROUP
+}
+
+enum MessageType {
+  TEXT
+  PAYMENT
+  PAYMENT_REQUEST
+  IMAGE
+  SYSTEM
+}
+
+enum PaymentStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+  EXPIRED
+}
+
 enum ChamaStatus {
   FORMING
   ACTIVE
@@ -132,6 +152,15 @@ model User {
   bondHoldings       BondHolding[]
   devApiKeys         DevApiKey[]
   country            Country           @default(TZ)
+  chatPublicKey      String?
+  chatSecretKeyEnc   String?
+  isOnline           Boolean           @default(false)
+  lastSeenAt         DateTime?
+  chatMembers        ConversationMember[]
+  sentMessages       Message[]
+  messageReceipts    MessageReceipt[]
+  blockedUsers       BlockedUser[]     @relation("Blocker")
+  blockedBy          BlockedUser[]     @relation("Blocked")
 }
 
 model Transaction {
@@ -549,4 +578,99 @@ model DevApiKey {
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   user        User     @relation(fields: [userId], references: [id])
+}
+
+// ── Chat Models ───────────────────────────────────────────────────────────────
+
+model Conversation {
+  id                 String    @id @default(cuid())
+  type               ConvType  @default(DIRECT)
+  groupName          String?
+  groupAvatar        String?
+  groupAdminId       String?
+  lastMessageAt      DateTime?
+  lastMessagePreview String?
+  createdAt          DateTime  @default(now())
+  participants       ConversationMember[]
+  messages           Message[]
+  groupKeys          GroupKey[]
+
+  @@index([lastMessageAt])
+}
+
+model ConversationMember {
+  id             String       @id @default(cuid())
+  conversationId String
+  userId         String
+  joinedAt       DateTime     @default(now())
+  lastReadAt     DateTime?
+  isMuted        Boolean      @default(false)
+  isArchived     Boolean      @default(false)
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  user           User         @relation(fields: [userId], references: [id])
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+}
+
+model Message {
+  id               String        @id @default(cuid())
+  conversationId   String
+  senderId         String
+  type             MessageType   @default(TEXT)
+  encryptedContent String?
+  plainContent     String?
+  amountUsdc       Float?
+  amountTzs        Float?
+  stellarTxId      String?
+  paymentStatus    PaymentStatus?
+  paymentNote      String?
+  mediaUrl         String?
+  mediaThumbUrl    String?
+  mediaMimeType    String?
+  replyToId        String?
+  isDeleted        Boolean       @default(false)
+  deletedAt        DateTime?
+  deliveredAt      DateTime?
+  createdAt        DateTime      @default(now())
+  replyTo          Message?      @relation("Replies", fields: [replyToId], references: [id])
+  replies          Message[]     @relation("Replies")
+  conversation     Conversation  @relation(fields: [conversationId], references: [id])
+  sender           User          @relation(fields: [senderId], references: [id])
+  receipts         MessageReceipt[]
+
+  @@index([conversationId, createdAt])
+  @@index([senderId])
+}
+
+model MessageReceipt {
+  id        String   @id @default(cuid())
+  messageId String
+  userId    String
+  readAt    DateTime @default(now())
+  message   Message  @relation(fields: [messageId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([messageId, userId])
+}
+
+model GroupKey {
+  id             String       @id @default(cuid())
+  conversationId String
+  userId         String
+  encryptedKey   String
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+
+  @@unique([conversationId, userId])
+}
+
+model BlockedUser {
+  id        String   @id @default(cuid())
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
+  blocker   User     @relation("Blocker",  fields: [blockerId], references: [id])
+  blocked   User     @relation("Blocked",  fields: [blockedId],  references: [id])
+
+  @@unique([blockerId, blockedId])
 }

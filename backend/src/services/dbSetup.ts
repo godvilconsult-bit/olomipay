@@ -414,6 +414,96 @@ export async function setupDatabase(): Promise<void> {
       );
     `);
 
+    // ── Chat tables ───────────────────────────────────────────────────────────
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE "User"
+        ADD COLUMN IF NOT EXISTS "chatPublicKey"    TEXT,
+        ADD COLUMN IF NOT EXISTS "chatSecretKeyEnc" TEXT,
+        ADD COLUMN IF NOT EXISTS "isOnline"         BOOLEAN NOT NULL DEFAULT false,
+        ADD COLUMN IF NOT EXISTS "lastSeenAt"       TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS "country"          TEXT NOT NULL DEFAULT 'TZ';
+    `);
+
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "Conversation" (
+        "id"                 TEXT NOT NULL PRIMARY KEY,
+        "type"               TEXT NOT NULL DEFAULT 'DIRECT',
+        "groupName"          TEXT,
+        "groupAvatar"        TEXT,
+        "groupAdminId"       TEXT,
+        "lastMessageAt"      TIMESTAMP,
+        "lastMessagePreview" TEXT,
+        "createdAt"          TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+    `);
+
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "ConversationMember" (
+        "id"             TEXT NOT NULL PRIMARY KEY,
+        "conversationId" TEXT NOT NULL,
+        "userId"         TEXT NOT NULL,
+        "joinedAt"       TIMESTAMP NOT NULL DEFAULT NOW(),
+        "lastReadAt"     TIMESTAMP,
+        "isMuted"        BOOLEAN NOT NULL DEFAULT false,
+        "isArchived"     BOOLEAN NOT NULL DEFAULT false,
+        UNIQUE("conversationId", "userId")
+      );
+    `);
+
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "Message" (
+        "id"               TEXT NOT NULL PRIMARY KEY,
+        "conversationId"   TEXT NOT NULL,
+        "senderId"         TEXT NOT NULL,
+        "type"             TEXT NOT NULL DEFAULT 'TEXT',
+        "encryptedContent" TEXT,
+        "plainContent"     TEXT,
+        "amountUsdc"       DOUBLE PRECISION,
+        "amountTzs"        DOUBLE PRECISION,
+        "stellarTxId"      TEXT,
+        "paymentStatus"    TEXT,
+        "paymentNote"      TEXT,
+        "mediaUrl"         TEXT,
+        "mediaThumbUrl"    TEXT,
+        "mediaMimeType"    TEXT,
+        "replyToId"        TEXT,
+        "isDeleted"        BOOLEAN NOT NULL DEFAULT false,
+        "deletedAt"        TIMESTAMP,
+        "deliveredAt"      TIMESTAMP,
+        "createdAt"        TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+    `);
+
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "MessageReceipt" (
+        "id"        TEXT NOT NULL PRIMARY KEY,
+        "messageId" TEXT NOT NULL,
+        "userId"    TEXT NOT NULL,
+        "readAt"    TIMESTAMP NOT NULL DEFAULT NOW(),
+        UNIQUE("messageId", "userId")
+      );
+    `);
+
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "GroupKey" (
+        "id"             TEXT NOT NULL PRIMARY KEY,
+        "conversationId" TEXT NOT NULL,
+        "userId"         TEXT NOT NULL,
+        "encryptedKey"   TEXT NOT NULL,
+        UNIQUE("conversationId", "userId")
+      );
+    `);
+
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "BlockedUser" (
+        "id"        TEXT NOT NULL PRIMARY KEY,
+        "blockerId" TEXT NOT NULL,
+        "blockedId" TEXT NOT NULL,
+        "createdAt" TIMESTAMP NOT NULL DEFAULT NOW(),
+        UNIQUE("blockerId", "blockedId")
+      );
+    `);
+
     console.log('[db] All tables created successfully ✓');
   } catch (e: any) {
     console.error('[db] Setup error:', e.message);

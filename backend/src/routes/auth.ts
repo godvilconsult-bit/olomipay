@@ -72,12 +72,21 @@ router.post('/register', authLimiter, async (req, res) => {
   const encryptedSecret          = encryptSecret(secretKey, pin, phone);
   const pinHash                  = hashPin(pin);
 
+  // Generate chat encryption keypair (NaCl box)
+  const { default: nacl } = await import('tweetnacl');
+  const { encodeBase64 } = await import('tweetnacl-util');
+  const chatKp = nacl.box.keyPair();
+  const chatPublicKey    = encodeBase64(chatKp.publicKey);
+  const chatSecretKeyEnc = encryptSecret(encodeBase64(chatKp.secretKey), pin, phone);
+
   const user = await prisma.user.create({
     data: {
       phone,
       pinHash,
-      stellarPubKey:  publicKey,
-      stellarSecret:  encryptedSecret,
+      stellarPubKey:    publicKey,
+      stellarSecret:    encryptedSecret,
+      chatPublicKey,
+      chatSecretKeyEnc,
     },
   });
 
