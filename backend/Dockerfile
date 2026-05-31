@@ -22,9 +22,5 @@ RUN npm run build
 
 EXPOSE 3001
 
-# Copy startup script
-COPY start.sh ./start.sh
-RUN chmod +x start.sh
-
-# Push schema (creates all tables) then start
-CMD ["sh", "start.sh"]
+# Start directly — tables created by dbSetup.ts on boot
+CMD ["node", "dist/index.js"]

@@ -28,6 +28,7 @@ import { cardRouter }          from './routes/card';
 import { pricelockRouter }     from './routes/pricelock';
 
 import { startScheduler }      from './services/scheduler';
+import { setupDatabase }       from './services/dbSetup';
 
 const app  = express();
 const PORT = process.env.PORT ?? 3001;
@@ -125,8 +126,9 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
   res.status(500).json({ success: false, error: 'Internal server error' });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`OlomiPay / Tuma API Phase 4 on :${PORT}`);
+  await setupDatabase();
   startScheduler();
 });
 
