@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* Minimum 16px body text to prevent iOS auto-zoom on inputs */
+  body { font-size: 16px; line-height: 1.5; }
+
+  /* Smooth scrolling */
+  html { scroll-behavior: smooth; }
+
+  /* Remove tap highlight on mobile */
+  * { -webkit-tap-highlight-color: transparent; }
+
+  /* Inputs: prevent iOS zoom (min 16px font-size) */
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
+
+@layer components {
+  /* Reusable button sizes that meet 48px touch target */
+  .btn-primary {
+    @apply inline-flex items-center justify-center
+           min-h-[48px] px-6 rounded-2xl
+           bg-primary text-white font-semibold text-base
+           active:scale-95 transition-transform duration-100
+           disabled:opacity-50 disabled:pointer-events-none
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50;
+  }
+
+  .btn-secondary {
+    @apply btn-primary bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white;
+  }
+
+  .btn-danger {
+    @apply btn-primary bg-danger text-white;
+  }
+
+  /* Full-width mobile card */
+  .card {
+    @apply bg-white dark:bg-slate-800 rounded-3xl shadow-sm p-5;
+  }
+
+  /* Input fields */
+  .input {
+    @apply w-full min-h-[48px] px-4 rounded-2xl border border-slate-200
+           dark:border-slate-700 bg-white dark:bg-slate-800
+           text-base text-slate-900 dark:text-slate-100
+           placeholder:text-slate-400
+           focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary
+           transition;
+  }
+
+  /* Status badge colours */
+  .badge-confirmed { @apply bg-success/10 text-success text-xs font-medium px-2 py-0.5 rounded-full; }
+  .badge-pending   { @apply bg-warning/10 text-warning text-xs font-medium px-2 py-0.5 rounded-full; }
+  .badge-failed    { @apply bg-danger/10  text-danger  text-xs font-medium px-2 py-0.5 rounded-full; }
+
+  /* Skeleton loading animation */
+  .skeleton {
+    @apply bg-slate-200 dark:bg-slate-700 rounded-xl animate-pulse;
+  }
+}

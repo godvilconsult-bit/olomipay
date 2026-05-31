@@ -1,0 +1,199 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Enums ──────────────────────────────────────────────────────────────────────
+
+enum KycStatus   { PENDING APPROVED REJECTED }
+enum TxType      { DEPOSIT WITHDRAWAL SEND RECEIVE FEE SAVINGS_DEPOSIT SAVINGS_WITHDRAW BILL_PAYMENT BANK_WITHDRAWAL }
+enum TxStatus    { PENDING CONFIRMED FAILED }
+enum Frequency   { DAILY WEEKLY BIWEEKLY MONTHLY }
+enum ClaimStatus { PENDING CLAIMED EXPIRED RETURNED }
+
+// ── Core models ───────────────────────────────────────────────────────────────
+
+model User {
+  id              String    @id @default(cuid())
+  phone           String    @unique
+  pinHash         String
+  stellarPubKey   String    @unique
+  stellarSecret   String
+  kycStatus       KycStatus @default(PENDING)
+  kycName         String?
+  kycIdType       String?
+  kycIdNumber     String?
+  dailyVolumeTzs  Float     @default(0)
+  dailyVolumeDate DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  transactions       Transaction[]
+  refreshTokens      RefreshToken[]
+  bankAccounts       BankAccount[]
+  savingsPosition    SavingsPosition?
+  billPayments       BillPayment[]
+  scheduledPayments  ScheduledPayment[]
+  pushSubscriptions  PushSubscription[]
+  notifications      Notification[]
+}
+
+model Transaction {
+  id          String   @id @default(cuid())
+  userId      String
+  type        TxType
+  status      TxStatus @default(PENDING)
+  amountTzs   Float?
+  amountUsdc  Float?
+  amountXlm   Float?
+  stellarTxId String?
+  mpesaTxId   String?
+  toAddress   String?
+  memo        String?
+  errorMsg    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([mpesaTxId])
+  @@index([stellarTxId])
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model ExchangeRateCache {
+  id        String   @id @default("singleton")
+  usdToTzs  Float
+  updatedAt DateTime @updatedAt
+}
+
+// ── Feature 1: Bank Withdrawal ────────────────────────────────────────────────
+
+model BankAccount {
+  id            String   @id @default(cuid())
+  userId        String
+  bankName      String
+  accountNumber String
+  swiftCode     String
+  accountName   String
+  isVerified    Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  user          User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+// ── Feature 2: Savings ────────────────────────────────────────────────────────
+
+model SavingsPosition {
+  id           String    @id @default(cuid())
+  userId       String    @unique
+  principal    Float     @default(0)
+  yieldEarned  Float     @default(0)
+  depositedAt  DateTime?
+  lastYieldAt  DateTime?
+  user         User      @relation(fields: [userId], references: [id])
+}
+
+// ── Feature 3: Bill Payments ──────────────────────────────────────────────────
+
+model BillPayment {
+  id            String   @id @default(cuid())
+  userId        String
+  billerName    String
+  billerCode    String
+  accountNumber String
+  amountTzs     Float
+  amountUsdc    Float
+  reference     String?
+  token         String?  // LUKU electricity token
+  status        TxStatus @default(PENDING)
+  createdAt     DateTime @default(now())
+  user          User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+// ── Feature 4: Contacts / Pending Claims ─────────────────────────────────────
+
+model PendingClaim {
+  id         String      @id @default(cuid())
+  senderId   String
+  toPhone    String
+  claimToken String      @unique
+  amountUsdc Float
+  expiresAt  DateTime
+  claimedAt  DateTime?
+  status     ClaimStatus @default(PENDING)
+  createdAt  DateTime    @default(now())
+
+  @@index([claimToken])
+  @@index([toPhone])
+}
+
+// ── Feature 5: Scheduled Payments ────────────────────────────────────────────
+
+model ScheduledPayment {
+  id             String    @id @default(cuid())
+  userId         String
+  toAddress      String
+  toPhone        String?
+  toName         String?
+  amount         Float
+  asset          String    @default("USDC")
+  frequency      Frequency
+  nextRunAt      DateTime
+  endDate        DateTime?
+  memo           String?
+  isActive       Boolean   @default(true)
+  executionCount Int       @default(0)
+  lastRunAt      DateTime?
+  createdAt      DateTime  @default(now())
+  user           User      @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([nextRunAt, isActive])
+}
+
+// ── Feature 6: Push Notifications ────────────────────────────────────────────
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dhKey String
+  authKey   String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  body      String
+  type      String   // money_in | money_out | low_balance | yield | scheduled | failed
+  isRead    Boolean  @default(false)
+  data      Json?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
+}
