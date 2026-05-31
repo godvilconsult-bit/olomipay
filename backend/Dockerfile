@@ -1,7 +1,10 @@
 FROM node:20-alpine
 
-# Install OpenSSL + postgresql-client for Prisma
-RUN apk add --no-cache openssl openssl-dev postgresql-client
+# Cache bust — increment this to force full rebuild
+ARG CACHE_BUST=5
+
+# Install OpenSSL for Prisma
+RUN apk add --no-cache openssl openssl-dev
 
 WORKDIR /app
 
@@ -22,5 +25,5 @@ RUN npm run build
 
 EXPOSE 3001
 
-# Start directly — tables created by dbSetup.ts on boot
+# Auto-create tables then start
 CMD ["node", "dist/index.js"]
