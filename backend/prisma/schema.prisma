@@ -47,6 +47,33 @@ enum ClaimStatus {
   RETURNED
 }
 
+enum StakeStatus {
+  ACTIVE
+  UNLOCKED
+  WITHDRAWN
+}
+
+enum ChamaStatus {
+  FORMING
+  ACTIVE
+  COMPLETED
+  PAUSED
+}
+
+enum LoanStatus {
+  OPEN
+  FUNDED
+  REPAID
+  DEFAULTED
+}
+
+enum RewardTier {
+  BRONZE
+  SILVER
+  GOLD
+  PLATINUM
+}
+
 // ── Core models ───────────────────────────────────────────────────────────────
 
 model User {
@@ -72,6 +99,14 @@ model User {
   scheduledPayments  ScheduledPayment[]
   pushSubscriptions  PushSubscription[]
   notifications      Notification[]
+  stakePosition      StakePosition?
+  chamasAdmin        Chama[]
+  chamaMembers       ChamaMember[]
+  loansGiven         LoanListing[]     @relation("LenderLoans")
+  loansTaken         LoanListing[]     @relation("BorrowerLoans")
+  creditScore        CreditScore?
+  rewardPoints       RewardPoints?
+  virtualCard        VirtualCard?
 }
 
 model Transaction {
@@ -220,7 +255,7 @@ model Notification {
   userId    String
   title     String
   body      String
-  type      String   // money_in | money_out | low_balance | yield | scheduled | failed
+  type      String
   isRead    Boolean  @default(false)
   data      Json?
   createdAt DateTime @default(now())
@@ -228,4 +263,108 @@ model Notification {
 
   @@index([userId, isRead])
   @@index([userId, createdAt])
+}
+
+// ── Phase 3 Models ────────────────────────────────────────────────────────────
+
+model StakePosition {
+  id           String      @id @default(cuid())
+  userId       String      @unique
+  amountUsdc   Float
+  lockDays     Int
+  apyBps       Int
+  stakedAt     DateTime
+  unlockAt     DateTime
+  yieldClaimed Float       @default(0)
+  contractKey  String?
+  status       StakeStatus @default(ACTIVE)
+  user         User        @relation(fields: [userId], references: [id])
+}
+
+model Chama {
+  id               String      @id @default(cuid())
+  name             String
+  contractId       String?
+  adminId          String
+  contributionUsdc Float
+  frequencyDays    Int
+  currentRound     Int         @default(0)
+  status           ChamaStatus @default(FORMING)
+  nextDueAt        DateTime?
+  createdAt        DateTime    @default(now())
+  members          ChamaMember[]
+  admin            User        @relation(fields: [adminId], references: [id])
+}
+
+model ChamaMember {
+  id          String  @id @default(cuid())
+  chamaId     String
+  userId      String
+  position    Int
+  hasReceived Boolean @default(false)
+  chama       Chama   @relation(fields: [chamaId], references: [id])
+  user        User    @relation(fields: [userId], references: [id])
+
+  @@unique([chamaId, userId])
+  @@index([chamaId])
+}
+
+model LoanListing {
+  id           String     @id @default(cuid())
+  lenderId     String
+  amountUsdc   Float
+  interestBps  Int
+  durationDays Int
+  status       LoanStatus @default(OPEN)
+  borrowerId   String?
+  contractLoanId Int?
+  createdAt    DateTime   @default(now())
+  dueAt        DateTime?
+  lender       User       @relation("LenderLoans",   fields: [lenderId],   references: [id])
+  borrower     User?      @relation("BorrowerLoans", fields: [borrowerId], references: [id])
+
+  @@index([status])
+  @@index([lenderId])
+}
+
+model CreditScore {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  score        Int      @default(40)
+  loansRepaid  Int      @default(0)
+  defaults     Int      @default(0)
+  monthsActive Int      @default(0)
+  updatedAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id])
+}
+
+model RewardPoints {
+  id           String     @id @default(cuid())
+  userId       String     @unique
+  balance      Int        @default(0)
+  totalEarned  Int        @default(0)
+  tier         RewardTier @default(BRONZE)
+  streak       Int        @default(0)
+  lastActivity DateTime?
+  user         User       @relation(fields: [userId], references: [id])
+}
+
+model VirtualCard {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  cardRef      String   @unique
+  maskedNumber String
+  expiryMonth  Int
+  expiryYear   Int
+  status       String   @default("active")
+  dailyLimit   Float    @default(500)
+  createdAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id])
+}
+
+model RateHistory {
+  id        String   @id @default(cuid())
+  usdToTzs  Float
+  date      DateTime @unique
+  createdAt DateTime @default(now())
 }

@@ -2,6 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+
+// Phase 1 + 2 routes
 import { authRouter }          from './routes/auth';
 import { walletRouter }        from './routes/wallet';
 import { mpesaRouter }         from './routes/mpesa';
@@ -14,12 +16,25 @@ import { contactsRouter }      from './routes/contacts';
 import { scheduleRouter }      from './routes/schedule';
 import { withdrawRouter }      from './routes/withdraw';
 import { notificationsRouter } from './routes/notifications';
+
+// Phase 3 routes
+import { stakeRouter }         from './routes/stake';
+import { chamaRouter }         from './routes/chama';
+import { swapRouter }          from './routes/swap';
+import { lendingRouter }       from './routes/lending';
+import { rewardsRouter }       from './routes/rewards';
+import { creditRouter }        from './routes/credit';
+import { cardRouter }          from './routes/card';
+import { pricelockRouter }     from './routes/pricelock';
+
 import { startScheduler }      from './services/scheduler';
 
 const app  = express();
 const PORT = process.env.PORT ?? 3001;
 
+// ── Security ──────────────────────────────────────────────────────────────────
 app.use(helmet());
+
 const allowedOrigins = [
   process.env.CORS_ORIGIN ?? 'http://localhost:3000',
   'http://localhost:3000',
@@ -28,16 +43,16 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: (origin, cb) => {
-    // Allow requests with no origin (mobile apps, curl, Postman)
     if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
     cb(new Error('Not allowed by CORS'));
   },
   credentials: true,
 }));
+
 app.use(express.json({ limit: '10kb' }));
 app.use(rateLimit({ windowMs: 60_000, max: 100, standardHeaders: true, legacyHeaders: false }));
 
-// ── Routes ────────────────────────────────────────────────────────────────────
+// ── Phase 1 + 2 Routes ────────────────────────────────────────────────────────
 app.use('/api/auth',          authRouter);
 app.use('/api/wallet',        walletRouter);
 app.use('/api/mpesa',         mpesaRouter);
@@ -51,15 +66,31 @@ app.use('/api/schedule',      scheduleRouter);
 app.use('/api/withdraw',      withdrawRouter);
 app.use('/api/notifications', notificationsRouter);
 
-app.get('/health', (_req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
+// ── Phase 3 Routes ────────────────────────────────────────────────────────────
+app.use('/api/stake',         stakeRouter);
+app.use('/api/chama',         chamaRouter);
+app.use('/api/swap',          swapRouter);
+app.use('/api/lending',       lendingRouter);
+app.use('/api/rewards',       rewardsRouter);
+app.use('/api/credit',        creditRouter);
+app.use('/api/card',          cardRouter);
+app.use('/api/pricelock',     pricelockRouter);
 
+// ── Health ────────────────────────────────────────────────────────────────────
+app.get('/health', (_req, res) => res.json({
+  status: 'ok',
+  ts:     new Date().toISOString(),
+  phase:  3,
+}));
+
+// ── Error handler ─────────────────────────────────────────────────────────────
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  console.error('[error]', err);
+  console.error('[error]', err.message);
   res.status(500).json({ success: false, error: 'Internal server error' });
 });
 
 app.listen(PORT, () => {
-  console.log(`OlomiPay API on :${PORT}`);
+  console.log(`OlomiPay API Phase 3 on :${PORT}`);
   startScheduler();
 });
 

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["olomipay", "savings_vault"]
+members = ["olomipay", "savings_vault", "staking_pool", "chama", "lending"]
 
 [profile.release]
 opt-level = "z"
