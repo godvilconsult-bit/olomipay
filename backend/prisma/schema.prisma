@@ -74,6 +74,27 @@ enum RewardTier {
   PLATINUM
 }
 
+enum BusinessPlan {
+  STARTER
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+enum BondStatus {
+  OPEN
+  CLOSED
+  MATURED
+  REDEEMED
+}
+
+enum Country {
+  TZ
+  KE
+  UG
+  RW
+  ZM
+}
+
 // ── Core models ───────────────────────────────────────────────────────────────
 
 model User {
@@ -107,6 +128,10 @@ model User {
   creditScore        CreditScore?
   rewardPoints       RewardPoints?
   virtualCard        VirtualCard?
+  merchant           Merchant?
+  bondHoldings       BondHolding[]
+  devApiKeys         DevApiKey[]
+  country            Country           @default(TZ)
 }
 
 model Transaction {
@@ -367,4 +392,161 @@ model RateHistory {
   usdToTzs  Float
   date      DateTime @unique
   createdAt DateTime @default(now())
+}
+
+// ── Phase 4 Models ────────────────────────────────────────────────────────────
+
+model Business {
+  id          String       @id @default(cuid())
+  name        String
+  tin         String       @unique
+  contactName String
+  email       String       @unique
+  phone       String
+  passwordHash String
+  apiKey      String       @unique @default(cuid())
+  plan        BusinessPlan @default(STARTER)
+  country     Country      @default(TZ)
+  createdAt   DateTime     @default(now())
+  payrollRuns PayrollRun[]
+  govPrograms GovProgram[]
+  webhooks    Webhook[]
+}
+
+model PayrollRun {
+  id             String    @id @default(cuid())
+  businessId     String
+  totalAmount    Float
+  recipientCount Int
+  stellarTxId    String?
+  status         TxStatus  @default(PENDING)
+  csvUrl         String?
+  executedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  business       Business  @relation(fields: [businessId], references: [id])
+  recipients     PayrollRecipient[]
+}
+
+model PayrollRecipient {
+  id           String     @id @default(cuid())
+  payrollRunId String
+  name         String
+  phone        String?
+  address      String?
+  amountUsdc   Float
+  department   String?
+  reference    String?
+  status       TxStatus   @default(PENDING)
+  stellarTxId  String?
+  payrollRun   PayrollRun @relation(fields: [payrollRunId], references: [id])
+}
+
+model Merchant {
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  shopName   String
+  category   String
+  qrPayload  String
+  totalSales Float    @default(0)
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id])
+}
+
+model GovProgram {
+  id           String        @id @default(cuid())
+  businessId   String
+  name         String
+  description  String?
+  budgetUsdc   Float
+  disbursed    Float         @default(0)
+  startDate    DateTime
+  status       String        @default("active")
+  createdAt    DateTime      @default(now())
+  business     Business      @relation(fields: [businessId], references: [id])
+  beneficiaries GovBeneficiary[]
+}
+
+model GovBeneficiary {
+  id           String     @id @default(cuid())
+  programId    String
+  nationalId   String
+  fullName     String
+  phone        String
+  amountUsdc   Float
+  ward         String?
+  district     String?
+  status       TxStatus   @default(PENDING)
+  reference    String     @unique @default(cuid())
+  stellarTxId  String?
+  disbursedAt  DateTime?
+  program      GovProgram @relation(fields: [programId], references: [id])
+
+  @@index([programId])
+  @@index([nationalId])
+}
+
+model Bond {
+  id             String     @id @default(cuid())
+  contractBondId Int?
+  name           String
+  faceValueUsdc  Float
+  couponRateBps  Int
+  maturityDate   DateTime
+  totalSupply    Float
+  invested       Float      @default(0)
+  minInvestment  Float
+  status         BondStatus @default(OPEN)
+  description    String?
+  createdAt      DateTime   @default(now())
+  holdings       BondHolding[]
+}
+
+model BondHolding {
+  id             String   @id @default(cuid())
+  bondId         String
+  userId         String
+  amountInvested Float
+  couponClaimed  Float    @default(0)
+  investedAt     DateTime @default(now())
+  bond           Bond     @relation(fields: [bondId], references: [id])
+  user           User     @relation(fields: [userId], references: [id])
+
+  @@unique([bondId, userId])
+}
+
+model Webhook {
+  id         String   @id @default(cuid())
+  businessId String
+  url        String
+  events     String[]
+  secret     String
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  business   Business @relation(fields: [businessId], references: [id])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  adminId    String
+  action     String
+  resource   String
+  resourceId String?
+  metadata   Json?
+  ipAddress  String
+  createdAt  DateTime @default(now())
+
+  @@index([adminId])
+  @@index([createdAt])
+}
+
+model DevApiKey {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  keyHash     String   @unique
+  lastUsedAt  DateTime?
+  requestCount Int     @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id])
 }

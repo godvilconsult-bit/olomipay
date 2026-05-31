@@ -1,0 +1,20 @@
+{
+  "name": "@tuma/payments-sdk",
+  "version": "1.0.0",
+  "description": "Tuma payment rails SDK — M-Pesa × Stellar bridge for East Africa",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": ["stellar", "mpesa", "usdc", "east-africa", "payments", "blockchain"],
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.7.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "@types/node": "^20.14.2"
+  }
+}

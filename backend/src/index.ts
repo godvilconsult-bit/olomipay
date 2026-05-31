@@ -18,7 +18,7 @@ import { withdrawRouter }      from './routes/withdraw';
 import { notificationsRouter } from './routes/notifications';
 
 // Phase 3 routes
-import { stakeRouter }         from './routes/stake';
+import { stakeRouter }   from './routes/stake';
 import { chamaRouter }         from './routes/chama';
 import { swapRouter }          from './routes/swap';
 import { lendingRouter }       from './routes/lending';
@@ -79,11 +79,25 @@ app.use('/api/credit',        creditRouter);
 app.use('/api/card',          cardRouter);
 app.use('/api/pricelock',     pricelockRouter);
 
+// ── Phase 4 Routes ────────────────────────────────────────────────────────────
+import { merchantRouter }  from './routes/merchant';
+import { payrollRouter }   from './routes/payroll';
+import { govRouter }       from './routes/gov';
+import { bondsRouter }     from './routes/bonds';
+import { developerRouter } from './routes/developer';
+
+app.use('/api/merchant',   merchantRouter);
+app.use('/api/payroll',    payrollRouter);
+app.use('/api/gov',        govRouter);
+app.use('/api/bonds',      bondsRouter);
+app.use('/api/developer',  developerRouter);
+
 // ── Health ────────────────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => res.json({
-  status: 'ok',
-  ts:     new Date().toISOString(),
-  phase:  3,
+  status:  'ok',
+  ts:      new Date().toISOString(),
+  phase:   4,
+  version: '4.0.0',
 }));
 
 // ── Error handler ─────────────────────────────────────────────────────────────
@@ -93,7 +107,7 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 });
 
 app.listen(PORT, () => {
-  console.log(`OlomiPay API Phase 3 on :${PORT}`);
+  console.log(`OlomiPay / Tuma API Phase 4 on :${PORT}`);
   startScheduler();
 });
 

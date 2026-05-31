@@ -7,6 +7,7 @@ import {
   Home, Send, TrendingUp, Users, MoreHorizontal,
   Receipt, ArrowUpDown, HandCoins, CreditCard,
   Star, Shield, History, User, Bell, Calendar, X,
+  QrCode, Landmark, Building2, TrendingDown,
 } from 'lucide-react';
 
 const MAIN_NAV = [
@@ -26,7 +27,10 @@ const MORE_ITEMS = [
   { href: '/history',       label: 'History',    icon: History    },
   { href: '/notifications', label: 'Alerts',     icon: Bell       },
   { href: '/schedule',      label: 'Scheduled',  icon: Calendar   },
-  { href: '/protect',       label: 'Protection', icon: Shield     },
+  { href: '/protect',       label: 'Protection', icon: TrendingDown },
+  { href: '/invest',        label: 'Bonds',      icon: Landmark   },
+  { href: '/merchant',      label: 'Merchant',   icon: QrCode     },
+  { href: '/admin',         label: 'Admin',      icon: Building2  },
   { href: '/profile',       label: 'Profile',    icon: User       },
 ];
 
