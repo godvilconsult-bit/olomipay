@@ -5,27 +5,22 @@ RUN apk add --no-cache openssl openssl-dev
 
 WORKDIR /app
 
-# Copy package files
+# Copy package files and schema first
 COPY package*.json ./
 COPY prisma ./prisma/
 
-# Install ALL dependencies (including dev for build)
+# Install all deps (including dev for build)
 RUN npm install --include=dev
 
-# Generate Prisma client BEFORE build
+# Generate Prisma client
 RUN npx prisma generate
 
-# Copy source
+# Copy source and build
 COPY . .
-
-# Re-generate after full copy (ensures schema is in sync)
 RUN npx prisma generate
-
-# TypeScript build
 RUN npm run build
 
-# Expose port
 EXPOSE 3001
 
-# Start — migrate then run
+# Run migrations then start
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
