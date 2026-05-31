@@ -51,7 +51,7 @@ export async function sendPushToUser(userId: string, payload: NotificationPayloa
   });
 
   await Promise.allSettled(
-    subs.map(sub =>
+    subs.map((sub: any) =>
       webpush.sendNotification(
         { endpoint: sub.endpoint, keys: { p256dh: sub.p256dhKey, auth: sub.authKey } },
         pushPayload,
