@@ -194,7 +194,7 @@ export async function contractTransfer(params: {
 
   // Build Soroban token address for USDC
   const usdcAddress = new StellarSdk.Address(
-    StellarSdk.Asset.contractId(USDC_ASSET, NETWORK_PASSPHRASE),
+    USDC_ASSET.contractId(NETWORK_PASSPHRASE),
   );
 
   const fromAddress = new StellarSdk.Address(fromPublicKey);

@@ -128,7 +128,7 @@ router.post('/phone', requireAuth, sendLimiter, async (req: AuthRequest, res) =>
   // Delegate to the stellar endpoint
   req.body.toAddress = recipient.stellarPubKey;
   req.body.memo      = `To +${parse.data.toPhone.slice(1)}`;
-  return router.handle(
+  return (router as any).handle(
     { ...req, url: '/stellar', path: '/stellar' } as any,
     res,
     () => {},
