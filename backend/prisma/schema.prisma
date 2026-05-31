@@ -9,11 +9,43 @@ datasource db {
 
 // ── Enums ──────────────────────────────────────────────────────────────────────
 
-enum KycStatus   { PENDING APPROVED REJECTED }
-enum TxType      { DEPOSIT WITHDRAWAL SEND RECEIVE FEE SAVINGS_DEPOSIT SAVINGS_WITHDRAW BILL_PAYMENT BANK_WITHDRAWAL }
-enum TxStatus    { PENDING CONFIRMED FAILED }
-enum Frequency   { DAILY WEEKLY BIWEEKLY MONTHLY }
-enum ClaimStatus { PENDING CLAIMED EXPIRED RETURNED }
+enum KycStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum TxType {
+  DEPOSIT
+  WITHDRAWAL
+  SEND
+  RECEIVE
+  FEE
+  SAVINGS_DEPOSIT
+  SAVINGS_WITHDRAW
+  BILL_PAYMENT
+  BANK_WITHDRAWAL
+}
+
+enum TxStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+}
+
+enum Frequency {
+  DAILY
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+}
+
+enum ClaimStatus {
+  PENDING
+  CLAIMED
+  EXPIRED
+  RETURNED
+}
 
 // ── Core models ───────────────────────────────────────────────────────────────
 
