@@ -124,7 +124,8 @@ app.get('/health', (_req, res) => res.json({
   status:  'ok',
   ts:      new Date().toISOString(),
   phase:   4,
-  version: '4.0.0',
+  version: '4.1.0',
+  build:   'chat+payments+gov',
 }));
 
 // ── Error handler ─────────────────────────────────────────────────────────────
