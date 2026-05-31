@@ -55,7 +55,7 @@ export async function sendPushToUser(userId: string, payload: NotificationPayloa
       webpush.sendNotification(
         { endpoint: sub.endpoint, keys: { p256dh: sub.p256dhKey, auth: sub.authKey } },
         pushPayload,
-      ).catch(async err => {
+      ).catch(async (err: { statusCode?: number }) => {
         // Remove invalid subscriptions (410 Gone)
         if (err.statusCode === 410) {
           await prisma.pushSubscription.delete({ where: { id: sub.id } }).catch(() => {});

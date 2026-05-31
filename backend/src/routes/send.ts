@@ -9,6 +9,8 @@ import { verifyPin } from '../services/crypto';
 const router = Router();
 const prisma = new PrismaClient();
 
+const fail = (msg: string) => ({ success: false, error: msg });
+
 const sendLimiter = rateLimit({
   windowMs: 60_000,
   max: 5,
@@ -125,13 +127,30 @@ router.post('/phone', requireAuth, sendLimiter, async (req: AuthRequest, res) =>
     });
   }
 
-  // Delegate to the stellar endpoint
-  req.body.toAddress = recipient.stellarPubKey;
-  req.body.memo      = `To +${parse.data.toPhone.slice(1)}`;
-  return (router as any).handle(
-    { ...req, url: '/stellar', path: '/stellar' } as any,
-    res,
-    () => {},
+  // Resolve phone → address then send directly
+  return res.status(200).json(
+    await (async () => {
+      const user = await prisma.user.findUnique({ where: { id: req.userId! } });
+      if (!user) return fail('User not found');
+      const validPin = await verifyPin(parse.data.pin, user.pinHash);
+      if (!validPin) return fail('Incorrect PIN');
+      const memo = `To ${parse.data.toPhone}`;
+      const hash = await contractTransfer({
+        fromEncryptedSecret: user.stellarSecret,
+        fromPin:             parse.data.pin,
+        fromPhone:           user.phone,
+        fromPublicKey:       user.stellarPubKey,
+        toPublicKey:         recipient.stellarPubKey,
+        amountUsdc:          parse.data.amount,
+        memo,
+      });
+      await prisma.transaction.create({ data: {
+        userId: req.userId!, type: 'SEND', status: 'CONFIRMED',
+        amountUsdc: parse.data.amount, stellarTxId: hash,
+        toAddress: recipient.stellarPubKey, memo,
+      }});
+      return { success: true, data: { hash, message: 'Sent successfully' } };
+    })()
   );
 });
 

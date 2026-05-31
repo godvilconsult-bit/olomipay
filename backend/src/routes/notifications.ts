@@ -56,7 +56,7 @@ router.get('/history', requireAuth, async (req: AuthRequest, res) => {
     prisma.notification.count({ where: { userId: req.userId! } }),
   ]);
 
-  return res.json(ok({ notifications, total, unread: notifications.filter((n: any) => !n.isRead).length }));
+  return res.json(ok({ notifications, total, unread: notifications.filter((n: { isRead: boolean }) => !n.isRead).length }));
 });
 
 // ── POST /api/notifications/read ─────────────────────────────────────────────
