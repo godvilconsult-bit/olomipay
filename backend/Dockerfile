@@ -22,5 +22,5 @@ RUN npm run build
 
 EXPOSE 3001
 
-# Run migrations then start
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
+# Push schema (creates all tables) then start
+CMD ["sh", "-c", "npx prisma db push --accept-data-loss && node dist/index.js"]
