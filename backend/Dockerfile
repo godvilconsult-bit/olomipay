@@ -1,7 +1,7 @@
 FROM node:20-alpine
 
-# Install OpenSSL for Prisma
-RUN apk add --no-cache openssl openssl-dev
+# Install OpenSSL + postgresql-client for Prisma
+RUN apk add --no-cache openssl openssl-dev postgresql-client
 
 WORKDIR /app
 
@@ -22,5 +22,9 @@ RUN npm run build
 
 EXPOSE 3001
 
+# Copy startup script
+COPY start.sh ./start.sh
+RUN chmod +x start.sh
+
 # Push schema (creates all tables) then start
-CMD ["sh", "-c", "npx prisma db push --accept-data-loss && node dist/index.js"]
+CMD ["sh", "start.sh"]
