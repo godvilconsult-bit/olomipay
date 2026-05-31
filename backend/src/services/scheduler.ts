@@ -25,22 +25,20 @@ function nextRunDate(frequency: string, from: Date): Date {
 export async function runScheduledPayments(): Promise<void> {
   const now = new Date();
 
-  // Guard: skip gracefully if table doesn't exist yet (pre-migration)
+  let duePmts: any[] = [];
   try {
-    await prisma.$queryRaw`SELECT 1 FROM "ScheduledPayment" LIMIT 1`;
-  } catch {
-    return; // Table not migrated yet — silent skip
-  }
-
-  const duePmts = await prisma.scheduledPayment.findMany({
+    duePmts = await prisma.scheduledPayment.findMany({
     where: {
       isActive:  true,
       nextRunAt: { lte: now },
       OR: [{ endDate: null }, { endDate: { gte: now } }],
     },
-    include: { user: true },
-    take: 50, // Process max 50 at a time
-  });
+      include: { user: true },
+      take: 50,
+    });
+  } catch {
+    return; // Tables not created yet — silent skip until migration runs
+  }
 
   if (duePmts.length === 0) return;
   console.log(`[scheduler] Processing ${duePmts.length} scheduled payments`);
