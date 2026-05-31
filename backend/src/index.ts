@@ -92,6 +92,25 @@ app.use('/api/gov',        govRouter);
 app.use('/api/bonds',      bondsRouter);
 app.use('/api/developer',  developerRouter);
 
+// ── One-time DB migration endpoint ───────────────────────────────────────────
+app.get('/setup-db', async (_req, res) => {
+  const secret = _req.query.secret;
+  if (secret !== process.env.JWT_SECRET?.slice(0, 16)) {
+    return res.status(403).json({ error: 'forbidden' });
+  }
+  try {
+    const { execSync } = await import('child_process');
+    const output = execSync('npx prisma db push --accept-data-loss', {
+      cwd: '/app',
+      encoding: 'utf8',
+      timeout: 120_000,
+    });
+    return res.json({ success: true, output });
+  } catch (e: any) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 // ── Health ────────────────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => res.json({
   status:  'ok',
