@@ -7,17 +7,22 @@ COPY package*.json ./
 COPY prisma ./prisma/
 
 # Install ALL dependencies (including dev for build)
-RUN npm install
+RUN npm install --include=dev
 
-# Generate Prisma client
+# Generate Prisma client BEFORE build
 RUN npx prisma generate
 
-# Copy source and build
+# Copy source
 COPY . .
+
+# Re-generate after full copy (ensures schema is in sync)
+RUN npx prisma generate
+
+# TypeScript build
 RUN npm run build
 
 # Expose port
 EXPOSE 3001
 
-# Start
-CMD ["node", "dist/index.js"]
+# Start — migrate then run
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
