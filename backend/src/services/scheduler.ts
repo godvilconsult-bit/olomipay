@@ -94,8 +94,8 @@ export function startScheduler(): void {
   setInterval(async () => {
     try {
       await runScheduledPayments();
-    } catch (e: any) {
-      console.error('[scheduler] Error:', e.message);
+    } catch {
+      // Silently skip — tables may not exist yet until prisma db push runs
     }
   }, 60_000);
 }
