@@ -89,7 +89,6 @@ router.post('/deposit', requireAuth, limiter, async (req: AuthRequest, res) => {
       where:  { userId: req.userId! },
       update: {
         principal:   { increment: parse.data.amountUsdc },
-        depositedAt: pos => pos.depositedAt ?? now,
         lastYieldAt: now,
       },
       create: {

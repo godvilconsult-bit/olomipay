@@ -32,7 +32,7 @@ router.post('/sync', requireAuth, async (req: AuthRequest, res) => {
     select: { phone: true, stellarPubKey: true },
   });
 
-  const registered = new Map(users.map(u => [u.phone, u.stellarPubKey]));
+  const registered = new Map(users.map((u: { phone: string; stellarPubKey: string }) => [u.phone, u.stellarPubKey]));
 
   const result = parse.data.phoneNumbers.map(phone => ({
     phone,
