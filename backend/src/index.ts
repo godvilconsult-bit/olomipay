@@ -69,7 +69,7 @@ app.use(cors({
 // Handle preflight requests
 app.options('*', cors());
 
-app.use(express.json({ limit: '10kb' }));
+app.use(express.json({ limit: '10mb' }));
 app.use(rateLimit({ windowMs: 60_000, max: 100, standardHeaders: true, legacyHeaders: false }));
 
 // ── Phase 1 + 2 Routes ────────────────────────────────────────────────────────
@@ -148,12 +148,18 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 });
 
 const httpServer = createServer(app);
-initSocket(httpServer);
+
+try {
+  initSocket(httpServer);
+  console.log('[socket] Socket.io initialized');
+} catch (e: any) {
+  console.warn('[socket] Socket.io failed to init:', e.message);
+}
 
 httpServer.listen(PORT, async () => {
   console.log(`Tuma API Phase 4 + Chat on :${PORT}`);
-  await setupDatabase();
-  startScheduler();
+  try { await setupDatabase(); } catch (e: any) { console.error('[db]', e.message); }
+  try { startScheduler(); } catch (e: any) { console.error('[scheduler]', e.message); }
 });
 
 export default app;
