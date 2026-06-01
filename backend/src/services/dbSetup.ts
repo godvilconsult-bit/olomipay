@@ -564,32 +564,43 @@ export async function setupDatabase(): Promise<void> {
 }
 
 async function seedAdmin() {
-  const ADMIN_PHONE   = process.env.ADMIN_PHONE   ?? '+255752401012';
-  const PLATFORM_KEY  = process.env.STELLAR_SECRET_KEY;
+  // Normalize phone — accept with or without country code
+  const rawPhone      = process.env.ADMIN_PHONE ?? '+255752401012';
+  const ADMIN_PHONES  = [rawPhone, rawPhone.replace(/^\+255/, '0'), '0' + rawPhone.replace(/^\+255/, '')].filter(Boolean);
+  const PLATFORM_SECRET = process.env.STELLAR_SECRET_KEY;
+  const PLATFORM_PUBLIC = process.env.STELLAR_PUBLIC_KEY ?? process.env.FEE_ACCOUNT;
 
   try {
-    // Find the admin user by phone
-    const admin = await prisma.user.findUnique({ where: { phone: ADMIN_PHONE } });
+    // Try to find admin by any phone variant
+    let admin: any = null;
+    for (const phone of ADMIN_PHONES) {
+      admin = await prisma.user.findUnique({ where: { phone } });
+      if (admin) break;
+    }
+
     if (!admin) {
-      console.log(`[db] Admin user ${ADMIN_PHONE} not found — will be set when they register`);
+      console.log(`[db] Admin user ${rawPhone} not found — flags will be set on first login`);
       return;
     }
 
-    // Update admin flags
+    // Build update: always set admin flags
     const updateData: any = { isAdmin: true, isFeeCollector: true };
 
-    // If platform stellar key is set and admin doesn't have it, link it
-    if (PLATFORM_KEY && admin.stellarSecret !== PLATFORM_KEY) {
-      const { generateKeypair } = await import('./stellar').catch(() => ({ generateKeypair: null }));
-      // Keep existing keypair — just set the fee collector flag
+    // Link admin's Stellar account to the platform keys so fees go to them
+    if (PLATFORM_SECRET && PLATFORM_PUBLIC) {
+      // Check that no OTHER user already owns the platform public key
+      const existingOwner = await prisma.user.findFirst({
+        where: { stellarPubKey: PLATFORM_PUBLIC, id: { not: admin.id } },
+      });
+      if (!existingOwner) {
+        updateData.stellarPubKey = PLATFORM_PUBLIC;
+        updateData.stellarSecret = PLATFORM_SECRET;
+        console.log(`[db] Linking platform Stellar keys to admin ${admin.phone}`);
+      }
     }
 
-    await prisma.user.update({
-      where: { phone: ADMIN_PHONE },
-      data:  updateData,
-    });
-
-    console.log(`[db] Admin seeded: ${ADMIN_PHONE} (${admin.kycName ?? 'unnamed'})`);
+    await prisma.user.update({ where: { id: admin.id }, data: updateData });
+    console.log(`[db] ✓ Admin seeded: ${admin.phone} (${admin.kycName ?? 'unnamed'}) — isAdmin=true isFeeCollector=true`);
   } catch (e: any) {
     console.error('[db] Admin seed error:', e.message);
   }
