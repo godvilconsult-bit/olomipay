@@ -152,7 +152,8 @@ router.post('/deposit', requireAuth, depositLimiter, async (req: AuthRequest, re
       status:    'PENDING',
       amountTzs,
       amountUsdc: fees.netUsdc,
-      memo: JSON.stringify({
+      memo: `${fees.channelName ?? 'Mobile Money'} deposit`,
+      metadata: JSON.stringify({
         fees,
         channelId:   fees.channelId,
         channelName: fees.channelName,
@@ -274,7 +275,8 @@ router.post('/callback', async (req, res) => {
         amountTzs:   actualAmount,
         stellarTxId: stellarHash,
         mpesaTxId:   payload.mpesaReceiptNumber ?? dbTx.mpesaTxId,
-        memo: JSON.stringify({
+        memo: 'Mobile Money deposit',
+        metadata: JSON.stringify({
           ycOrderId:    ycOrder.id,
           mpesaReceipt: payload.mpesaReceiptNumber,
           grossUsdc,
@@ -333,7 +335,8 @@ router.post('/withdraw', requireAuth, depositLimiter, async (req: AuthRequest, r
     data: {
       userId: user.id, type: 'WITHDRAWAL', status: 'PENDING',
       amountUsdc, amountTzs: fees.localPayout,
-      memo: JSON.stringify({ fees }),
+      memo: 'Withdraw to Mobile Money',
+      metadata: JSON.stringify({ fees }),
     },
   });
 
@@ -369,7 +372,8 @@ router.post('/withdraw', requireAuth, depositLimiter, async (req: AuthRequest, r
       data: {
         status: 'CONFIRMED', stellarTxId: stellarHash,
         mpesaTxId: b2cResult.conversationId,
-        memo: JSON.stringify({ ycOrderId: ycOrder.id, b2cId: b2cResult.conversationId, fees, stellarHash }),
+        memo: 'Withdraw to Mobile Money',
+        metadata: JSON.stringify({ ycOrderId: ycOrder.id, b2cId: b2cResult.conversationId, fees, stellarHash }),
       },
     });
 

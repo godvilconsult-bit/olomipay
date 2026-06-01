@@ -35,10 +35,23 @@ interface Props {
   tx: Transaction;
 }
 
+/** Use the memo only if it's a clean human label — never raw JSON / huge blobs. */
+function cleanMemo(memo?: string | null): string | null {
+  if (!memo) return null;
+  const m = memo.trim();
+  if (!m) return null;
+  // Looks like JSON or a serialized object/array — ignore it
+  if (m.startsWith('{') || m.startsWith('[') || m.includes('":')) return null;
+  // Unreasonably long for a label — ignore
+  if (m.length > 60) return null;
+  return m;
+}
+
 export default function TransactionItem({ tx }: Props) {
   const meta  = TYPE_META[tx.type];
   const Icon  = meta.icon;
   const isSent = meta.sign === '-';
+  const label = cleanMemo(tx.memo) ?? meta.label;
 
   const primaryAmount = tx.amountUsdc != null
     ? `${meta.sign}${formatUsdc(tx.amountUsdc)}`
@@ -57,7 +70,7 @@ export default function TransactionItem({ tx }: Props) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">
-            {tx.memo ?? meta.label}
+            {label}
           </p>
           <span className={STATUS_CLASS[tx.status]}>{tx.status}</span>
         </div>

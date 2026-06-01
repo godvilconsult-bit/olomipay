@@ -94,11 +94,13 @@ export async function setupDatabase(): Promise<void> {
         "stellarTxId" TEXT,
         "toAddress" TEXT,
         "memo" TEXT,
+        "metadata" TEXT,
         "errorMsg" TEXT,
         "createdAt" TIMESTAMP NOT NULL DEFAULT NOW(),
         "updatedAt" TIMESTAMP NOT NULL DEFAULT NOW()
       );
     `);
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Transaction" ADD COLUMN IF NOT EXISTS "metadata" TEXT`).catch(() => {});
 
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "BankAccount" (
