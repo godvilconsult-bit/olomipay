@@ -18,8 +18,14 @@ function isPublic(path: string): boolean {
  */
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
+
+  // Public pages (landing / auth / join) bring their own immersive backgrounds.
+  if (isPublic(path)) return <div>{children}</div>;
+
+  // Authenticated app: animated 2030 gradient-mesh backdrop behind every page.
   return (
-    <div className={isPublic(path) ? '' : 'md:ml-56 lg:ml-64'}>
+    <div className="app-canvas md:ml-56 lg:ml-64">
+      <div className="app-bg" aria-hidden />
       {children}
     </div>
   );

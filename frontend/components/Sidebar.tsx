@@ -73,32 +73,49 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="hidden md:flex flex-col w-56 lg:w-64 min-h-screen bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 fixed left-0 top-0 z-50">
+    <aside className="hidden md:flex flex-col w-56 lg:w-64 min-h-screen fixed left-0 top-0 z-50
+                      bg-[#0a1120]/95 backdrop-blur-xl border-r border-white/10 text-slate-300
+                      overflow-hidden">
+      {/* ambient glow */}
+      <div className="anim-glow pointer-events-none absolute -top-20 -left-10 h-48 w-48 rounded-full bg-blue-600/20 blur-3xl" />
+      <div className="anim-glow pointer-events-none absolute bottom-20 -right-10 h-48 w-48 rounded-full bg-emerald-500/15 blur-3xl" style={{ animationDelay: '-3s' }} />
+
       {/* Logo */}
-      <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800">
+      <div className="relative px-5 py-5 border-b border-white/10">
         <div className="flex items-center gap-2.5">
-          <img src="/logo.svg" alt="OlomiPay" className="w-9 h-9 flex-shrink-0" />
+          <div className="relative">
+            <div className="anim-glow absolute -inset-1.5 rounded-xl bg-gradient-to-tr from-blue-500/50 to-emerald-500/50 blur-md" />
+            <img src="/logo.svg" alt="OlomiPay" className="relative w-9 h-9 flex-shrink-0" />
+          </div>
           <div>
-            <p className="font-bold text-slate-800 dark:text-slate-200 text-sm leading-tight">OlomiPay</p>
-            <p className="text-[9px] text-primary leading-tight">Building Trust Through Blockchain</p>
+            <p className="font-bold text-white text-sm leading-tight">OlomiPay</p>
+            <p className="text-[9px] leading-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
+              Building Trust Through Blockchain
+            </p>
           </div>
         </div>
       </div>
 
       {/* Nav items */}
-      <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-0.5">
+      <nav className="relative flex-1 overflow-y-auto py-3 px-3 space-y-1">
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-          const active   = path === href || path.startsWith(href + '/');
+          const active    = path === href || path.startsWith(href + '/');
           const showBadge = href === '/chat' && unread > 0 && !active;
           return (
             <Link key={href} href={href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${
+              className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
                 active
-                  ? 'bg-primary text-white font-semibold'
-                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200'
+                  ? 'text-white font-semibold'
+                  : 'text-slate-400 hover:text-white hover:bg-white/5'
               }`}>
+              {/* active gradient pill */}
+              {active && (
+                <span className="absolute inset-0 -z-10 rounded-xl bg-gradient-to-r from-blue-500 to-emerald-500 shadow-lg shadow-blue-500/25" />
+              )}
+              {/* active left accent */}
+              {active && <span className="absolute -left-3 top-1/2 h-6 -translate-y-1/2 w-1 rounded-full bg-gradient-to-b from-blue-400 to-emerald-400" />}
               <div className="relative flex-shrink-0">
-                <Icon size={18} strokeWidth={active ? 2.5 : 1.8} />
+                <Icon size={18} strokeWidth={active ? 2.4 : 1.8} />
                 {showBadge && (
                   <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-0.5">
                     {unread > 99 ? '99+' : unread}
@@ -107,7 +124,7 @@ export default function Sidebar() {
               </div>
               <span className="text-sm flex-1">{label}</span>
               {showBadge && (
-                <span className="bg-red-500 text-white text-[9px] font-bold rounded-full min-w-[18px] h-4.5 flex items-center justify-center px-1 ml-auto">
+                <span className="bg-gradient-to-r from-blue-500 to-emerald-500 text-white text-[9px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 ml-auto">
                   {unread > 99 ? '99+' : unread}
                 </span>
               )}
@@ -117,9 +134,9 @@ export default function Sidebar() {
       </nav>
 
       {/* Logout */}
-      <div className="px-3 py-4 border-t border-slate-100 dark:border-slate-800">
+      <div className="relative px-3 py-4 border-t border-white/10">
         <button onClick={handleLogout}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-xl w-full text-left text-slate-500 hover:bg-red-50 hover:text-danger transition-colors">
+          className="flex items-center gap-3 px-3 py-2.5 rounded-xl w-full text-left text-slate-400 hover:bg-red-500/10 hover:text-red-400 transition-colors">
           <LogOut size={18} />
           <span className="text-sm">Sign out</span>
         </button>

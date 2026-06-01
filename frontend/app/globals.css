@@ -259,12 +259,64 @@
     radial-gradient(1000px 500px at 110% 10%, rgba(16,185,129,0.14), transparent 55%);
 }
 
+/* ═════════════════════════════════════════════════════════════════════════════
+   APP-WIDE 2030 FINTECH SKIN
+   A fixed gradient-mesh backdrop sits behind every authenticated page. Page
+   roots are made transparent so the mesh shows through; cards/headers keep
+   their own surfaces. Works in both light and dark colour schemes.
+   ═════════════════════════════════════════════════════════════════════════════ */
+.app-bg {
+  position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden;
+  /* Light-mode default: airy, cool, premium */
+  background:
+    radial-gradient(900px 600px at 8% -5%,  rgba(59,130,246,0.10), transparent 60%),
+    radial-gradient(800px 600px at 100% 5%, rgba(16,185,129,0.10), transparent 55%),
+    radial-gradient(700px 700px at 50% 110%, rgba(139,92,246,0.08), transparent 55%),
+    linear-gradient(180deg, #f5f8ff 0%, #eef2fb 100%);
+}
+.app-bg::before {
+  content: ''; position: absolute; inset: -20%;
+  background:
+    radial-gradient(40vmax 40vmax at 15% 20%, rgba(59,130,246,0.10), transparent 60%),
+    radial-gradient(38vmax 38vmax at 85% 30%, rgba(16,185,129,0.10), transparent 60%);
+  animation: auroraDrift 22s ease-in-out infinite;
+}
+@media (prefers-color-scheme: dark) {
+  .app-bg {
+    background:
+      radial-gradient(900px 600px at 8% -5%,  rgba(59,130,246,0.16), transparent 60%),
+      radial-gradient(800px 600px at 100% 5%, rgba(16,185,129,0.14), transparent 55%),
+      radial-gradient(700px 700px at 50% 110%, rgba(139,92,246,0.12), transparent 55%),
+      linear-gradient(180deg, #070d1a 0%, #0a1120 100%);
+  }
+}
+
+/* Make authenticated page roots transparent so the mesh shows through.
+   (Cards, sticky headers, sheets keep their own bg — they aren't min-h-screen.) */
+.app-canvas .min-h-screen { background-color: transparent !important; }
+
+/* Soften the flat card surfaces into glassy 2030 panels app-wide */
+.app-canvas .card {
+  background-color: rgba(255,255,255,0.72);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.6);
+  box-shadow: 0 8px 30px -12px rgba(30,58,138,0.18);
+}
+@media (prefers-color-scheme: dark) {
+  .app-canvas .card {
+    background-color: rgba(255,255,255,0.05);
+    border-color: rgba(255,255,255,0.08);
+    box-shadow: 0 8px 30px -12px rgba(0,0,0,0.6);
+  }
+}
+
 /* Respect reduced-motion preference */
 @media (prefers-reduced-motion: reduce) {
   .anim-float, .anim-float-slow, .anim-aurora, .anim-glow, .anim-spin-slow,
   .anim-marquee, .anim-pop, .reveal, .reveal.in-view, .hero-rise,
   .text-gradient-anim, .msg-in-right, .msg-in-left, .presence-ring,
-  .heart-float { animation: none !important; opacity: 1 !important; }
+  .heart-float, .app-bg::before { animation: none !important; opacity: 1 !important; }
   .reveal { opacity: 1 !important; }
 }
 
