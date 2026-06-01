@@ -4,8 +4,8 @@ import Sidebar from '../components/Sidebar';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title:       'OlomiPay — Send money instantly',
-  description: 'Bridge M-Pesa Tanzania with global Stellar payments. Send TZS, receive USDC worldwide.',
+  title:       'OlomiPay — Building Trust Through Blockchain',
+  description: 'OlomiPay — Send money instantly via M-Pesa, chat with friends, earn interest. Building Trust Through Blockchain.',
   manifest:    '/manifest.json',
   appleWebApp: {
     capable:           true,

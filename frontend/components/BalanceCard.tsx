@@ -52,58 +52,49 @@ export default function BalanceCard({ publicKey }: Props) {
   }
 
   return (
-    <div className="card bg-gradient-to-br from-[#1a56db] to-[#1e40af] text-white relative overflow-hidden">
+    <div className="card bg-gradient-to-br from-[#1a3a6b] to-[#1a56db] text-white relative overflow-hidden">
       {/* Decorative circles */}
       <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/5 rounded-full" />
       <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-white/5 rounded-full" />
+      {/* Logo watermark */}
+      <img src="/logo.svg" alt="" className="absolute -right-4 -bottom-4 w-24 h-24 opacity-10" />
 
       <div className="relative z-10">
         <div className="flex items-center justify-between mb-3">
-          <span className="text-sm font-medium text-white/70">Total Balance</span>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => load(true)}
-              className="p-1.5 rounded-full hover:bg-white/10 transition-colors min-h-[32px] min-w-[32px] flex items-center justify-center"
-              aria-label="Refresh balance"
-            >
+            <img src="/logo.svg" alt="OlomiPay" className="w-5 h-5" />
+            <span className="text-sm font-medium text-white/80">Olomi Wallet</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => load(true)}
+              className="p-1.5 rounded-full hover:bg-white/10 min-h-[32px] min-w-[32px] flex items-center justify-center">
               <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
             </button>
-            <button
-              onClick={() => setHidden(h => !h)}
-              className="p-1.5 rounded-full hover:bg-white/10 transition-colors min-h-[32px] min-w-[32px] flex items-center justify-center"
-              aria-label={hidden ? 'Show balance' : 'Hide balance'}
-            >
+            <button onClick={() => setHidden(h => !h)}
+              className="p-1.5 rounded-full hover:bg-white/10 min-h-[32px] min-w-[32px] flex items-center justify-center">
               {hidden ? <EyeOff size={14} /> : <Eye size={14} />}
             </button>
           </div>
         </div>
 
-        {/* Primary balance — USDC */}
+        {/* Primary balance */}
         <div className="mb-1">
           <span className="text-4xl font-bold tracking-tight">
             {hidden ? '••••••' : formatUsdc(usdcNum)}
           </span>
-          <span className="ml-2 text-lg font-medium text-white/70">USDC</span>
+          <span className="ml-2 text-lg font-medium text-white/70">USD</span>
         </div>
 
         {/* TZS equivalent */}
         <div className="text-sm text-white/60 mb-4">
-          ≈ {hidden ? '•••' : formatTzs(tzsEquiv)}
+          ≈ {hidden ? '•••' : formatTzs(tzsEquiv)} TZS
         </div>
 
-        {/* XLM sub-balance */}
+        {/* Coins balance — no Stellar mention */}
         <div className="flex items-center gap-2 text-xs text-white/50">
-          <span>{hidden ? '••' : `${parseFloat(xlm ?? '0').toFixed(2)} XLM`}</span>
+          <span>{hidden ? '••' : `${parseFloat(xlm ?? '0').toFixed(2)} coins`}</span>
           <span>·</span>
-          <span>Stellar Network</span>
-          {publicKey && (
-            <>
-              <span>·</span>
-              <span className="font-mono">
-                {publicKey.slice(0, 4)}...{publicKey.slice(-4)}
-              </span>
-            </>
-          )}
+          <span>OlomiPay · Building Trust Through Blockchain</span>
         </div>
       </div>
     </div>

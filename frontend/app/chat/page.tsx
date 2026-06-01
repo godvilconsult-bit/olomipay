@@ -134,8 +134,8 @@ export default function ChatPage() {
       const matched = await pickAndMatchContacts();
       setContacts(matched);
       setContactsLoaded(true);
-      if (matched.length === 0) toast('None of your contacts are on Tuma yet.', { icon: '📱' });
-      else toast.success(`${matched.length} contacts found on Tuma!`);
+      if (matched.length === 0) toast('None of your contacts are on OlomiPay yet.', { icon: '📱' });
+      else toast.success(`${matched.length} contacts found on OlomiPay!`);
     } catch (e: any) {
       toast.error('Could not load contacts. Try Chrome on Android.');
     } finally {
@@ -144,8 +144,8 @@ export default function ChatPage() {
   }
 
   function shareInvite() {
-    const msg = `Join me on Tuma — send money, chat, and do business instantly! ${inviteLink}`;
-    if (navigator.share) navigator.share({ title: 'Join Tuma', text: msg, url: inviteLink });
+    const msg = `Join me on OlomiPay — send money, chat, and do business instantly! ${inviteLink}`;
+    if (navigator.share) navigator.share({ title: 'Join OlomiPay', text: msg, url: inviteLink });
     else { navigator.clipboard.writeText(msg); toast.success('Invite link copied!'); }
   }
 
@@ -156,7 +156,7 @@ export default function ChatPage() {
       {/* Header */}
       <div className="sticky top-0 z-40 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800">
         <div className="px-4 py-3 flex items-center gap-3">
-          <h1 className="text-xl font-bold flex-1">Tuma Chat</h1>
+          <h1 className="text-xl font-bold flex-1">OlomiPay Chat</h1>
           <button onClick={shareInvite}
             className="flex items-center gap-1.5 bg-primary/10 text-primary px-3 py-1.5 rounded-full text-xs font-semibold">
             <UserPlus size={14} /> Invite
@@ -187,7 +187,7 @@ export default function ChatPage() {
               <MessageCircle size={36} className="text-primary" />
             </div>
             <h3 className="font-bold text-lg mb-2">No conversations yet</h3>
-            <p className="text-slate-400 text-sm mb-6">Go to People tab to find Tuma users and start chatting</p>
+            <p className="text-slate-400 text-sm mb-6">Go to People tab to find OlomiPay users and start chatting</p>
             <button onClick={() => setTab('people')} className="btn-primary px-8">Find People</button>
             <button onClick={shareInvite} className="mt-3 flex items-center gap-2 text-sm text-primary">
               <Share2 size={14}/> Invite friends
@@ -247,11 +247,11 @@ export default function ChatPage() {
                   <Phone size={18} className="text-amber-600" />
                 </div>
                 <div className="flex-1">
-                  <p className="font-semibold text-sm text-amber-800 mb-1">This number is not on Tuma</p>
+                  <p className="font-semibold text-sm text-amber-800 mb-1">This number is not on OlomiPay</p>
                   <p className="text-xs text-amber-600 mb-3">Send them an invite link so they can join and chat with you</p>
                   <button onClick={() => {
-                    const msg = `Hey! I'm inviting you to Tuma — send money and chat instantly. Join free: ${inviteLink}`;
-                    if (navigator.share) navigator.share({ title: 'Join Tuma', text: msg, url: inviteLink });
+                    const msg = `Hey! I'm inviting you to OlomiPay — send money and chat instantly. Join free: ${inviteLink}`;
+                    if (navigator.share) navigator.share({ title: 'Join OlomiPay', text: msg, url: inviteLink });
                     else { navigator.clipboard.writeText(msg); toast.success('Invite message copied!'); }
                   }} className="flex items-center gap-2 bg-amber-500 text-white text-sm font-semibold px-4 py-2 rounded-xl">
                     <Share2 size={14}/> Send invite link
@@ -286,8 +286,8 @@ export default function ChatPage() {
                         <BookUser size={18} className="text-primary" />
                       </div>
                       <div className="flex-1">
-                        <p className="text-sm font-semibold">Find your contacts on Tuma</p>
-                        <p className="text-xs text-slate-400 mt-0.5">See which of your saved contacts are already on Tuma</p>
+                        <p className="text-sm font-semibold">Find your contacts on OlomiPay</p>
+                        <p className="text-xs text-slate-400 mt-0.5">See which of your saved contacts are already on OlomiPay</p>
                       </div>
                       <button onClick={loadContacts} className="bg-primary text-white text-xs font-bold px-3 py-2 rounded-xl flex-shrink-0">
                         Sync
@@ -303,7 +303,7 @@ export default function ChatPage() {
 
               {contactsLoaded && contacts.length > 0 && (
                 <>
-                  <p className="px-4 pb-1 text-xs text-slate-400">{contacts.length} of your contacts are on Tuma</p>
+                  <p className="px-4 pb-1 text-xs text-slate-400">{contacts.length} of your contacts are on OlomiPay</p>
                   {contacts.map(c => <ContactRow key={c.id} contact={c} onChat={() => startChat(c.id)} />)}
                   <div className="mx-4 my-2 border-b border-slate-100 dark:border-slate-800" />
                 </>
@@ -311,14 +311,14 @@ export default function ChatPage() {
 
               {contactsLoaded && contacts.length === 0 && (
                 <div className="mx-4 mb-3 bg-slate-50 dark:bg-slate-800 rounded-2xl p-4 text-center">
-                  <p className="text-sm text-slate-400">None of your contacts are on Tuma yet</p>
+                  <p className="text-sm text-slate-400">None of your contacts are on OlomiPay yet</p>
                   <button onClick={shareInvite} className="text-xs text-primary font-semibold mt-2">Invite them →</button>
                 </div>
               )}
             </div>
           )}
 
-          {/* All Tuma users */}
+          {/* All OlomiPay users */}
           {searching && displayedUsers.length === 0 ? (
             <div className="flex justify-center py-10"><Loader2 size={20} className="animate-spin text-slate-300" /></div>
           ) : displayedUsers.length === 0 && query.length >= 2 ? (
@@ -326,14 +326,14 @@ export default function ChatPage() {
               <Users size={36} className="mx-auto mb-3 text-slate-200" />
               <p className="text-sm text-slate-400 mb-4">No user found for "{query}"</p>
               <button onClick={shareInvite} className="flex items-center gap-2 mx-auto text-sm text-primary font-semibold">
-                <Share2 size={14}/> Invite them to Tuma
+                <Share2 size={14}/> Invite them to OlomiPay
               </button>
             </div>
           ) : (
             <>
               {!query && displayedUsers.length > 0 && (
                 <p className="px-4 pt-1 pb-2 text-xs font-semibold text-slate-400 uppercase tracking-wide">
-                  All Tuma users ({displayedUsers.length})
+                  All OlomiPay users ({displayedUsers.length})
                 </p>
               )}
               {displayedUsers.map(user => {
@@ -345,7 +345,7 @@ export default function ChatPage() {
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-sm truncate">{name}</p>
                       <p className="text-xs text-slate-400">
-                        {user.isOnline ? '🟢 Online now' : user.lastSeenAt ? `Last seen ${timeAgo(user.lastSeenAt)}` : 'Tuma user'}
+                        {user.isOnline ? '🟢 Online now' : user.lastSeenAt ? `Last seen ${timeAgo(user.lastSeenAt)}` : 'OlomiPay user'}
                       </p>
                     </div>
                     <div className="bg-primary text-white text-xs font-semibold px-3 py-1.5 rounded-full flex-shrink-0">Chat</div>

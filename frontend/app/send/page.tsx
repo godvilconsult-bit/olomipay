@@ -99,7 +99,7 @@ export default function SendPage() {
               <label className="text-sm font-medium text-slate-600 dark:text-slate-400">To</label>
               <input
                 type="text"
-                placeholder="+255712345678 or G... Stellar address"
+                placeholder="+255712345678 or wallet address"
                 value={recipient}
                 onChange={e => setRecipient(e.target.value.trim())}
                 className="input"
@@ -112,8 +112,8 @@ export default function SendPage() {
                     : 'text-success'
                 }`}>
                   {recipientType === 'phone'    ? '✓ Tanzania phone number' :
-                   recipientType === 'stellar'  ? '✓ Stellar address'       :
-                   '✗ Not a valid phone or Stellar address'}
+                   recipientType === 'stellar'  ? '✓ Valid wallet address' :
+                   '✗ Not a valid phone or wallet address'}
                 </p>
               )}
             </div>

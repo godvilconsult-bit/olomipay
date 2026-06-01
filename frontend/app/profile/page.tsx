@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Copy, LogOut, Shield, Camera, Wallet, ExternalLink, RefreshCw, Edit2, Check } from 'lucide-react';
+import { ArrowLeft, Copy, LogOut, Shield, Camera, Wallet, RefreshCw, Edit2, Check } from 'lucide-react';
 import BottomNav from '../../components/BottomNav';
 import { auth, clearTokens } from '../../lib/api';
 
@@ -173,78 +173,74 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* ── Stellar Wallet ── */}
+        {/* ── Olomi Wallet ── */}
         <div className="bg-white dark:bg-slate-800 rounded-3xl p-5 space-y-4">
           <div className="flex items-center gap-2 mb-1">
             <Wallet size={18} className="text-primary" />
-            <h3 className="font-semibold">Stellar Wallet</h3>
-            <span className={`ml-auto text-xs px-2 py-0.5 rounded-full font-medium ${
-              wallet?.network === 'mainnet' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
-            }`}>
-              {wallet?.network === 'mainnet' ? 'Mainnet' : 'Testnet'}
-            </span>
+            <h3 className="font-semibold">Olomi Wallet</h3>
+            <span className="ml-auto text-xs px-2 py-0.5 rounded-full font-medium bg-green-100 text-green-700">Active</span>
           </div>
 
           {/* Balances */}
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-slate-50 dark:bg-slate-700 rounded-2xl p-3 text-center">
-              <p className="text-xs text-slate-400 mb-1">USDC Balance</p>
+              <p className="text-xs text-slate-400 mb-1">USD Balance</p>
               <p className="font-bold text-lg">${parseFloat(wallet?.balance?.usdc ?? '0').toFixed(2)}</p>
             </div>
             <div className="bg-slate-50 dark:bg-slate-700 rounded-2xl p-3 text-center">
-              <p className="text-xs text-slate-400 mb-1">XLM Balance</p>
+              <p className="text-xs text-slate-400 mb-1">Coins Balance</p>
               <p className="font-bold text-lg">{parseFloat(wallet?.balance?.xlm ?? '0').toFixed(2)}</p>
             </div>
           </div>
 
-          {/* Wallet address */}
+          {/* Wallet ID — no Stellar mention */}
           <div className="bg-slate-50 dark:bg-slate-700 rounded-2xl p-3">
-            <p className="text-xs text-slate-400 mb-1">Your Stellar Address</p>
+            <p className="text-xs text-slate-400 mb-1">Your Wallet ID</p>
             <p className="font-mono text-xs text-slate-600 dark:text-slate-300 break-all leading-relaxed">
               {wallet?.address}
             </p>
             <div className="flex gap-2 mt-2">
               <button onClick={copyAddress}
                 className="flex items-center gap-1.5 text-xs text-primary font-semibold bg-primary/10 px-3 py-1.5 rounded-xl">
-                <Copy size={12} /> Copy
+                <Copy size={12} /> Copy ID
               </button>
-              <a href={wallet?.explorerUrl} target="_blank" rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-xs text-slate-500 font-semibold bg-slate-100 dark:bg-slate-600 px-3 py-1.5 rounded-xl">
-                <ExternalLink size={12} /> Explorer
-              </a>
-              {wallet?.network === 'testnet' && !wallet?.funded && (
+              {wallet?.network === 'testnet' && (
                 <button onClick={fundWallet}
                   className="flex items-center gap-1.5 text-xs text-amber-600 font-semibold bg-amber-50 px-3 py-1.5 rounded-xl ml-auto">
-                  <RefreshCw size={12} /> Fund (testnet)
+                  <RefreshCw size={12} /> Activate
                 </button>
               )}
             </div>
           </div>
 
           <p className="text-xs text-slate-400 text-center">
-            Your wallet address is automatically linked to {user?.phone}
+            Your Olomi Wallet is linked to {user?.phone}
           </p>
         </div>
 
-        {/* ── M-Pesa → USDC/XLM info ── */}
-        <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-3xl p-5 text-white">
-          <h3 className="font-bold mb-1">M-Pesa → USDC / XLM</h3>
+        {/* ── M-Pesa → Olomi Wallet info ── */}
+        <div className="bg-gradient-to-r from-[#1a3a6b] to-[#1a56db] rounded-3xl p-5 text-white">
+          <div className="flex items-center gap-2 mb-2">
+            <img src="/logo.svg" alt="" className="w-6 h-6" />
+            <h3 className="font-bold">M-Pesa → Olomi Wallet</h3>
+          </div>
           <p className="text-sm text-white/80 mb-3">
-            When you deposit via M-Pesa, your TZS is automatically converted to USDC in your Stellar wallet. You can then swap USDC → XLM anytime.
+            Deposit via M-Pesa and your money is instantly available in your Olomi Wallet. Send, save, or convert anytime.
           </p>
           <div className="space-y-2">
-            <div className="flex items-center gap-2 bg-white/20 rounded-xl p-2.5 text-sm">
-              <span>1.</span><span>Go to <strong>Deposit</strong> → enter amount → pay via M-Pesa STK push</span>
-            </div>
-            <div className="flex items-center gap-2 bg-white/20 rounded-xl p-2.5 text-sm">
-              <span>2.</span><span>TZS automatically converts to <strong>USDC</strong> in your wallet</span>
-            </div>
-            <div className="flex items-center gap-2 bg-white/20 rounded-xl p-2.5 text-sm">
-              <span>3.</span><span>Use <strong>Swap</strong> to convert USDC ↔ XLM on Stellar DEX</span>
-            </div>
+            {[
+              'Go to Deposit → enter amount → pay via M-Pesa',
+              'Money is instantly credited to your Olomi Wallet',
+              'Send to anyone, save for interest, or convert currencies',
+            ].map((s, i) => (
+              <div key={i} className="flex items-center gap-2 bg-white/20 rounded-xl p-2.5 text-sm">
+                <span className="w-5 h-5 bg-white/30 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">{i+1}</span>
+                <span>{s}</span>
+              </div>
+            ))}
           </div>
           <button onClick={() => router.push('/deposit')}
-            className="mt-4 w-full bg-white text-green-600 font-bold py-3 rounded-2xl text-sm">
+            className="mt-4 w-full bg-white text-primary font-bold py-3 rounded-2xl text-sm">
             Deposit via M-Pesa →
           </button>
         </div>

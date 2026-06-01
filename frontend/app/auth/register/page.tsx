@@ -41,7 +41,7 @@ export default function RegisterPage() {
     try {
       const data = await auth.register(phone, pin, name);
       setTokens(data.accessToken, data.refreshToken);
-      toast.success(`Welcome to Tuma, ${name || 'friend'}! 🎉`);
+      toast.success(`Welcome to OlomiPay, ${name || 'friend'}! 🎉`);
       router.push('/dashboard');
     } catch (err: any) {
       toast.error(err.message ?? 'Registration failed. Please try again.');

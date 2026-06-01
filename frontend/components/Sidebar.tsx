@@ -44,12 +44,12 @@ export default function Sidebar() {
   return (
     <aside className="hidden lg:flex flex-col w-64 min-h-screen bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 fixed left-0 top-0 z-50">
       {/* Logo */}
-      <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-800">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-primary rounded-2xl flex items-center justify-center text-white font-bold text-lg">T</div>
+      <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800">
+        <div className="flex items-center gap-2.5">
+          <img src="/logo.svg" alt="OlomiPay" className="w-9 h-9 flex-shrink-0" />
           <div>
-            <p className="font-bold text-slate-800 dark:text-slate-200">Tuma</p>
-            <p className="text-xs text-slate-400">Digital Wallet</p>
+            <p className="font-bold text-slate-800 dark:text-slate-200 text-sm leading-tight">OlomiPay</p>
+            <p className="text-[9px] text-primary leading-tight">Building Trust Through Blockchain</p>
           </div>
         </div>
       </div>

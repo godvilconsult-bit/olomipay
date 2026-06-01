@@ -1,7 +1,7 @@
 {
-  "name": "OlomiPay — M-Pesa × Stellar",
+  "name": "OlomiPay — Building Trust Through Blockchain",
   "short_name": "OlomiPay",
-  "description": "Send money globally via M-Pesa and Stellar USDC",
+  "description": "Send money instantly, chat with friends, earn interest. Building Trust Through Blockchain.",
   "start_url": "/dashboard",
   "display": "standalone",
   "orientation": "portrait",

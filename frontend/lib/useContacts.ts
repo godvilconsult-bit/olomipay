@@ -10,7 +10,7 @@
 const API = process.env.NEXT_PUBLIC_API_URL;
 
 export type TumaContact = {
-  id:           string;      // Tuma user ID
+  id:           string;      // OlomiPay user ID
   phone:        string;      // normalized E.164
   savedName:    string;      // name from phone's contacts
   kycName:      string | null;
@@ -31,7 +31,7 @@ export function isContactPickerSupported(): boolean {
 }
 
 /**
- * Open the native contact picker and return Tuma users
+ * Open the native contact picker and return OlomiPay users
  * that match numbers in the user's phonebook.
  * Each result includes the contact's saved name.
  */
@@ -59,7 +59,7 @@ export async function pickAndMatchContacts(): Promise<TumaContact[]> {
 
   const phones = entries.map(e => e.phone);
 
-  // Ask backend which ones are registered on Tuma
+  // Ask backend which ones are registered on OlomiPay
   const res = await fetch(`${API}/api/invite/match-contacts`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },

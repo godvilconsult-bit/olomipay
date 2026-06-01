@@ -7,7 +7,7 @@ import Link from 'next/link';
 function JoinContent() {
   const params   = useSearchParams();
   const ref      = params.get('ref') ?? '';
-  const fromName = params.get('from') ?? 'A Tuma user';
+  const fromName = params.get('from') ?? 'A OlomiPay user';
   const [inviter, setInviter] = useState(fromName);
 
   useEffect(() => {
@@ -28,7 +28,7 @@ function JoinContent() {
         <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center text-white text-3xl font-bold mx-auto mb-4">T</div>
         <div className="mb-6">
           <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">👋</div>
-          <h1 className="text-xl font-bold text-slate-800 mb-2">{inviter} invited you to Tuma!</h1>
+          <h1 className="text-xl font-bold text-slate-800 mb-2">{inviter} invited you to OlomiPay!</h1>
           <p className="text-slate-500 text-sm leading-relaxed">
             Tuma is the all-in-one app for sending money, chatting with friends, and running your business.
           </p>
@@ -53,7 +53,7 @@ function JoinContent() {
         <Link href="/auth/login" className="block text-sm text-slate-400 hover:text-primary transition-colors">
           Already have an account? Sign in
         </Link>
-        <p className="text-xs text-slate-300 mt-4">Tuma · Secure · Fast</p>
+        <p className="text-xs text-slate-300 mt-4">OlomiPay · Secure · Fast</p>
       </div>
     </div>
   );
