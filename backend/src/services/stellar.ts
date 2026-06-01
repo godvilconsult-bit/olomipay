@@ -41,26 +41,29 @@ const rpcServer = new StellarSdk.SorobanRpc.Server(SOROBAN_RPC_URL, { allowHttp:
 // ── Platform (anchor) keypair ──────────────────────────────────────────────────
 
 function getPlatformKeypair(): StellarSdk.Keypair {
-  return StellarSdk.Keypair.fromSecret(process.env.STELLAR_SECRET_KEY!);
+  const secret = process.env.STELLAR_SECRET_KEY;
+  if (!secret) throw new Error('STELLAR_SECRET_KEY not set in environment variables');
+  return StellarSdk.Keypair.fromSecret(secret);
 }
 
 // ── Fee wallet ─────────────────────────────────────────────────────────────────
 // The fee wallet is the Stellar address that receives all 1% platform fees.
-// Configured via FEE_WALLET_PUBLIC (public key) and FEE_WALLET_SECRET (to sign).
-// Falls back to STELLAR_PUBLIC_KEY / STELLAR_SECRET_KEY if not separately set.
+// Priority: FEE_WALLET_PUBLIC → FEE_ACCOUNT → STELLAR_PUBLIC_KEY
 //
-// On testnet: both can be the same address — fees stay in platform wallet.
-// On mainnet: you should use a SEPARATE keypair so fees are clearly segregated.
+// NEVER calls getPlatformKeypair() here — that crashes if STELLAR_SECRET_KEY
+// is missing. Public key lookup must not require the secret.
 //
-// The fee wallet MUST have a USDC trustline. Call setupFeeWallet() once
-// or use POST /api/admin/fee-wallet/setup to configure it automatically.
+// On testnet: same address as platform wallet is fine.
+// On mainnet: use a SEPARATE keypair for clean accounting.
+//
+// The fee wallet MUST have a USDC trustline. Use POST /api/admin/fee-wallet/setup.
 
 export function getFeeWalletPublic(): string {
   return (
-    process.env.FEE_WALLET_PUBLIC   ??
-    process.env.FEE_ACCOUNT         ??
-    process.env.STELLAR_PUBLIC_KEY  ??
-    getPlatformKeypair().publicKey()
+    process.env.FEE_WALLET_PUBLIC  ??
+    process.env.FEE_ACCOUNT        ??
+    process.env.STELLAR_PUBLIC_KEY ??
+    '' // empty string — caller must check and handle gracefully
   );
 }
 
