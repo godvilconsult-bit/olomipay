@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import Reveal from '../components/Reveal';
 import CountUp from '../components/CountUp';
+import SpeedRace from '../components/SpeedRace';
 
 /* Pan-African rails we ride — proof of reach (scrolling ticker) */
 const RAILS = [
@@ -199,6 +200,9 @@ export default function LandingPage() {
               </div>
 
               <h3 className="mb-4 text-lg font-semibold leading-snug">{p.headline}</h3>
+
+              {/* Animated speed race — only on the SPEED pillar */}
+              {p.tag === 'SPEED' && <SpeedRace />}
 
               {/* Them */}
               <div className="mb-3 rounded-2xl border border-white/5 bg-white/[0.02] p-3">
