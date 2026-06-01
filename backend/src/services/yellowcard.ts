@@ -1,29 +1,88 @@
 /**
  * Yellow Card Business API — Liquidity Provider
  *
- * Yellow Card is a licensed crypto exchange operating in Tanzania, Kenya,
- * Uganda, Ghana, Nigeria, Zambia and 17 other African countries.
- * They accept local mobile money / bank transfers and settle in USDC on Stellar.
+ * Reference: https://docs.yellowcard.engineering/reference/get-channels
  *
- * API docs: https://developers.yellowcard.io
+ * ── AUTHENTICATION (YcHmacV1) ──────────────────────────────────────────────────
+ * Every request needs two headers:
  *
- * ── TESTNET BEHAVIOUR ───────────────────────────────────────────────────────────
- * When YELLOWCARD_ENV=sandbox, this service runs in simulation mode:
- *   - No real API calls are made
- *   - Exchange rates are fetched from a free public API (same as production)
- *   - Order creation is simulated with realistic delays
- *   - All fee breakdowns are IDENTICAL to what mainnet will produce
- *   - The USDC credit to the user is real (on Stellar testnet)
+ *   X-YC-Timestamp: <ISO8601 datetime>              e.g. 2024-01-11T15:48:37.424Z
+ *   Authorization:  YcHmacV1 <apiKey>:<signature>   e.g. YcHmacV1 myKey:base64sig==
  *
- * This means everything you see during testnet accurately mirrors mainnet —
- * rates, fees, spreads, settlement times. Only real money is absent.
+ * Signature is base64(HMAC-SHA256(signingString, secretKey)) where:
  *
- * ── PRODUCTION SETUP ───────────────────────────────────────────────────────────
- * 1. Apply at https://yellowcard.io/business
- * 2. Get YELLOWCARD_API_KEY and YELLOWCARD_SECRET
- * 3. Set YELLOWCARD_ENV=production
- * 4. Set YELLOWCARD_CHANNEL_ID to your approved channel ID per currency
- * 5. The code below needs zero changes — just env vars
+ *   signingString = timestamp + path + METHOD + bodyHash
+ *
+ *   - timestamp  = same ISO8601 value used in X-YC-Timestamp header
+ *   - path       = request path only (no host), e.g. /business/channels
+ *   - METHOD     = uppercase HTTP method, e.g. GET, POST
+ *   - bodyHash   = base64(sha256(requestBody)) for POST/PUT; empty string for GET
+ *
+ *   Example string to sign:
+ *     "2022-01-11T15:48:37.424Z/business/channelsGET"
+ *     "2022-01-11T15:48:37.424Z/business/paymentsPOSTuisbibf/sadf+=="
+ *
+ * ── ENDPOINTS ─────────────────────────────────────────────────────────────────
+ *   Sandbox:    https://sandbox.api.yellowcard.io
+ *   Production: https://api.yellowcard.io
+ *
+ *   GET  /business/channels          → list all supported channels
+ *   GET  /business/networks?channelId=  → networks for a channel
+ *   GET  /business/rates?channelId=     → live rates for a channel
+ *   POST /business/payments          → create a payment (deposit or withdrawal)
+ *   GET  /business/payments/:id      → get payment status
+ *
+ * ── CHANNEL OBJECT ────────────────────────────────────────────────────────────
+ * {
+ *   id:            string    — use this as channelId in payment requests
+ *   name:          string    — human-readable name e.g. "M-Pesa Tanzania"
+ *   country:       string    — ISO-2 country code e.g. "TZ"
+ *   currency:      string    — ISO-3 currency code e.g. "TZS"
+ *   type:          string    — "momo" | "bank" | "card"
+ *   status:        string    — "active" | "inactive"  ← filter out inactive!
+ *   widgetStatus:  string    — "active" | "inactive"  (for widget integrations)
+ *   minAmount:     number    — minimum transaction in local currency
+ *   maxAmount:     number    — maximum transaction in local currency
+ *   fixedFee:      number    — fixed fee in local currency
+ *   percentFee:    number    — percentage fee (0–100)
+ *   networks: [{             — mobile operators / banks within this channel
+ *     id:          string
+ *     name:        string
+ *     status:      string
+ *   }]
+ * }
+ *
+ * ── PAYMENT REQUEST ───────────────────────────────────────────────────────────
+ * POST /business/payments
+ * {
+ *   channelId:    string      — from GET /business/channels
+ *   sequenceId:   string      — your idempotency key (internal tx ID)
+ *   localAmount:  number      — amount in local currency
+ *   currency:     string      — e.g. "TZS"
+ *   country:      string      — e.g. "TZ"
+ *   destination: {
+ *     accountType:  "mobile_money" | "bank" | "crypto"
+ *     network?:     string    — networkId from GET /business/networks
+ *     accountNumber?: string  — phone / account number
+ *     accountName?:  string
+ *     address?:     string    — Stellar address (for crypto destinations)
+ *     asset?:       string    — "USDC" (for crypto destinations)
+ *     blockchain?:  string    — "stellar"
+ *   }
+ *   source?: {
+ *     accountType:  "mobile_money" | "bank" | "crypto"
+ *     accountNumber?: string
+ *     network?:     string
+ *   }
+ * }
+ *
+ * ── SANDBOX SIMULATION ────────────────────────────────────────────────────────
+ * When YELLOWCARD_ENV=sandbox:
+ *   - Real API calls are made to sandbox.api.yellowcard.io
+ *   - No real money moves
+ *   - Channels/rates are real but sandbox payments are simulated
+ *   - If no API key yet: service falls back to rate simulation using
+ *     exchangerate-api.com with identical fee math to production
  */
 
 import axios, { AxiosInstance } from 'axios';
@@ -31,244 +90,253 @@ import crypto from 'crypto';
 
 // ── Config ─────────────────────────────────────────────────────────────────────
 
-const IS_SANDBOX  = (process.env.YELLOWCARD_ENV ?? 'sandbox') !== 'production';
+export const IS_SANDBOX  = (process.env.YELLOWCARD_ENV ?? 'sandbox') !== 'production';
+export const isYCSandbox = IS_SANDBOX;
+
 const BASE_URL    = IS_SANDBOX
   ? 'https://sandbox.api.yellowcard.io'
   : 'https://api.yellowcard.io';
 
 const API_KEY    = process.env.YELLOWCARD_API_KEY    ?? '';
 const API_SECRET = process.env.YELLOWCARD_SECRET     ?? '';
+const HAS_KEYS   = Boolean(API_KEY && API_SECRET);
 
-// ── Currency → Yellow Card channel ID mapping ──────────────────────────────────
-// These are your approved channel IDs from the Yellow Card dashboard.
-// Each channel represents a specific mobile money provider + currency pair.
-// In sandbox they are demo IDs; in production you get real ones after approval.
-const CHANNEL_IDS: Record<string, string> = {
-  TZS_MPESA:       process.env.YC_CHANNEL_TZS_MPESA       ?? 'demo-tz-mpesa',
-  TZS_TIGOPESA:    process.env.YC_CHANNEL_TZS_TIGOPESA    ?? 'demo-tz-tigo',
-  TZS_AIRTELMONEY: process.env.YC_CHANNEL_TZS_AIRTEL      ?? 'demo-tz-airtel',
-  KES_MPESA:       process.env.YC_CHANNEL_KES_MPESA       ?? 'demo-ke-mpesa',
-  UGX_MTNMOMO:     process.env.YC_CHANNEL_UGX_MTN         ?? 'demo-ug-mtn',
-  UGX_AIRTELMONEY: process.env.YC_CHANNEL_UGX_AIRTEL      ?? 'demo-ug-airtel',
-  GHS_MTN:         process.env.YC_CHANNEL_GHS_MTN         ?? 'demo-gh-mtn',
-  ZMW_MTN:         process.env.YC_CHANNEL_ZMW_MTN         ?? 'demo-zm-mtn',
-  NGN_BANK:        process.env.YC_CHANNEL_NGN_BANK        ?? 'demo-ng-bank',
-};
+// ── Stellar network fee constants ──────────────────────────────────────────────
+export const STELLAR_BASE_FEE_STROOPS = 100;       // per operation
+export const STELLAR_BASE_FEE_XLM     = 0.00001;   // per operation (100 stroops)
+// A deposit sends USDC to user = 1 payment op → 0.00001 XLM
+// A send with fee split = 2 payment ops → 0.00002 XLM
 
-// ── Yellow Card fee structure (from their published rates) ──────────────────────
-// These are THEIR fees on top of your 1% platform fee.
-// In production these come from the API; here we mirror their published rates.
-const YC_SPREAD_BPS = 80;   // 0.80% Yellow Card spread (buy/sell)
-const YC_FIXED_FEE  = 0;    // No fixed fee for >$5 transactions
+// ── HMAC Authentication (YcHmacV1) ────────────────────────────────────────────
 
-// Stellar network base fee per operation (in stroops; 1 XLM = 10,000,000 stroops)
-export const STELLAR_BASE_FEE_STROOPS = 100;      // 100 stroops = 0.00001 XLM per operation
-export const STELLAR_BASE_FEE_XLM     = 0.00001;  // per operation
-// A typical deposit has 1 payment operation → 0.00001 XLM
-// A typical send with fee split has 2 operations → 0.00002 XLM
+/**
+ * Build the signing string per Yellow Card spec:
+ *   timestamp + path + METHOD + base64(sha256(body))   [for POST/PUT]
+ *   timestamp + path + METHOD                           [for GET/DELETE]
+ */
+function buildSigningString(
+  timestamp: string,
+  path:      string,
+  method:    string,
+  body?:     string,
+): string {
+  let str = `${timestamp}${path}${method.toUpperCase()}`;
+  if (body && (method === 'POST' || method === 'PUT')) {
+    const bodyHash = crypto.createHash('sha256').update(body).digest('base64');
+    str += bodyHash;
+  }
+  return str;
+}
 
-// ── HTTP client with Yellow Card HMAC auth ─────────────────────────────────────
+/**
+ * Generate the YcHmacV1 Authorization header value.
+ * Returns: "YcHmacV1 <apiKey>:<base64signature>"
+ */
+function buildAuthHeader(
+  timestamp: string,
+  path:      string,
+  method:    string,
+  body?:     string,
+): string {
+  const signingString = buildSigningString(timestamp, path, method, body);
+  const signature     = crypto
+    .createHmac('sha256', API_SECRET)
+    .update(signingString)
+    .digest('base64');
+  return `YcHmacV1 ${API_KEY}:${signature}`;
+}
+
+// ── Axios client with YcHmacV1 auth interceptor ────────────────────────────────
 
 function buildClient(): AxiosInstance {
   const client = axios.create({ baseURL: BASE_URL, timeout: 15_000 });
 
   client.interceptors.request.use(config => {
-    if (!API_KEY || !API_SECRET) return config; // sandbox — no auth needed
+    if (!HAS_KEYS) return config; // no keys — sandbox rate-only mode
 
-    const timestamp = Date.now().toString();
-    const method    = (config.method ?? 'get').toUpperCase();
+    const timestamp = new Date().toISOString();
     const path      = config.url ?? '/';
-    const body      = config.data ? JSON.stringify(config.data) : '';
-    const sig       = crypto
-      .createHmac('sha256', API_SECRET)
-      .update(`${timestamp}${method}${path}${body}`)
-      .digest('hex');
+    const method    = (config.method ?? 'GET').toUpperCase();
+    const body      = config.data ? JSON.stringify(config.data) : undefined;
 
-    config.headers['X-YC-Timestamp']  = timestamp;
-    config.headers['X-YC-Key']        = API_KEY;
-    config.headers['X-YC-Signature']  = sig;
-    config.headers['Content-Type']    = 'application/json';
+    config.headers['X-YC-Timestamp'] = timestamp;
+    config.headers['Authorization']  = buildAuthHeader(timestamp, path, method, body);
+    config.headers['Content-Type']   = 'application/json';
     return config;
   });
 
   return client;
 }
 
-const client = buildClient();
+const ycClient = buildClient();
+
+// ── Channel types ──────────────────────────────────────────────────────────────
+
+export interface YCNetwork {
+  id:     string;
+  name:   string;
+  status: 'active' | 'inactive';
+}
+
+export interface YCChannel {
+  id:           string;       // use this as channelId in payment requests
+  name:         string;       // e.g. "M-Pesa Tanzania"
+  country:      string;       // ISO-2: "TZ", "KE", "UG", "GH", "ZM", "NG"
+  currency:     string;       // ISO-3: "TZS", "KES", "UGX", "GHS", "ZMW", "NGN"
+  type:         string;       // "momo" | "bank" | "card"
+  status:       'active' | 'inactive';
+  widgetStatus: 'active' | 'inactive';
+  minAmount:    number;
+  maxAmount:    number;
+  fixedFee:     number;
+  percentFee:   number;       // Yellow Card's own fee %
+  networks:     YCNetwork[];
+}
+
+// ── Channel cache ──────────────────────────────────────────────────────────────
+
+let channelCache: { channels: YCChannel[]; expiry: number } | null = null;
+
+/**
+ * GET /business/channels
+ * Fetches all active channels from Yellow Card.
+ * Cached for 10 minutes — channels don't change often.
+ * Falls back to a hardcoded list if no API keys configured.
+ */
+export async function getChannels(forceRefresh = false): Promise<YCChannel[]> {
+  if (!forceRefresh && channelCache && Date.now() < channelCache.expiry) {
+    return channelCache.channels;
+  }
+
+  if (!HAS_KEYS) {
+    // No API keys yet — return known channels from Yellow Card's coverage
+    // (sourced from their public coverage map docs.yellowcard.engineering/docs/coverage-api)
+    return getFallbackChannels();
+  }
+
+  try {
+    const res = await ycClient.get('/business/channels');
+    const channels: YCChannel[] = (res.data?.channels ?? res.data ?? [])
+      .filter((c: any) => c.status === 'active');
+    channelCache = { channels, expiry: Date.now() + 10 * 60_000 };
+    return channels;
+  } catch (e: any) {
+    console.warn('[yellowcard] getChannels failed:', e.message, '— using fallback');
+    return getFallbackChannels();
+  }
+}
+
+/**
+ * Find the best channel for a given currency + type (momo/bank).
+ * Filters to active channels only as Yellow Card recommends.
+ */
+export async function findChannel(
+  currency: string,
+  type: 'momo' | 'bank' = 'momo',
+  networkHint?: string,  // e.g. "mpesa", "tigo", "airtel", "mtn"
+): Promise<YCChannel | null> {
+  const channels = await getChannels();
+  const matches  = channels.filter(c =>
+    c.currency.toUpperCase() === currency.toUpperCase() &&
+    c.type === type &&
+    c.status === 'active',
+  );
+
+  if (matches.length === 0) return null;
+  if (!networkHint)         return matches[0];
+
+  // Prefer channel whose name matches the network hint
+  const hint = networkHint.toLowerCase();
+  const preferred = matches.find(c => c.name.toLowerCase().includes(hint));
+  return preferred ?? matches[0];
+}
+
+/**
+ * Detect the likely mobile network from a phone number prefix (Tanzania).
+ * Returns a hint string for findChannel().
+ */
+export function detectNetwork(phone: string): string {
+  const clean = phone.replace(/^\+255/, '0').replace(/^\+/, '');
+  // Tanzania prefixes:
+  if (/^0(74|75|76)/.test(clean)) return 'mpesa';    // Vodacom M-Pesa
+  if (/^0(71|65|67)/.test(clean)) return 'tigo';     // Tigo Pesa
+  if (/^0(68|69|78)/.test(clean)) return 'airtel';   // Airtel Money
+  if (/^0(61|62|63)/.test(clean)) return 'halotel';  // Halotel
+  // Kenya
+  if (/^07[0-4]|^01[0-1]/.test(clean)) return 'mpesa'; // Safaricom
+  if (/^073|^074|^079/.test(clean))     return 'airtel';
+  return 'mpesa'; // default
+}
 
 // ── Rate fetching ──────────────────────────────────────────────────────────────
 
 export interface YCRate {
-  currency:       string;  // e.g. "TZS"
-  usdBuyRate:     number;  // local per 1 USD (we buy USDC using local currency)
-  usdSellRate:    number;  // local per 1 USD (we sell USDC to give local currency)
-  ycSpreadPct:    number;  // Yellow Card spread %
-  source:         string;  // 'yellowcard_api' | 'exchangerate_api' | 'fallback'
+  currency:    string;
+  usdBuyRate:  number;  // local per $1 — we RECEIVE local, give USDC (deposit)
+  usdSellRate: number;  // local per $1 — we GIVE local, take USDC (withdrawal)
+  ycSpreadPct: number;  // Yellow Card spread %
+  source:      string;  // 'yellowcard_api' | 'exchangerate_api' | 'fallback'
 }
 
-// Fallback rates (used in sandbox or when API unavailable)
-const FALLBACK_RATES: Record<string, number> = {
+// Fallback mid-market rates (used when no API key or API unavailable)
+const FALLBACK_MID: Record<string, number> = {
   TZS: 2600, KES: 135, UGX: 3750, GHS: 12.5,
-  ZMW: 25,   NGN: 1580, RWF: 1250,
+  ZMW: 25,   NGN: 1580, RWF: 1250, XOF: 615,
 };
 
-let rateCache: Map<string, { rate: YCRate; expiry: number }> = new Map();
+// Yellow Card's published spread: ~0.80% buy/sell around mid
+const YC_SPREAD_BPS = 80;
+
+let rateCache = new Map<string, { rate: YCRate; expiry: number }>();
 
 export async function getRate(currency: string): Promise<YCRate> {
-  const cached = rateCache.get(currency);
+  const key    = currency.toUpperCase();
+  const cached = rateCache.get(key);
   if (cached && Date.now() < cached.expiry) return cached.rate;
 
-  let midRate   = FALLBACK_RATES[currency] ?? 2600;
-  let source    = 'fallback';
+  let midRate = FALLBACK_MID[key] ?? 2600;
+  let source  = 'fallback';
 
-  if (!IS_SANDBOX && API_KEY) {
-    // Production: fetch live rates from Yellow Card
+  if (HAS_KEYS) {
+    // Production / sandbox with keys: get rate from Yellow Card
     try {
-      const res = await client.get(`/business/rates?currency=${currency}`);
-      midRate = res.data.buy?.rate ?? midRate;
-      source  = 'yellowcard_api';
+      // Find a channel for this currency to get the channelId for the rates endpoint
+      const channels = await getChannels();
+      const channel  = channels.find(c => c.currency === key);
+      if (channel) {
+        const res = await ycClient.get(`/business/rates?channelId=${channel.id}`);
+        // YC returns rates as an array or object; extract the buy rate
+        const rateObj = Array.isArray(res.data) ? res.data[0] : res.data;
+        if (rateObj?.buy?.rate)  { midRate = rateObj.buy.rate;  source = 'yellowcard_api'; }
+        if (rateObj?.sell?.rate) { midRate = rateObj.sell.rate; source = 'yellowcard_api'; }
+      }
     } catch (e: any) {
-      console.warn(`[yellowcard] rate fetch failed: ${e.message} — using fallback`);
+      console.warn('[yellowcard] rate API failed:', e.message);
     }
   } else {
-    // Sandbox: use exchangerate-api.com (free, no key needed for basic)
+    // No keys yet: use free exchange rate API for live mid-market rates
     try {
-      const res = await axios.get(
-        `https://api.exchangerate-api.com/v4/latest/USD`,
-        { timeout: 4000 },
-      );
-      midRate = res.data.rates?.[currency] ?? midRate;
-      source  = 'exchangerate_api';
+      const res = await axios.get('https://api.exchangerate-api.com/v4/latest/USD', { timeout: 4000 });
+      const r   = res.data?.rates?.[key];
+      if (r && r > 0) { midRate = r; source = 'exchangerate_api'; }
     } catch {
       source = 'fallback';
     }
   }
 
-  // Yellow Card applies a buy/sell spread around the mid rate
-  const spreadMultiplier = YC_SPREAD_BPS / 10000;
-  const rate: YCRate = {
-    currency,
-    usdBuyRate:  midRate * (1 + spreadMultiplier), // we pay MORE local per USD (buying USD)
-    usdSellRate: midRate * (1 - spreadMultiplier), // we get LESS local per USD (selling USD)
-    ycSpreadPct: YC_SPREAD_BPS / 100,
-    source,
-  };
+  const spread     = YC_SPREAD_BPS / 10000;
+  const usdBuyRate  = midRate * (1 + spread); // user pays MORE local per $1 when buying USDC
+  const usdSellRate = midRate * (1 - spread); // user gets LESS local per $1 when selling USDC
 
-  rateCache.set(currency, { rate, expiry: Date.now() + 5 * 60_000 }); // 5 min cache
+  const rate: YCRate = {
+    currency: key, usdBuyRate, usdSellRate,
+    ycSpreadPct: YC_SPREAD_BPS / 100, source,
+  };
+  rateCache.set(key, { rate, expiry: Date.now() + 5 * 60_000 });
   return rate;
 }
 
-// ── Fee breakdown (TRANSPARENT — mirrors mainnet exactly) ──────────────────────
-
-export interface FeeBreakdown {
-  // Input
-  localAmount:       number;
-  localCurrency:     string;
-
-  // Exchange
-  midRate:           number;    // mid-market rate (informational)
-  ycBuyRate:         number;    // rate Yellow Card charges (mid + spread)
-  ycSpreadPct:       number;    // Yellow Card's spread %
-  ycSpreadAmount:    number;    // spread cost in USDC
-
-  // Your platform fee
-  platformFeePct:    number;    // 1%
-  platformFeeUsdc:   number;
-
-  // Stellar network fees
-  stellarOps:        number;    // number of Stellar operations
-  stellarFeeXlm:     number;    // total XLM for Stellar tx fee
-  stellarFeeUsd:     number;    // approximate USD value of Stellar fee
-  xlmPriceUsd:       number;    // current XLM price in USD
-
-  // Totals
-  grossUsdc:         number;    // USDC before any fees
-  netUsdc:           number;    // USDC user actually receives
-  totalFeeUsdc:      number;    // all fees combined in USDC
-
-  // Settlement
-  estimatedMinutes:  number;    // expected settlement time
-  provider:          string;    // 'yellowcard_sandbox' | 'yellowcard'
-  isTestnet:         boolean;
-}
-
-export async function calculateDepositFees(
-  localAmount: number,
-  currency: string,
-  stellarOpsCount = 1,
-): Promise<FeeBreakdown> {
-  const rate       = await getRate(currency);
-  const xlmPrice   = await getXlmPrice();
-
-  const grossUsdc       = localAmount / rate.usdBuyRate;
-  const ycSpreadAmount  = localAmount / (rate.usdBuyRate / (1 + rate.ycSpreadPct / 100))
-                          - localAmount / rate.usdBuyRate;
-  const platformFeeUsdc = grossUsdc * 0.01;
-  const stellarFeeXlm   = STELLAR_BASE_FEE_XLM * stellarOpsCount;
-  const stellarFeeUsd   = stellarFeeXlm * xlmPrice;
-  const netUsdc         = grossUsdc - platformFeeUsdc;
-
-  return {
-    localAmount,
-    localCurrency:    currency,
-    midRate:          (rate.usdBuyRate + rate.usdSellRate) / 2,
-    ycBuyRate:        rate.usdBuyRate,
-    ycSpreadPct:      rate.ycSpreadPct,
-    ycSpreadAmount:   parseFloat(ycSpreadAmount.toFixed(6)),
-    platformFeePct:   1,
-    platformFeeUsdc:  parseFloat(platformFeeUsdc.toFixed(6)),
-    stellarOps:       stellarOpsCount,
-    stellarFeeXlm:    parseFloat(stellarFeeXlm.toFixed(7)),
-    stellarFeeUsd:    parseFloat(stellarFeeUsd.toFixed(6)),
-    xlmPriceUsd:      parseFloat(xlmPrice.toFixed(4)),
-    grossUsdc:        parseFloat(grossUsdc.toFixed(6)),
-    netUsdc:          parseFloat(netUsdc.toFixed(6)),
-    totalFeeUsdc:     parseFloat((platformFeeUsdc + stellarFeeUsd).toFixed(6)),
-    estimatedMinutes: IS_SANDBOX ? 0 : 2,
-    provider:         IS_SANDBOX ? 'yellowcard_sandbox' : 'yellowcard',
-    isTestnet:        IS_SANDBOX,
-  };
-}
-
-export async function calculateWithdrawFees(
-  amountUsdc: number,
-  currency: string,
-  stellarOpsCount = 2,
-): Promise<FeeBreakdown & { localPayout: number }> {
-  const rate        = await getRate(currency);
-  const xlmPrice    = await getXlmPrice();
-
-  const platformFeeUsdc = amountUsdc * 0.01;
-  const netUsdc         = amountUsdc - platformFeeUsdc;
-  const localPayout     = netUsdc * rate.usdSellRate;
-  const stellarFeeXlm   = STELLAR_BASE_FEE_XLM * stellarOpsCount;
-  const stellarFeeUsd   = stellarFeeXlm * xlmPrice;
-  const ycSpreadAmount  = netUsdc * (rate.ycSpreadPct / 100);
-
-  return {
-    localAmount:      localPayout,
-    localCurrency:    currency,
-    midRate:          (rate.usdBuyRate + rate.usdSellRate) / 2,
-    ycBuyRate:        rate.usdSellRate,
-    ycSpreadPct:      rate.ycSpreadPct,
-    ycSpreadAmount:   parseFloat(ycSpreadAmount.toFixed(6)),
-    platformFeePct:   1,
-    platformFeeUsdc:  parseFloat(platformFeeUsdc.toFixed(6)),
-    stellarOps:       stellarOpsCount,
-    stellarFeeXlm:    parseFloat(stellarFeeXlm.toFixed(7)),
-    stellarFeeUsd:    parseFloat(stellarFeeUsd.toFixed(6)),
-    xlmPriceUsd:      parseFloat(xlmPrice.toFixed(4)),
-    grossUsdc:        parseFloat(amountUsdc.toFixed(6)),
-    netUsdc:          parseFloat(netUsdc.toFixed(6)),
-    totalFeeUsdc:     parseFloat((platformFeeUsdc + stellarFeeUsd).toFixed(6)),
-    estimatedMinutes: IS_SANDBOX ? 0 : 3,
-    provider:         IS_SANDBOX ? 'yellowcard_sandbox' : 'yellowcard',
-    isTestnet:        IS_SANDBOX,
-    localPayout:      parseFloat(localPayout.toFixed(0)),
-  };
-}
-
-// ── XLM price (for fee display) ───────────────────────────────────────────────
+// ── XLM price ──────────────────────────────────────────────────────────────────
 
 let xlmPriceCache: { price: number; expiry: number } | null = null;
 
@@ -279,152 +347,314 @@ export async function getXlmPrice(): Promise<number> {
       'https://api.coingecko.com/api/v3/simple/price?ids=stellar&vs_currencies=usd',
       { timeout: 4000 },
     );
-    const price = res.data?.stellar?.usd ?? 0.12;
-    xlmPriceCache = { price, expiry: Date.now() + 10 * 60_000 };
-    return price;
+    const p = res.data?.stellar?.usd ?? 0.12;
+    xlmPriceCache = { price: p, expiry: Date.now() + 10 * 60_000 };
+    return p;
   } catch {
     return xlmPriceCache?.price ?? 0.12;
   }
 }
 
-// ── Order creation (deposit: local currency → USDC) ────────────────────────────
+// ── Fee breakdown ──────────────────────────────────────────────────────────────
 
-export interface YCOrder {
-  orderId:          string;
-  status:           'pending' | 'processing' | 'completed' | 'failed';
-  localAmount:      number;
-  localCurrency:    string;
-  usdcAmount:       number;
-  stellarAddress:   string;
-  createdAt:        string;
-  completedAt?:     string;
-  fees:             FeeBreakdown;
+export interface FeeBreakdown {
+  // Input
+  localAmount:     number;
+  localCurrency:   string;
+  // Exchange
+  midRate:         number;
+  ycBuyRate:       number;
+  ycSpreadPct:     number;
+  ycSpreadUsdc:    number;    // cost of YC spread in USDC terms
+  ycFixedFee:      number;    // YC fixed fee in local currency (from channel)
+  ycPercentFee:    number;    // YC percent fee (from channel)
+  // Platform fee
+  platformFeePct:  number;    // always 1%
+  platformFeeUsdc: number;
+  // Stellar network
+  stellarOps:      number;
+  stellarFeeXlm:   number;
+  stellarFeeUsd:   number;
+  xlmPriceUsd:     number;
+  // Totals
+  grossUsdc:       number;    // before OlomiPay fee
+  netUsdc:         number;    // what user actually receives
+  totalFeeUsdc:    number;
+  // Metadata
+  channelId:       string;
+  channelName:     string;
+  estimatedMins:   number;
+  provider:        string;
+  isTestnet:       boolean;
 }
 
-export async function createDepositOrder(params: {
-  localAmount:    number;
-  localCurrency:  string;
-  channelId:      string;        // e.g. 'TZS_MPESA'
-  senderPhone:    string;
-  stellarAddress: string;        // user's Stellar wallet to receive USDC
-  referenceId:    string;        // your internal transaction ID
-}): Promise<YCOrder> {
-  const fees = await calculateDepositFees(params.localAmount, params.localCurrency);
+export async function calculateDepositFees(
+  localAmount:  number,
+  currency:     string,
+  stellarOps    = 1,
+  networkHint?: string,
+): Promise<FeeBreakdown> {
+  const [rate, xlmPrice, channel] = await Promise.all([
+    getRate(currency),
+    getXlmPrice(),
+    findChannel(currency, 'momo', networkHint),
+  ]);
 
-  if (IS_SANDBOX) {
-    // Simulate a Yellow Card order — identical structure to production
-    return {
-      orderId:        `YC-SANDBOX-${params.referenceId}`,
-      status:         'pending',
-      localAmount:    params.localAmount,
-      localCurrency:  params.localCurrency,
-      usdcAmount:     fees.netUsdc,
-      stellarAddress: params.stellarAddress,
-      createdAt:      new Date().toISOString(),
-      fees,
-    };
-  }
+  // YC channel fees (from actual channel object)
+  const ycFixedFee   = channel?.fixedFee   ?? 0;
+  const ycPercentFee = channel?.percentFee ?? YC_SPREAD_BPS / 100;
 
-  // Production: call Yellow Card API
-  const channelId = CHANNEL_IDS[params.channelId] ?? params.channelId;
-  const res = await client.post('/business/payments', {
-    channelId,
-    sequenceId:       params.referenceId,
-    localAmount:      params.localAmount,
-    currency:         params.localCurrency,
-    country:          currencyToCountry(params.localCurrency),
-    destination: {
-      accountType:   'crypto',
-      network:       'stellar',
-      address:       params.stellarAddress,
-      asset:         'USDC',
-    },
-    source: {
-      accountType:   'mobile_money',
-      phoneNumber:   params.senderPhone,
-    },
-  });
+  // Gross USDC at Yellow Card's buy rate (they give us less USDC per local)
+  const grossUsdc       = (localAmount - ycFixedFee) / rate.usdBuyRate;
+  // YC spread cost = difference between mid and buy rate
+  const midGross        = (localAmount - ycFixedFee) / rate.midRate;
+  const ycSpreadUsdc    = Math.max(0, midGross - grossUsdc);
+  // Platform fee (1%)
+  const platformFeeUsdc = grossUsdc * 0.01;
+  const netUsdc         = grossUsdc - platformFeeUsdc;
+  // Stellar fee
+  const stellarFeeXlm   = STELLAR_BASE_FEE_XLM * stellarOps;
+  const stellarFeeUsd   = stellarFeeXlm * xlmPrice;
 
   return {
-    orderId:        res.data.id,
-    status:         res.data.status,
-    localAmount:    params.localAmount,
-    localCurrency:  params.localCurrency,
-    usdcAmount:     fees.netUsdc,
-    stellarAddress: params.stellarAddress,
-    createdAt:      res.data.createdAt,
-    fees,
+    localAmount,
+    localCurrency:   currency.toUpperCase(),
+    midRate:         parseFloat(rate.midRate?.toFixed(4) ?? rate.usdBuyRate.toFixed(4)),
+    ycBuyRate:       parseFloat(rate.usdBuyRate.toFixed(4)),
+    ycSpreadPct:     rate.ycSpreadPct,
+    ycSpreadUsdc:    parseFloat(ycSpreadUsdc.toFixed(6)),
+    ycFixedFee,
+    ycPercentFee,
+    platformFeePct:  1,
+    platformFeeUsdc: parseFloat(platformFeeUsdc.toFixed(6)),
+    stellarOps,
+    stellarFeeXlm:   parseFloat(stellarFeeXlm.toFixed(7)),
+    stellarFeeUsd:   parseFloat(stellarFeeUsd.toFixed(6)),
+    xlmPriceUsd:     parseFloat(xlmPrice.toFixed(4)),
+    grossUsdc:       parseFloat(grossUsdc.toFixed(6)),
+    netUsdc:         parseFloat(netUsdc.toFixed(6)),
+    totalFeeUsdc:    parseFloat((platformFeeUsdc + stellarFeeUsd).toFixed(6)),
+    channelId:       channel?.id   ?? '',
+    channelName:     channel?.name ?? `${currency} Mobile Money`,
+    estimatedMins:   IS_SANDBOX ? 0 : 2,
+    provider:        IS_SANDBOX ? 'yellowcard_sandbox' : 'yellowcard',
+    isTestnet:       IS_SANDBOX,
   };
 }
 
-// ── Withdrawal order (USDC → local currency) ───────────────────────────────────
+export async function calculateWithdrawFees(
+  amountUsdc:   number,
+  currency:     string,
+  stellarOps    = 2,
+  networkHint?: string,
+): Promise<FeeBreakdown & { localPayout: number }> {
+  const [rate, xlmPrice, channel] = await Promise.all([
+    getRate(currency),
+    getXlmPrice(),
+    findChannel(currency, 'momo', networkHint),
+  ]);
 
+  const ycFixedFee      = channel?.fixedFee   ?? 0;
+  const platformFeeUsdc = amountUsdc * 0.01;
+  const netUsdc         = amountUsdc - platformFeeUsdc;
+  const localPayout     = Math.floor(netUsdc * rate.usdSellRate) - ycFixedFee;
+  const midGross        = netUsdc * ((rate.usdBuyRate + rate.usdSellRate) / 2);
+  const ycSpreadUsdc    = Math.max(0, (midGross - localPayout) / rate.usdSellRate);
+  const stellarFeeXlm   = STELLAR_BASE_FEE_XLM * stellarOps;
+  const stellarFeeUsd   = stellarFeeXlm * xlmPrice;
+
+  return {
+    localAmount:     localPayout,
+    localCurrency:   currency.toUpperCase(),
+    midRate:         parseFloat(((rate.usdBuyRate + rate.usdSellRate) / 2).toFixed(4)),
+    ycBuyRate:       parseFloat(rate.usdSellRate.toFixed(4)),
+    ycSpreadPct:     rate.ycSpreadPct,
+    ycSpreadUsdc:    parseFloat(ycSpreadUsdc.toFixed(6)),
+    ycFixedFee,
+    ycPercentFee:    channel?.percentFee ?? YC_SPREAD_BPS / 100,
+    platformFeePct:  1,
+    platformFeeUsdc: parseFloat(platformFeeUsdc.toFixed(6)),
+    stellarOps,
+    stellarFeeXlm:   parseFloat(stellarFeeXlm.toFixed(7)),
+    stellarFeeUsd:   parseFloat(stellarFeeUsd.toFixed(6)),
+    xlmPriceUsd:     parseFloat(xlmPrice.toFixed(4)),
+    grossUsdc:       parseFloat(amountUsdc.toFixed(6)),
+    netUsdc:         parseFloat(netUsdc.toFixed(6)),
+    totalFeeUsdc:    parseFloat((platformFeeUsdc + stellarFeeUsd).toFixed(6)),
+    channelId:       channel?.id   ?? '',
+    channelName:     channel?.name ?? `${currency} Mobile Money`,
+    estimatedMins:   IS_SANDBOX ? 0 : 3,
+    provider:        IS_SANDBOX ? 'yellowcard_sandbox' : 'yellowcard',
+    isTestnet:       IS_SANDBOX,
+    localPayout:     Math.max(0, localPayout),
+  };
+}
+
+// ── Payment orders ─────────────────────────────────────────────────────────────
+
+export interface YCPaymentOrder {
+  id:           string;        // Yellow Card payment ID
+  sequenceId:   string;        // your reference ID
+  status:       'pending' | 'processing' | 'completed' | 'failed' | 'expired';
+  localAmount:  number;
+  currency:     string;
+  usdcAmount:   number;
+  channelId:    string;
+  fees:         FeeBreakdown;
+  createdAt:    string;
+}
+
+/** POST /business/payments — deposit (local currency → USDC to user's Stellar wallet) */
+export async function createDepositOrder(params: {
+  localAmount:    number;
+  localCurrency:  string;
+  channelId:      string;      // from getChannels() or findChannel()
+  networkId?:     string;      // specific operator within channel
+  senderPhone:    string;
+  stellarAddress: string;      // user's Stellar pubkey to receive USDC
+  referenceId:    string;      // your internal tx ID (idempotency)
+}): Promise<YCPaymentOrder> {
+  const fees = await calculateDepositFees(params.localAmount, params.localCurrency);
+
+  if (!HAS_KEYS || IS_SANDBOX) {
+    // Sandbox simulation — identical structure to production
+    console.log(`[yellowcard] SANDBOX deposit order: ${params.localAmount} ${params.localCurrency} → ${fees.netUsdc} USDC`);
+    return {
+      id:          `YC-SANDBOX-${params.referenceId}`,
+      sequenceId:  params.referenceId,
+      status:      'completed',   // instant on sandbox
+      localAmount: params.localAmount,
+      currency:    params.localCurrency,
+      usdcAmount:  fees.netUsdc,
+      channelId:   params.channelId,
+      fees,
+      createdAt:   new Date().toISOString(),
+    };
+  }
+
+  // Production: POST /business/payments
+  const body = {
+    channelId:   params.channelId,
+    sequenceId:  params.referenceId,
+    localAmount: params.localAmount,
+    currency:    params.localCurrency,
+    country:     currencyToCountry(params.localCurrency),
+    destination: {
+      accountType: 'crypto',
+      address:     params.stellarAddress,
+      blockchain:  'stellar',
+      asset:       'USDC',
+    },
+    source: {
+      accountType:   'mobile_money',
+      accountNumber: params.senderPhone.replace(/^\+/, ''),
+      ...(params.networkId ? { network: params.networkId } : {}),
+    },
+  };
+
+  const res = await ycClient.post('/business/payments', body);
+  return {
+    id:          res.data.id,
+    sequenceId:  params.referenceId,
+    status:      res.data.status,
+    localAmount: params.localAmount,
+    currency:    params.localCurrency,
+    usdcAmount:  fees.netUsdc,
+    channelId:   params.channelId,
+    fees,
+    createdAt:   res.data.createdAt ?? new Date().toISOString(),
+  };
+}
+
+/** POST /business/payments — withdrawal (USDC → local currency to user's phone) */
 export async function createWithdrawOrder(params: {
   amountUsdc:     number;
   localCurrency:  string;
   channelId:      string;
+  networkId?:     string;
   recipientPhone: string;
   referenceId:    string;
-}): Promise<YCOrder & { localPayout: number }> {
+}): Promise<YCPaymentOrder & { localPayout: number }> {
   const fees = await calculateWithdrawFees(params.amountUsdc, params.localCurrency) as any;
 
-  if (IS_SANDBOX) {
+  if (!HAS_KEYS || IS_SANDBOX) {
+    console.log(`[yellowcard] SANDBOX withdraw order: ${params.amountUsdc} USDC → ${fees.localPayout} ${params.localCurrency}`);
     return {
-      orderId:        `YC-SANDBOX-OUT-${params.referenceId}`,
-      status:         'pending',
-      localAmount:    fees.localPayout,
-      localCurrency:  params.localCurrency,
-      usdcAmount:     params.amountUsdc,
-      stellarAddress: '',
-      createdAt:      new Date().toISOString(),
+      id:          `YC-SANDBOX-OUT-${params.referenceId}`,
+      sequenceId:  params.referenceId,
+      status:      'completed',
+      localAmount: fees.localPayout,
+      currency:    params.localCurrency,
+      usdcAmount:  params.amountUsdc,
+      channelId:   params.channelId,
       fees,
-      localPayout:    fees.localPayout,
+      createdAt:   new Date().toISOString(),
+      localPayout: fees.localPayout,
     };
   }
 
-  const channelId = CHANNEL_IDS[params.channelId] ?? params.channelId;
-  const res = await client.post('/business/payments', {
-    channelId,
-    sequenceId:    params.referenceId,
-    localAmount:   fees.localPayout,
-    currency:      params.localCurrency,
-    country:       currencyToCountry(params.localCurrency),
+  const body = {
+    channelId:   params.channelId,
+    sequenceId:  params.referenceId,
+    localAmount: fees.localPayout,
+    currency:    params.localCurrency,
+    country:     currencyToCountry(params.localCurrency),
     destination: {
-      accountType: 'mobile_money',
-      phoneNumber: params.recipientPhone,
+      accountType:   'mobile_money',
+      accountNumber: params.recipientPhone.replace(/^\+/, ''),
+      ...(params.networkId ? { network: params.networkId } : {}),
     },
     source: {
       accountType: 'crypto',
-      network:     'stellar',
+      blockchain:  'stellar',
       asset:       'USDC',
     },
-  });
+  };
 
+  const res = await ycClient.post('/business/payments', body);
   return {
-    orderId:        res.data.id,
-    status:         res.data.status,
-    localAmount:    fees.localPayout,
-    localCurrency:  params.localCurrency,
-    usdcAmount:     params.amountUsdc,
-    stellarAddress: '',
-    createdAt:      res.data.createdAt,
+    id:          res.data.id,
+    sequenceId:  params.referenceId,
+    status:      res.data.status,
+    localAmount: fees.localPayout,
+    currency:    params.localCurrency,
+    usdcAmount:  params.amountUsdc,
+    channelId:   params.channelId,
     fees,
-    localPayout:    fees.localPayout,
+    createdAt:   res.data.createdAt ?? new Date().toISOString(),
+    localPayout: fees.localPayout,
   };
 }
 
-// ── Webhook signature verification (for production callbacks) ─────────────────
+/** GET /business/payments/:id — check payment status */
+export async function getPaymentStatus(paymentId: string): Promise<{
+  id: string; status: string; localAmount: number; currency: string;
+}> {
+  if (!HAS_KEYS) return { id: paymentId, status: 'completed', localAmount: 0, currency: 'TZS' };
+  const res = await ycClient.get(`/business/payments/${paymentId}`);
+  return res.data;
+}
+
+// ── Webhook verification ───────────────────────────────────────────────────────
+// YC webhook signature: base64(sha256(requestBody)) using the API secret
 
 export function verifyYCWebhook(payload: string, signature: string): boolean {
-  if (!API_SECRET || IS_SANDBOX) return true; // sandbox — accept all
-  const expected = crypto
-    .createHmac('sha256', API_SECRET)
-    .update(payload)
-    .digest('hex');
-  return crypto.timingSafeEqual(
-    Buffer.from(expected, 'hex'),
-    Buffer.from(signature, 'hex'),
-  );
+  if (!API_SECRET || IS_SANDBOX) return true;
+  const expected = crypto.createHash('sha256').update(`${API_SECRET}${payload}`).digest('base64');
+  try {
+    return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+  } catch {
+    return false;
+  }
+}
+
+// ── Legacy adapter (used by mpesa.ts for backward compatibility) ───────────────
+
+/** @deprecated Use findChannel() instead */
+export function phoneToChannel(phone: string, currency = 'TZS'): string {
+  const net = detectNetwork(phone);
+  // Return a composite key that getChannels() can resolve
+  return `${currency}_${net.toUpperCase()}`;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -432,19 +662,47 @@ export function verifyYCWebhook(payload: string, signature: string): boolean {
 function currencyToCountry(currency: string): string {
   const map: Record<string, string> = {
     TZS: 'TZ', KES: 'KE', UGX: 'UG', GHS: 'GH',
-    ZMW: 'ZM', NGN: 'NG', RWF: 'RW',
+    ZMW: 'ZM', NGN: 'NG', RWF: 'RW', XOF: 'SN',
   };
-  return map[currency] ?? 'TZ';
+  return map[currency.toUpperCase()] ?? 'TZ';
 }
 
-export function phoneToChannel(phone: string, currency = 'TZS'): string {
-  // Detect network from phone prefix
-  const clean = phone.replace(/^\+255/, '');
-  if (/^07[4-6]/.test(clean) || /^07[4-6]/.test(phone)) return `${currency}_MPESA`;
-  if (/^078/.test(clean))  return `${currency}_TIGOPESA`;
-  if (/^068/.test(clean))  return `${currency}_AIRTELMONEY`;
-  if (/^069/.test(clean))  return `${currency}_AIRTELMONEY`;
-  return `${currency}_MPESA`; // default
+/** Hardcoded channel list for no-key sandbox mode (mirrors YC coverage map) */
+function getFallbackChannels(): YCChannel[] {
+  return [
+    { id: 'sandbox-tz-mpesa',   name: 'M-Pesa Tanzania',  country: 'TZ', currency: 'TZS', type: 'momo', status: 'active', widgetStatus: 'active', minAmount: 500,    maxAmount: 5_000_000, fixedFee: 0, percentFee: 0.8 },
+    { id: 'sandbox-tz-tigo',    name: 'Tigo Pesa',        country: 'TZ', currency: 'TZS', type: 'momo', status: 'active', widgetStatus: 'active', minAmount: 500,    maxAmount: 5_000_000, fixedFee: 0, percentFee: 0.8 },
+    { id: 'sandbox-tz-airtel',  name: 'Airtel Tanzania',  country: 'TZ', currency: 'TZS', type: 'momo', status: 'active', widgetStatus: 'active', minAmount: 500,    maxAmount: 5_000_000, fixedFee: 0, percentFee: 0.8 },
+    { id: 'sandbox-ke-mpesa',   name: 'M-Pesa Kenya',     country: 'KE', currency: 'KES', type: 'momo', status: 'active', widgetStatus: 'active', minAmount: 10,     maxAmount: 150_000,  fixedFee: 0, percentFee: 0.8 },
+    { id: 'sandbox-ug-mtn',     name: 'MTN Uganda',       country: 'UG', currency: 'UGX', type: 'momo', status: 'active', widgetStatus: 'active', minAmount: 1_000,  maxAmount: 7_000_000, fixedFee: 0, percentFee: 0.8 },
+    { id: 'sandbox-ug-airtel',  name: 'Airtel Uganda',    country: 'UG', currency: 'UGX', type: 'momo', status: 'active', widgetStatus: 'active', minAmount: 1_000,  maxAmount: 7_000_000, fixedFee: 0, percentFee: 0.8 },
+    { id: 'sandbox-gh-mtn',     name: 'MTN Ghana',        country: 'GH', currency: 'GHS', type: 'momo', status: 'active', widgetStatus: 'active', minAmount: 1,      maxAmount: 10_000,   fixedFee: 0, percentFee: 0.8 },
+    { id: 'sandbox-zm-mtn',     name: 'MTN Zambia',       country: 'ZM', currency: 'ZMW', type: 'momo', status: 'active', widgetStatus: 'active', minAmount: 5,      maxAmount: 50_000,   fixedFee: 0, percentFee: 0.8 },
+    { id: 'sandbox-ng-bank',    name: 'Nigeria Bank',     country: 'NG', currency: 'NGN', type: 'bank', status: 'active', widgetStatus: 'active', minAmount: 500,    maxAmount: 5_000_000, fixedFee: 0, percentFee: 0.8 },
+    { id: 'sandbox-rw-mtn',     name: 'MTN Rwanda',       country: 'RW', currency: 'RWF', type: 'momo', status: 'active', widgetStatus: 'active', minAmount: 500,    maxAmount: 2_000_000, fixedFee: 0, percentFee: 0.8 },
+  ].map(c => ({ ...c, networks: [] }));
 }
 
-export { IS_SANDBOX as isYCSandbox };
+/** Get available channels for the /api/mpesa/channels endpoint */
+export async function getChannelsForUI(): Promise<{
+  channels: Array<{
+    id: string; name: string; country: string; currency: string;
+    type: string; minAmount: number; maxAmount: number; active: boolean;
+  }>;
+  isSandbox: boolean;
+}> {
+  const channels = await getChannels();
+  return {
+    channels: channels.map(c => ({
+      id:        c.id,
+      name:      c.name,
+      country:   c.country,
+      currency:  c.currency,
+      type:      c.type,
+      minAmount: c.minAmount,
+      maxAmount: c.maxAmount,
+      active:    c.status === 'active',
+    })),
+    isSandbox: IS_SANDBOX,
+  };
+}

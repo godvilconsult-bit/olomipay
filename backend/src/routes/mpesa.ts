@@ -29,6 +29,9 @@ import {
   createWithdrawOrder,
   getRate,
   getXlmPrice,
+  getChannelsForUI,
+  findChannel,
+  detectNetwork,
   phoneToChannel,
   isYCSandbox,
   verifyYCWebhook,
@@ -46,6 +49,20 @@ const depositLimiter  = rateLimit({ windowMs: 60_000, max: 5, message: { error: 
 async function getMno() {
   return await import('../services/mpesa');
 }
+
+// ── GET /api/mpesa/channels ────────────────────────────────────────────────────
+// Returns all active Yellow Card channels — used by frontend to show
+// exactly which mobile money providers are supported and their limits.
+// Filters out inactive channels as Yellow Card recommends.
+
+router.get('/channels', async (req, res) => {
+  try {
+    const result = await getChannelsForUI();
+    return res.json({ success: true, ...result });
+  } catch (e: any) {
+    return res.status(502).json({ error: e.message });
+  }
+});
 
 // ── GET /api/mpesa/rate ────────────────────────────────────────────────────────
 
@@ -107,7 +124,18 @@ router.post('/deposit', requireAuth, depositLimiter, async (req: AuthRequest, re
 
   await checkDailyLimit(user, amountTzs);
 
-  const fees = await calculateDepositFees(amountTzs, currency, 1);
+  // Detect network from phone prefix and find the right YC channel
+  const networkHint = detectNetwork(user.phone);
+  const channel     = await findChannel(currency, 'momo', networkHint);
+  const fees        = await calculateDepositFees(amountTzs, currency, 1, networkHint);
+
+  // Validate amount against channel limits
+  if (channel) {
+    if (amountTzs < channel.minAmount)
+      return res.status(400).json({ error: `Minimum deposit is ${channel.minAmount.toLocaleString()} ${currency} for ${channel.name}` });
+    if (amountTzs > channel.maxAmount)
+      return res.status(400).json({ error: `Maximum deposit is ${channel.maxAmount.toLocaleString()} ${currency} for ${channel.name}` });
+  }
 
   const tx = await prisma.transaction.create({
     data: {
@@ -118,8 +146,10 @@ router.post('/deposit', requireAuth, depositLimiter, async (req: AuthRequest, re
       amountUsdc: fees.netUsdc,
       memo: JSON.stringify({
         fees,
-        channel:  phoneToChannel(user.phone, currency),
-        provider: isYCSandbox ? 'yellowcard_sandbox' : 'yellowcard',
+        channelId:   fees.channelId,
+        channelName: fees.channelName,
+        networkHint,
+        provider:    isYCSandbox ? 'yellowcard_sandbox' : 'yellowcard',
       }),
     },
   });
@@ -175,7 +205,10 @@ router.post('/callback', async (req, res) => {
 
     const actualAmount = payload.amount ?? dbTx.amountTzs ?? 0;
     const currency     = storedMemo.fees?.localCurrency ?? 'TZS';
-    const channelId    = storedMemo.channel ?? phoneToChannel(dbTx.user.phone, currency);
+    // Use the real channelId resolved at deposit time, or re-resolve now
+    const channelId    = storedMemo.channelId
+      || (await findChannel(currency, 'momo', storedMemo.networkHint ?? detectNetwork(dbTx.user.phone)))?.id
+      || phoneToChannel(dbTx.user.phone, currency);
 
     // Step 1: Yellow Card converts local -> USDC
     const ycOrder = await createDepositOrder({
