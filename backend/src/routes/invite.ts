@@ -35,6 +35,43 @@ router.get('/check/:phone', requireAuth, async (req: AuthRequest, res) => {
   return res.json(ok({ registered: !!user, user: user ?? null }));
 });
 
+// ── POST /api/invite/match-contacts — bulk match phone numbers ────────────────
+// Send array of phone numbers, get back which ones are registered on Tuma
+router.post('/match-contacts', requireAuth, async (req: AuthRequest, res) => {
+  const { phones } = req.body as { phones: string[] };
+  if (!Array.isArray(phones) || phones.length === 0) {
+    return res.json(ok({ matches: [] }));
+  }
+
+  // Normalize all phone numbers
+  const normalize = (p: string) => {
+    const clean = p.replace(/[\s\-().+]/g, '');
+    if (clean.startsWith('0') && clean.length === 10) return '+255' + clean.slice(1);
+    if (clean.startsWith('255') && clean.length === 12) return '+' + clean;
+    if (clean.startsWith('7') && clean.length === 9) return '+255' + clean;
+    return '+' + clean;
+  };
+
+  const normalized = [...new Set(phones.map(normalize))].slice(0, 500);
+
+  const users = await prisma.user.findMany({
+    where:  { phone: { in: normalized }, id: { not: req.userId! } },
+    select: { id: true, phone: true, kycName: true, chatPublicKey: true, isOnline: true, lastSeenAt: true },
+  });
+
+  // Return map of normalized phone → user
+  const matches = users.map(u => ({
+    id:           u.id,
+    phone:        u.phone,
+    kycName:      u.kycName,
+    chatPublicKey: u.chatPublicKey,
+    isOnline:     u.isOnline ?? false,
+    lastSeenAt:   u.lastSeenAt,
+  }));
+
+  return res.json(ok({ matches }));
+});
+
 // ── GET /api/invite/resolve/:code — resolve invite code to inviter info ───────
 router.get('/resolve/:code', async (req, res) => {
   try {

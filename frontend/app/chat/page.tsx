@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, X, MessageCircle, Users, Loader2, UserPlus, Share2, Phone } from 'lucide-react';
+import { Search, X, MessageCircle, Users, Loader2, UserPlus, Share2, Phone, BookUser } from 'lucide-react';
 import BottomNav from '../../components/BottomNav';
 import { useSocket } from '../../lib/useSocket';
 import { timeAgo } from '../../lib/utils';
 import toast from 'react-hot-toast';
+import { isContactPickerSupported, pickAndMatchContacts, type TumaContact } from '../../lib/useContacts';
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
@@ -53,6 +54,9 @@ export default function ChatPage() {
   const [conversations, setConversations] = useState<any[]>([]);
   const [allUsers,      setAllUsers]      = useState<any[]>([]);
   const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [contacts,      setContacts]      = useState<TumaContact[]>([]);
+  const [loadingContacts, setLoadingContacts] = useState(false);
+  const [contactsLoaded,  setContactsLoaded]  = useState(false);
   const [query,         setQuery]         = useState('');
   const [tab,           setTab]           = useState<'chats'|'people'>('chats');
   const [loading,       setLoading]       = useState(true);
@@ -60,6 +64,7 @@ export default function ChatPage() {
   const [inviteLink,    setInviteLink]    = useState('');
   const [phoneCheck,    setPhoneCheck]    = useState<{registered: boolean; user: any}|null>(null);
   const [checkingPhone, setCheckingPhone] = useState(false);
+  const supportsContacts = typeof window !== 'undefined' && isContactPickerSupported();
 
   useEffect(() => {
     chatApi('/conversations').then(r => {
@@ -135,6 +140,32 @@ export default function ChatPage() {
     const r = await chatApi('/conversations', 'POST', { toUserId: userId });
     if (r.success) router.push(`/chat/${r.data.conversation.id}`);
     else toast.error(r.error ?? 'Failed to start chat');
+  }
+
+  async function loadContacts() {
+    if (!supportsContacts) {
+      toast.error('Kifaa chako hakisaidii kufikia orodha ya mawasiliano.');
+      return;
+    }
+    setLoadingContacts(true);
+    try {
+      const matched = await pickAndMatchContacts();
+      setContacts(matched);
+      setContactsLoaded(true);
+      if (matched.length === 0) {
+        toast('Hakuna mawasiliano yako yaliyopatikana kwenye Tuma.', { icon: '📱' });
+      } else {
+        toast.success(`Mawasiliano ${matched.length} yaliyopatikana kwenye Tuma!`);
+      }
+    } catch (e: any) {
+      if (e.message.includes('not supported')) {
+        toast.error('Kivinjari chako hakisaidii kipengele hiki. Tumia Chrome kwenye Android.');
+      } else {
+        toast.error('Imeshindwa kupakia mawasiliano.');
+      }
+    } finally {
+      setLoadingContacts(false);
+    }
   }
 
   function shareInvite() {
@@ -272,7 +303,76 @@ export default function ChatPage() {
             </div>
           )}
 
-          {/* Users list */}
+          {/* ── Contacts from phonebook ── */}
+          {!query && (
+            <div className="mb-1">
+              {/* Header */}
+              <div className="flex items-center justify-between px-4 py-2">
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide flex items-center gap-1.5">
+                  <BookUser size={12} /> Mawasiliano yako
+                </p>
+                {supportsContacts && (
+                  <button onClick={loadContacts} disabled={loadingContacts}
+                    className="flex items-center gap-1.5 text-xs text-primary font-semibold">
+                    {loadingContacts
+                      ? <><Loader2 size={12} className="animate-spin" /> Inapakia...</>
+                      : contactsLoaded
+                      ? <><BookUser size={12} /> Onyesha tena</>
+                      : <><BookUser size={12} /> Soma mawasiliano</>}
+                  </button>
+                )}
+              </div>
+
+              {/* Contacts not yet loaded */}
+              {!contactsLoaded && !loadingContacts && (
+                <div className={`mx-4 mb-3 rounded-2xl p-4 ${supportsContacts ? 'bg-primary/5 border border-primary/10' : 'bg-slate-50 dark:bg-slate-800'}`}>
+                  {supportsContacts ? (
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
+                        <BookUser size={18} className="text-primary" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Onyesha marafiki wako</p>
+                        <p className="text-xs text-slate-400 mt-0.5">Gonga ili kuona ni mawasiliano gani yako yaliyopo kwenye Tuma</p>
+                      </div>
+                      <button onClick={loadContacts}
+                        className="bg-primary text-white text-xs font-bold px-3 py-2 rounded-xl flex-shrink-0">
+                        Fungua
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-400 text-center py-1">
+                      📱 Fungua kwenye Chrome (Android) kuona mawasiliano yako
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Matched contacts */}
+              {contactsLoaded && contacts.length > 0 && (
+                <>
+                  <p className="px-4 pb-1 text-xs text-slate-400">
+                    {contacts.length} marafiki wako wapo kwenye Tuma
+                  </p>
+                  {contacts.map(c => (
+                    <ContactRow key={c.id} contact={c} onChat={() => startChat(c.id)} />
+                  ))}
+                  <div className="mx-4 my-2 border-b border-slate-100 dark:border-slate-800" />
+                </>
+              )}
+
+              {contactsLoaded && contacts.length === 0 && (
+                <div className="mx-4 mb-3 bg-slate-50 dark:bg-slate-800 rounded-2xl p-4 text-center">
+                  <p className="text-sm text-slate-400">Hakuna mawasiliano yako kwenye Tuma bado</p>
+                  <button onClick={shareInvite} className="text-xs text-primary font-semibold mt-2">
+                    Walika marafiki →
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── All Tuma users ── */}
           {searching && displayedUsers.length === 0 ? (
             <div className="flex justify-center py-10"><Loader2 size={20} className="animate-spin text-slate-300" /></div>
           ) : displayedUsers.length === 0 && query.length >= 2 ? (
@@ -328,5 +428,35 @@ export default function ChatPage() {
 
       <BottomNav />
     </div>
+  );
+}
+
+// ── Contact row — shows SAVED NAME from phonebook ─────────────────────────────
+function ContactRow({ contact, onChat }: { contact: TumaContact; onChat: () => void }) {
+  const colors = ['bg-primary','bg-purple-500','bg-teal-500','bg-orange-500','bg-pink-500','bg-indigo-500'];
+  const color  = colors[contact.savedName.charCodeAt(0) % colors.length];
+  return (
+    <button onClick={onChat}
+      className="w-full flex items-center gap-3 px-4 py-3 border-b border-slate-50 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 text-left">
+      <div className="relative flex-shrink-0">
+        <div className={`w-12 h-12 rounded-full ${color} flex items-center justify-center text-white font-bold text-sm`}>
+          {contact.savedName.slice(0, 2).toUpperCase()}
+        </div>
+        <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${contact.isOnline ? 'bg-green-500' : 'bg-slate-300'}`} />
+      </div>
+      <div className="flex-1 min-w-0">
+        {/* Saved name from phone contacts — shown prominently */}
+        <p className="font-semibold text-sm truncate">{contact.savedName}</p>
+        <p className="text-xs text-slate-400">
+          {contact.kycName && contact.kycName !== contact.savedName
+            ? `Tuma: ${contact.kycName} · `
+            : ''}
+          {contact.isOnline ? '🟢 Mtandaoni' : 'Tuma'}
+        </p>
+      </div>
+      <span className="bg-green-500 text-white text-xs font-semibold px-3 py-1.5 rounded-full flex-shrink-0">
+        Chat
+      </span>
+    </button>
   );
 }
