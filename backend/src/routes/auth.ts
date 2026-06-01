@@ -55,12 +55,16 @@ async function storeRefreshToken(userId: string, token: string): Promise<void> {
 // ── POST /api/auth/register ────────────────────────────────────────────────────
 
 router.post('/register', authLimiter, async (req, res) => {
-  const parse = z.object({ phone: phoneSchema, pin: pinSchema }).safeParse(req.body);
+  const parse = z.object({
+    phone: phoneSchema,
+    pin:   pinSchema,
+    name:  z.string().min(2).max(100).optional(),
+  }).safeParse(req.body);
   if (!parse.success) {
     return res.status(400).json({ error: parse.error.errors[0].message });
   }
 
-  const { phone, pin } = parse.data;
+  const { phone, pin, name } = parse.data;
 
   const existing = await prisma.user.findUnique({ where: { phone } });
   if (existing) {
@@ -87,6 +91,7 @@ router.post('/register', authLimiter, async (req, res) => {
       stellarSecret:    encryptedSecret,
       chatPublicKey,
       chatSecretKeyEnc,
+      kycName:          name ?? null,
     },
   });
 

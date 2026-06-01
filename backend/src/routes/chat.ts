@@ -61,33 +61,34 @@ router.get('/users/:id/pubkey', async (req, res) => {
 });
 
 // ── GET /api/chat/users/search ────────────────────────────────────────────────
+// Returns all users if no query, or filtered results
 router.get('/users/search', requireAuth, async (req: AuthRequest, res) => {
   const q = (req.query.q as string ?? '').trim();
-  if (q.length < 3) return res.status(400).json(fail('Search query too short'));
+
+  const where: any = { id: { not: req.userId! } };
+
+  if (q.length >= 2) {
+    where.OR = [
+      { phone:   { contains: q } },
+      { kycName: { contains: q, mode: 'insensitive' } },
+    ];
+  }
 
   const users = await prisma.user.findMany({
-    where: {
-      AND: [
-        { id: { not: req.userId! } },
-        {
-          OR: [
-            { phone: { contains: q } },
-            { kycName: { contains: q, mode: 'insensitive' } },
-          ],
-        },
-      ],
-    },
+    where,
     select: { id: true, kycName: true, phone: true, chatPublicKey: true, isOnline: true, lastSeenAt: true },
-    take: 20,
+    orderBy: [{ isOnline: 'desc' }, { createdAt: 'desc' }],
+    take: 50,
   });
 
-  // Mask phone: +255****1234
-  const masked = users.map(u => ({
+  // Show partial phone for privacy: +255****1234
+  const result = users.map(u => ({
     ...u,
-    phone: u.phone.slice(0, 5) + '****' + u.phone.slice(-4),
+    phoneMasked: u.phone.slice(0, 5) + '****' + u.phone.slice(-4),
+    displayName: u.kycName ?? u.phone.slice(0, 5) + '****' + u.phone.slice(-4),
   }));
 
-  return res.json(ok({ users: masked }));
+  return res.json(ok({ users: result }));
 });
 
 // ── GET /api/chat/conversations ───────────────────────────────────────────────

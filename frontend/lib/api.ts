@@ -109,10 +109,10 @@ export class ApiError extends Error {
 // ── Auth ───────────────────────────────────────────────────────────────────────
 
 export const auth = {
-  register: (phone: string, pin: string) =>
+  register: (phone: string, pin: string, name?: string) =>
     apiFetch('/api/auth/register', {
       method: 'POST',
-      body:   JSON.stringify({ phone, pin }),
+      body:   JSON.stringify({ phone, pin, ...(name ? { name } : {}) }),
       skipAuth: true,
     }),
 

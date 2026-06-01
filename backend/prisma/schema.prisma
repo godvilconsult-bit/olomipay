@@ -32,6 +32,7 @@ enum TxStatus {
   PENDING
   CONFIRMED
   FAILED
+  EXPIRED
 }
 
 enum Frequency {
