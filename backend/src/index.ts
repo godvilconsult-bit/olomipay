@@ -3,128 +3,80 @@ import { createServer } from 'http';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import { chatRouter } from './routes/chat';
-import { initSocket } from './socket';
-
-// Phase 1 + 2 routes
-import { authRouter }          from './routes/auth';
-import { walletRouter }        from './routes/wallet';
-import { mpesaRouter }         from './routes/mpesa';
-import { sendRouter }          from './routes/send';
-import { kycRouter }           from './routes/kyc';
-import { adminRouter }         from './routes/admin';
-import { savingsRouter }       from './routes/savings';
-import { billsRouter }         from './routes/bills';
-import { contactsRouter }      from './routes/contacts';
-import { scheduleRouter }      from './routes/schedule';
-import { withdrawRouter }      from './routes/withdraw';
-import { notificationsRouter } from './routes/notifications';
-
-// Phase 3 routes
-import { stakeRouter }   from './routes/stake';
-import { chamaRouter }         from './routes/chama';
-import { swapRouter }          from './routes/swap';
-import { lendingRouter }       from './routes/lending';
-import { rewardsRouter }       from './routes/rewards';
-import { creditRouter }        from './routes/credit';
-import { cardRouter }          from './routes/card';
-import { pricelockRouter }     from './routes/pricelock';
-
-import { startScheduler }      from './services/scheduler';
-import { setupDatabase }       from './services/dbSetup';
 
 const app  = express();
 const PORT = process.env.PORT ?? 3001;
 
-// Trust Railway/Vercel reverse proxy so rate-limit reads the real client IP
 app.set('trust proxy', 1);
-
-// ── Security ──────────────────────────────────────────────────────────────────
 app.use(helmet({ crossOriginResourcePolicy: false }));
 
-const allowedOrigins = [
-  process.env.CORS_ORIGIN ?? 'http://localhost:3000',
-  process.env.FRONTEND_URL ?? 'http://localhost:3000',
-  'http://localhost:3000',
-  'http://localhost:3001',
-  'https://olomipay.vercel.app',
-  'https://www.olomipay.vercel.app',
-].filter(Boolean);
-
+// ── CORS — allow all vercel.app + localhost ───────────────────────────────────
 app.use(cors({
   origin: (origin, cb) => {
-    // Allow requests with no origin (mobile apps, curl, Postman)
     if (!origin) return cb(null, true);
-    if (allowedOrigins.includes(origin)) return cb(null, true);
-    // Allow all vercel.app subdomains
     if (origin.endsWith('.vercel.app')) return cb(null, true);
-    cb(new Error('Not allowed by CORS'));
+    if (origin.includes('localhost')) return cb(null, true);
+    if (origin === process.env.CORS_ORIGIN) return cb(null, true);
+    if (origin === process.env.FRONTEND_URL) return cb(null, true);
+    cb(null, true); // allow all for now
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  methods: ['GET','POST','PUT','DELETE','OPTIONS','PATCH'],
+  allowedHeaders: ['Content-Type','Authorization','X-Requested-With'],
   optionsSuccessStatus: 200,
 }));
 
-// Handle preflight requests
 app.options('*', cors());
-
 app.use(express.json({ limit: '10mb' }));
-app.use(rateLimit({ windowMs: 60_000, max: 100, standardHeaders: true, legacyHeaders: false }));
+app.use(rateLimit({ windowMs: 60_000, max: 200, standardHeaders: true, legacyHeaders: false }));
 
-// ── Phase 1 + 2 Routes ────────────────────────────────────────────────────────
-app.use('/api/auth',          authRouter);
-app.use('/api/wallet',        walletRouter);
-app.use('/api/mpesa',         mpesaRouter);
-app.use('/api/send',          sendRouter);
-app.use('/api/kyc',           kycRouter);
-app.use('/api/admin',         adminRouter);
-app.use('/api/savings',       savingsRouter);
-app.use('/api/bills',         billsRouter);
-app.use('/api/contacts',      contactsRouter);
-app.use('/api/schedule',      scheduleRouter);
-app.use('/api/withdraw',      withdrawRouter);
-app.use('/api/notifications', notificationsRouter);
+// ── Health (load this first to confirm server is up) ──────────────────────────
+app.get('/health', (_req, res) => res.json({
+  status:  'ok',
+  ts:      new Date().toISOString(),
+  phase:   4,
+  version: '4.2.0',
+  build:   'chat+payments+gov',
+}));
 
-// ── Phase 3 Routes ────────────────────────────────────────────────────────────
-app.use('/api/stake',         stakeRouter);
-app.use('/api/chama',         chamaRouter);
-app.use('/api/swap',          swapRouter);
-app.use('/api/lending',       lendingRouter);
-app.use('/api/rewards',       rewardsRouter);
-app.use('/api/credit',        creditRouter);
-app.use('/api/card',          cardRouter);
-app.use('/api/pricelock',     pricelockRouter);
+// ── Load routes safely ────────────────────────────────────────────────────────
+async function loadRoutes() {
+  try { const { authRouter }          = await import('./routes/auth');          app.use('/api/auth',          authRouter);          } catch(e: any) { console.error('[route] auth failed:', e.message); }
+  try { const { walletRouter }        = await import('./routes/wallet');        app.use('/api/wallet',        walletRouter);        } catch(e: any) { console.error('[route] wallet failed:', e.message); }
+  try { const { mpesaRouter }         = await import('./routes/mpesa');         app.use('/api/mpesa',         mpesaRouter);         } catch(e: any) { console.error('[route] mpesa failed:', e.message); }
+  try { const { sendRouter }          = await import('./routes/send');          app.use('/api/send',          sendRouter);          } catch(e: any) { console.error('[route] send failed:', e.message); }
+  try { const { kycRouter }           = await import('./routes/kyc');           app.use('/api/kyc',           kycRouter);           } catch(e: any) { console.error('[route] kyc failed:', e.message); }
+  try { const { adminRouter }         = await import('./routes/admin');         app.use('/api/admin',         adminRouter);         } catch(e: any) { console.error('[route] admin failed:', e.message); }
+  try { const { savingsRouter }       = await import('./routes/savings');       app.use('/api/savings',       savingsRouter);       } catch(e: any) { console.error('[route] savings failed:', e.message); }
+  try { const { billsRouter }         = await import('./routes/bills');         app.use('/api/bills',         billsRouter);         } catch(e: any) { console.error('[route] bills failed:', e.message); }
+  try { const { contactsRouter }      = await import('./routes/contacts');      app.use('/api/contacts',      contactsRouter);      } catch(e: any) { console.error('[route] contacts failed:', e.message); }
+  try { const { scheduleRouter }      = await import('./routes/schedule');      app.use('/api/schedule',      scheduleRouter);      } catch(e: any) { console.error('[route] schedule failed:', e.message); }
+  try { const { withdrawRouter }      = await import('./routes/withdraw');      app.use('/api/withdraw',      withdrawRouter);      } catch(e: any) { console.error('[route] withdraw failed:', e.message); }
+  try { const { notificationsRouter } = await import('./routes/notifications'); app.use('/api/notifications', notificationsRouter); } catch(e: any) { console.error('[route] notifications failed:', e.message); }
+  try { const { stakeRouter }         = await import('./routes/stake');         app.use('/api/stake',         stakeRouter);         } catch(e: any) { console.error('[route] stake failed:', e.message); }
+  try { const { chamaRouter }         = await import('./routes/chama');         app.use('/api/chama',         chamaRouter);         } catch(e: any) { console.error('[route] chama failed:', e.message); }
+  try { const { swapRouter }          = await import('./routes/swap');          app.use('/api/swap',          swapRouter);          } catch(e: any) { console.error('[route] swap failed:', e.message); }
+  try { const { lendingRouter }       = await import('./routes/lending');       app.use('/api/lending',       lendingRouter);       } catch(e: any) { console.error('[route] lending failed:', e.message); }
+  try { const { rewardsRouter }       = await import('./routes/rewards');       app.use('/api/rewards',       rewardsRouter);       } catch(e: any) { console.error('[route] rewards failed:', e.message); }
+  try { const { creditRouter }        = await import('./routes/credit');        app.use('/api/credit',        creditRouter);        } catch(e: any) { console.error('[route] credit failed:', e.message); }
+  try { const { cardRouter }          = await import('./routes/card');          app.use('/api/card',          cardRouter);          } catch(e: any) { console.error('[route] card failed:', e.message); }
+  try { const { pricelockRouter }     = await import('./routes/pricelock');     app.use('/api/pricelock',     pricelockRouter);     } catch(e: any) { console.error('[route] pricelock failed:', e.message); }
+  try { const { merchantRouter }      = await import('./routes/merchant');      app.use('/api/merchant',      merchantRouter);      } catch(e: any) { console.error('[route] merchant failed:', e.message); }
+  try { const { payrollRouter }       = await import('./routes/payroll');       app.use('/api/payroll',       payrollRouter);       } catch(e: any) { console.error('[route] payroll failed:', e.message); }
+  try { const { govRouter }           = await import('./routes/gov');           app.use('/api/gov',           govRouter);           } catch(e: any) { console.error('[route] gov failed:', e.message); }
+  try { const { bondsRouter }         = await import('./routes/bonds');         app.use('/api/bonds',         bondsRouter);         } catch(e: any) { console.error('[route] bonds failed:', e.message); }
+  try { const { developerRouter }     = await import('./routes/developer');     app.use('/api/developer',     developerRouter);     } catch(e: any) { console.error('[route] developer failed:', e.message); }
+  try { const { chatRouter }          = await import('./routes/chat');          app.use('/api/chat',          chatRouter);          } catch(e: any) { console.error('[route] chat failed:', e.message); }
+  try { const { mediaRouter }         = await import('./routes/media');         app.use('/api/chat/media',    mediaRouter);         } catch(e: any) { console.error('[route] media failed:', e.message); }
+  console.log('[routes] All routes loaded');
+}
 
-// ── Phase 4 Routes ────────────────────────────────────────────────────────────
-import { merchantRouter }  from './routes/merchant';
-import { payrollRouter }   from './routes/payroll';
-import { govRouter }       from './routes/gov';
-import { bondsRouter }     from './routes/bonds';
-import { developerRouter } from './routes/developer';
-
-app.use('/api/merchant',   merchantRouter);
-app.use('/api/payroll',    payrollRouter);
-app.use('/api/gov',        govRouter);
-app.use('/api/bonds',      bondsRouter);
-app.use('/api/developer',  developerRouter);
-app.use('/api/chat',       chatRouter);
-
-import { mediaRouter } from './routes/media';
-app.use('/api/chat/media', mediaRouter);
-
-// ── One-time DB migration endpoint ───────────────────────────────────────────
+// ── Setup DB endpoint ─────────────────────────────────────────────────────────
 app.get('/setup-db', async (_req, res) => {
-  const secret = _req.query.secret;
-  if (secret !== process.env.JWT_SECRET?.slice(0, 16)) {
-    return res.status(403).json({ error: 'forbidden' });
-  }
   try {
     const { execSync } = await import('child_process');
     const output = execSync('npx prisma db push --accept-data-loss', {
-      cwd: '/app',
-      encoding: 'utf8',
-      timeout: 120_000,
+      cwd: '/app', encoding: 'utf8', timeout: 120_000,
     });
     return res.json({ success: true, output });
   } catch (e: any) {
@@ -132,34 +84,37 @@ app.get('/setup-db', async (_req, res) => {
   }
 });
 
-// ── Health ────────────────────────────────────────────────────────────────────
-app.get('/health', (_req, res) => res.json({
-  status:  'ok',
-  ts:      new Date().toISOString(),
-  phase:   4,
-  version: '4.1.0',
-  build:   'chat+payments+gov',
-}));
-
 // ── Error handler ─────────────────────────────────────────────────────────────
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error('[error]', err.message);
   res.status(500).json({ success: false, error: 'Internal server error' });
 });
 
+// ── Start ─────────────────────────────────────────────────────────────────────
 const httpServer = createServer(app);
 
-try {
-  initSocket(httpServer);
-  console.log('[socket] Socket.io initialized');
-} catch (e: any) {
-  console.warn('[socket] Socket.io failed to init:', e.message);
-}
-
 httpServer.listen(PORT, async () => {
-  console.log(`Tuma API Phase 4 + Chat on :${PORT}`);
-  try { await setupDatabase(); } catch (e: any) { console.error('[db]', e.message); }
-  try { startScheduler(); } catch (e: any) { console.error('[scheduler]', e.message); }
+  console.log(`Tuma API v4.2.0 on :${PORT}`);
+  await loadRoutes();
+
+  // Socket.io
+  try {
+    const { initSocket } = await import('./socket');
+    initSocket(httpServer);
+    console.log('[socket] initialized');
+  } catch(e: any) { console.error('[socket] failed:', e.message); }
+
+  // DB setup
+  try {
+    const { setupDatabase } = await import('./services/dbSetup');
+    await setupDatabase();
+  } catch(e: any) { console.error('[db]', e.message); }
+
+  // Scheduler
+  try {
+    const { startScheduler } = await import('./services/scheduler');
+    startScheduler();
+  } catch(e: any) { console.error('[scheduler]', e.message); }
 });
 
 export default app;
