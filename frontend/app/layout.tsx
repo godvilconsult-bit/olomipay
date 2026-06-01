@@ -30,8 +30,9 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width:              'device-width',
   initialScale:       1,
-  maximumScale:       1,        // prevents zoom on input focus (iOS)
-  userScalable:       false,
+  maximumScale:       5,        // allow pinch-zoom for accessibility
+  userScalable:       true,
+  viewportFit:        'cover',  // extend under notches; safe-area insets handle padding
   themeColor:         '#1a56db',
 };
 

@@ -16,6 +16,33 @@
   input, select, textarea {
     font-size: 16px !important;
   }
+
+  /* ── Global overflow protection — nothing escapes the screen ──────────────── */
+  html, body {
+    max-width: 100%;
+    overflow-x: hidden;       /* never allow horizontal scroll */
+    overscroll-behavior-y: none;
+  }
+
+  /* Every element respects its box; media never overflows its container */
+  *, *::before, *::after { box-sizing: border-box; min-width: 0; }
+
+  img, svg, video, canvas, iframe {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* Long unbroken strings (wallet addresses, URLs) wrap instead of overflowing */
+  p, span, h1, h2, h3, h4, a, div, td, th, li, label, button {
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+
+  /* Honour safe areas on notched / rounded devices */
+  body {
+    padding-left:  env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
 }
 
 @layer components {
@@ -82,3 +109,47 @@
 @media (min-width: 768px) {
   .page-pad { padding-left: 1.5rem; padding-right: 1.5rem; }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Fixed bottom navigation — keep clear of the home-indicator / safe area
+   ───────────────────────────────────────────────────────────────────────────── */
+nav.fixed.bottom-0 {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Fluid typography — large display headings scale with viewport width so they
+   never overflow on small screens and don't look tiny on large ones.
+   ───────────────────────────────────────────────────────────────────────────── */
+.text-4xl { font-size: clamp(1.75rem, 6vw, 2.25rem) !important; line-height: 1.15; }
+.text-3xl { font-size: clamp(1.5rem,  5vw, 1.875rem) !important; line-height: 1.2; }
+.text-2xl { font-size: clamp(1.25rem, 4.5vw, 1.5rem) !important; line-height: 1.25; }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Landscape on short screens (phones rotated): tighten vertical rhythm and let
+   tall content scroll instead of getting cut off.
+   ───────────────────────────────────────────────────────────────────────────── */
+@media (max-height: 480px) and (orientation: landscape) {
+  /* Trim big vertical paddings so forms/heroes fit without clipping.
+     (Chat keeps its h-screen flex layout — its message area scrolls internally.) */
+  .py-16 { padding-top: 1.5rem !important; padding-bottom: 1.5rem !important; }
+  .py-12 { padding-top: 1.25rem !important; padding-bottom: 1.25rem !important; }
+  .py-8  { padding-top: 1rem !important; padding-bottom: 1rem !important; }
+  /* Centered full-height flows (auth, landing hero) scroll instead of clipping */
+  .min-h-screen { min-height: auto; }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Horizontal scroll containers (wide tables, chip rows) must scroll internally
+   instead of stretching the page.
+   ───────────────────────────────────────────────────────────────────────────── */
+.overflow-x-auto { -webkit-overflow-scrolling: touch; max-width: 100%; }
+table { max-width: 100%; }
+
+/* Flex rows wrap by default on narrow screens unless explicitly nowrap */
+@media (max-width: 380px) {
+  .flex.gap-3 > *, .flex.gap-4 > * { min-width: 0; }
+}
+
+/* Prevent any element from forcing the page wider than the viewport */
+#__next, main, section, header, footer { max-width: 100%; }
