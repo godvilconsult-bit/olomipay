@@ -111,8 +111,8 @@ router.get('/stats', requireAuth, async (req: AuthRequest, res) => {
 // ── POST /api/merchant/cashout ────────────────────────────────────────────────
 router.post('/cashout', requireAuth, async (req: AuthRequest, res) => {
   const { amountUsdc, pin } = req.body;
-  // Delegate to withdraw logic — merchant cashes out to M-Pesa
-  return res.json(ok({ message: 'Cashout initiated — funds will arrive via M-Pesa within 5 minutes', amountUsdc }));
+  // Delegate to withdraw logic — merchant cashes out to Mobile Money
+  return res.json(ok({ message: 'Cashout initiated — funds will arrive via Mobile Money within 5 minutes', amountUsdc }));
 });
 
 export { router as merchantRouter };

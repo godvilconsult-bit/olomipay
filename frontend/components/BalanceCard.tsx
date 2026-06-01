@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Eye, EyeOff, RefreshCw } from 'lucide-react';
 import { formatUsdc, formatTzs } from '../lib/utils';
-import { wallet, mpesa } from '../lib/api';
+import { wallet, mobile_money } from '../lib/api';
 
 interface Props {
   publicKey?: string;
@@ -23,7 +23,7 @@ export default function BalanceCard({ publicKey }: Props) {
     try {
       const [balRes, rateRes] = await Promise.all([
         wallet.balance(),
-        mpesa.rate().catch(() => ({ usdcToTzs: 2600 })),
+        mobile_money.rate().catch(() => ({ usdcToTzs: 2600 })),
       ]);
       setUsdc(balRes.balance.usdc);
       setXlm(balRes.balance.xlm);

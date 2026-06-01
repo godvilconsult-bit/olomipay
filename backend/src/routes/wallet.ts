@@ -41,7 +41,7 @@ router.get('/history', requireAuth, async (req: AuthRequest, res) => {
   const user = await prisma.user.findUnique({ where: { id: req.userId! } });
   if (!user) return res.status(404).json({ error: 'User not found' });
 
-  // DB transactions (M-Pesa + Stellar via our records)
+  // DB transactions (Mobile Money + Stellar via our records)
   const [dbTxs, count] = await prisma.$transaction([
     prisma.transaction.findMany({
       where:   { userId: req.userId! },
@@ -57,7 +57,7 @@ router.get('/history', requireAuth, async (req: AuthRequest, res) => {
   try {
     stellarTxs = await getTransactionHistory(user.stellarPubKey, 10);
   } catch {
-    // Non-fatal — DB records are the source of truth for M-Pesa side
+    // Non-fatal — DB records are the source of truth for Mobile Money side
   }
 
   return res.json({

@@ -1,20 +1,20 @@
 /**
- * Safaricom Daraja API client.
+ * mobile operator Daraja API client.
  *
- * Handles STK Push (deposit) and B2C (withdrawal) flows.
- * Tanzania M-Pesa uses a different Daraja instance than Kenya — adapt
- * the base URL to https://openapi.m-pesa.com/sandbox for Tanzania Vodacom.
+ * Handles Mobile Money prompt (deposit) and B2C (withdrawal) flows.
+ * Tanzania Mobile Money uses a different Daraja instance than Kenya — adapt
+ * the base URL to https://openapi.mobile money.com/sandbox for Tanzania Vodacom.
  * For the initial MVP we target the Kenya Daraja sandbox which has the
  * widest documentation coverage; swap the base URL for production Tanzania.
  */
 
 import axios from 'axios';
 
-const IS_SANDBOX = (process.env.MPESA_ENV ?? 'sandbox') === 'sandbox';
+const IS_SANDBOX = (process.env.Mobile Money_ENV ?? 'sandbox') === 'sandbox';
 
 const BASE_URL = IS_SANDBOX
-  ? 'https://sandbox.safaricom.co.ke'
-  : 'https://api.safaricom.co.ke';
+  ? 'https://sandbox.mobile operator.co.ke'
+  : 'https://api.mobile operator.co.ke';
 
 // ── Token cache ───────────────────────────────────────────────────────────────
 
@@ -25,7 +25,7 @@ async function getAccessToken(): Promise<string> {
   if (cachedToken && Date.now() < tokenExpiry) return cachedToken;
 
   const credentials = Buffer.from(
-    `${process.env.MPESA_CONSUMER_KEY}:${process.env.MPESA_CONSUMER_SECRET}`,
+    `${process.env.Mobile Money_CONSUMER_KEY}:${process.env.Mobile Money_CONSUMER_SECRET}`,
   ).toString('base64');
 
   const res = await axios.get(
@@ -38,7 +38,7 @@ async function getAccessToken(): Promise<string> {
   return cachedToken;
 }
 
-// ── STK Push (deposit: user pays via phone prompt) ────────────────────────────
+// ── Mobile Money prompt (deposit: user pays via phone prompt) ────────────────────────────
 
 export interface StkPushResult {
   merchantRequestId:  string;
@@ -46,7 +46,7 @@ export interface StkPushResult {
   responseDescription: string;
 }
 
-export async function initiateSTKPush(params: {
+export async function initiatemobile moneyPush(params: {
   phone:     string; // +255XXXXXXXXX — will be normalised to 255XXXXXXXXX
   amountTzs: number; // whole TZS amount
   reference: string; // OlomiPay transaction ID
@@ -63,21 +63,21 @@ export async function initiateSTKPush(params: {
     .slice(0, 14); // YYYYMMDDHHmmss
 
   const password = Buffer.from(
-    `${process.env.MPESA_SHORTCODE}${process.env.MPESA_PASSKEY}${timestamp}`,
+    `${process.env.Mobile Money_SHORTCODE}${process.env.Mobile Money_PASSKEY}${timestamp}`,
   ).toString('base64');
 
   const res = await axios.post(
     `${BASE_URL}/mpesa/stkpush/v1/processrequest`,
     {
-      BusinessShortCode: process.env.MPESA_SHORTCODE,
+      BusinessShortCode: process.env.Mobile Money_SHORTCODE,
       Password:          password,
       Timestamp:         timestamp,
       TransactionType:   'CustomerPayBillOnline',
-      Amount:            Math.ceil(params.amountTzs), // M-Pesa requires integer
+      Amount:            Math.ceil(params.amountTzs), // Mobile Money requires integer
       PartyA:            phone,
-      PartyB:            process.env.MPESA_SHORTCODE,
+      PartyB:            process.env.Mobile Money_SHORTCODE,
       PhoneNumber:       phone,
-      CallBackURL:       process.env.MPESA_CALLBACK_URL,
+      CallBackURL:       process.env.Mobile Money_CALLBACK_URL,
       AccountReference:  params.reference.slice(0, 12), // max 12 chars
       TransactionDesc:   params.description.slice(0, 13), // max 13 chars
     },
@@ -91,7 +91,7 @@ export async function initiateSTKPush(params: {
   };
 }
 
-// ── STK Push callback payload (from M-Pesa webhook) ──────────────────────────
+// ── Mobile Money prompt callback payload (from Mobile Money webhook) ──────────────────────────
 
 export interface StkCallbackPayload {
   merchantRequestId: string;
@@ -144,15 +144,15 @@ export async function initiateB2C(params: {
   const res = await axios.post(
     `${BASE_URL}/mpesa/b2c/v3/paymentrequest`,
     {
-      InitiatorName:          process.env.MPESA_B2C_INITIATOR_NAME,
-      SecurityCredential:     process.env.MPESA_B2C_SECURITY_CREDENTIAL,
+      InitiatorName:          process.env.Mobile Money_B2C_INITIATOR_NAME,
+      SecurityCredential:     process.env.Mobile Money_B2C_SECURITY_CREDENTIAL,
       CommandID:              'BusinessPayment',
       Amount:                 Math.floor(params.amountTzs),
-      PartyA:                 process.env.MPESA_SHORTCODE,
+      PartyA:                 process.env.Mobile Money_SHORTCODE,
       PartyB:                 phone,
       Remarks:                params.remarks.slice(0, 100),
-      QueueTimeOutURL:        process.env.MPESA_B2C_QUEUE_URL,
-      ResultURL:              process.env.MPESA_B2C_RESULT_URL,
+      QueueTimeOutURL:        process.env.Mobile Money_B2C_QUEUE_URL,
+      ResultURL:              process.env.Mobile Money_B2C_RESULT_URL,
       Occasion:               params.reference.slice(0, 100),
     },
     { headers: { Authorization: `Bearer ${token}` } },

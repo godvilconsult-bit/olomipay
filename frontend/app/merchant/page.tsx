@@ -149,7 +149,7 @@ export default function MerchantPage() {
                 const r = await merchantApi('/cashout', 'POST', { amountUsdc: merchant.totalSales });
                 if (r.success) toast.success(r.data.message);
               }}>
-                Cash Out to M-Pesa
+                Cash Out to Mobile Money
               </button>
             </div>
 

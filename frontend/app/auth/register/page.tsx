@@ -76,7 +76,7 @@ export default function RegisterPage() {
           <div className="flex flex-col gap-6">
             <div>
               <h2 className="text-2xl font-bold mb-1">Your phone number</h2>
-              <p className="text-slate-500 text-sm">We'll link your M-Pesa to this number</p>
+              <p className="text-slate-500 text-sm">We'll link your Mobile Money to this number</p>
             </div>
             <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800 rounded-2xl px-4 min-h-[56px]">
               <Phone size={18} className="text-slate-400 flex-shrink-0" />

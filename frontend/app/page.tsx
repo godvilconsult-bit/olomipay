@@ -43,7 +43,7 @@ export default function LandingPage() {
         </h1>
 
         <p className="text-lg text-slate-300 mb-3 max-w-md">
-          Deposit via M-Pesa, send money anywhere in the world, chat with friends, and cash out back to M-Pesa.
+          Deposit via Mobile Money, send money anywhere in the world, chat with friends, and cash out back to Mobile Money.
         </p>
         <p className="text-sm text-blue-300 mb-8 font-medium italic">
           "Building Trust Through Blockchain"
@@ -69,7 +69,7 @@ export default function LandingPage() {
         <div className="grid sm:grid-cols-3 gap-4">
           {[
             { icon: Globe,          title: 'Send Worldwide',    desc: 'Send money to anyone worldwide instantly — no crypto knowledge needed.' },
-            { icon: Zap,            title: 'M-Pesa Bridge',     desc: 'Deposit TZS via M-Pesa. Money converts automatically to your digital wallet.' },
+            { icon: Zap,            title: 'Mobile Money Bridge',     desc: 'Deposit TZS via Mobile Money. Money converts automatically to your digital wallet.' },
             { icon: Shield,         title: '1% Flat Fee',       desc: 'Transparent pricing. You always see the exact fee before confirming.' },
             { icon: MessageCircle,  title: 'Chat & Pay',        desc: 'Chat with contacts and send money directly in the conversation.' },
             { icon: TrendingUp,     title: 'Earn Interest',     desc: 'Save your money and earn daily interest on your balance.' },
@@ -87,7 +87,7 @@ export default function LandingPage() {
       <section className="px-5 pb-20 max-w-2xl mx-auto w-full text-center">
         <h2 className="text-xl font-semibold mb-6 text-slate-200">How it works</h2>
         <div className="flex items-center justify-center gap-2 flex-wrap">
-          {['M-Pesa', '→', 'Olomi Wallet', '→', 'Send / Save / Chat', '→', 'Cash Out'].map((step, i) => (
+          {['Mobile Money', '→', 'Olomi Wallet', '→', 'Send / Save / Chat', '→', 'Cash Out'].map((step, i) => (
             <span key={i} className={step === '→' ? 'text-slate-500 text-lg' :
               'bg-white/10 rounded-full px-4 py-2 text-sm font-medium text-slate-200'}>
               {step}

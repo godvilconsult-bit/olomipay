@@ -47,7 +47,7 @@ router.get('/balance', requireAuth, async (req: AuthRequest, res) => {
     progress,
     catalog: [
       { id: 'fee_waiver',  label: 'Free transaction',     points: 100,  description: 'Skip the 1% fee on your next transfer' },
-      { id: 'airtime_1k',  label: '1,000 TZS Airtime',    points: 500,  description: 'Credited to your M-Pesa instantly' },
+      { id: 'airtime_1k',  label: '1,000 TZS Airtime',    points: 500,  description: 'Credited to your Mobile Money instantly' },
       { id: 'usdc_1',      label: '$1 USDC',              points: 1000, description: 'Added to your Stellar wallet' },
       { id: 'usdc_5',      label: '$5 USDC',              points: 4500, description: 'Added to your Stellar wallet' },
     ],

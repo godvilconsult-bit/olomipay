@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { PrismaClient } from '@prisma/client';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 import {
-  initiateSTKPush,
+  initiatemobile moneyPush,
   parseStkCallback,
   initiateB2C,
   tzsToUsdc,
@@ -27,7 +27,7 @@ const depositLimiter = rateLimit({
 });
 
 // ── POST /api/mpesa/deposit ────────────────────────────────────────────────────
-// Triggers STK Push on user's M-Pesa phone.
+// Triggers Mobile Money prompt on user's Mobile Money phone.
 
 router.post('/deposit', requireAuth, depositLimiter, async (req: AuthRequest, res) => {
   const parse = z.object({
@@ -55,7 +55,7 @@ router.post('/deposit', requireAuth, depositLimiter, async (req: AuthRequest, re
   });
 
   try {
-    const stkResult = await initiateSTKPush({
+    const stkResult = await initiatemobile moneyPush({
       phone:       user.phone,
       amountTzs:   parse.data.amountTzs,
       reference:   tx.id,
@@ -69,7 +69,7 @@ router.post('/deposit', requireAuth, depositLimiter, async (req: AuthRequest, re
     });
 
     return res.json({
-      message:         'STK Push sent. Check your phone to complete payment.',
+      message:         'Mobile Money prompt sent. Check your phone to complete payment.',
       transactionId:   tx.id,
       checkoutRequestId: stkResult.checkoutRequestId,
     });
@@ -78,16 +78,16 @@ router.post('/deposit', requireAuth, depositLimiter, async (req: AuthRequest, re
       where: { id: tx.id },
       data:  { status: 'FAILED', errorMsg: err.message },
     });
-    console.error('[mpesa/deposit] STK Push failed:', err?.response?.data ?? err.message);
-    return res.status(502).json({ error: 'Failed to initiate M-Pesa payment' });
+    console.error('[mpesa/deposit] Mobile Money prompt failed:', err?.response?.data ?? err.message);
+    return res.status(502).json({ error: 'Failed to initiate Mobile Money payment' });
   }
 });
 
 // ── POST /api/mpesa/callback ───────────────────────────────────────────────────
-// M-Pesa webhook — called by Safaricom servers on payment completion.
+// Mobile Money webhook — called by mobile operator servers on payment completion.
 
 router.post('/callback', async (req, res) => {
-  // Acknowledge receipt immediately (M-Pesa will retry if we take > 5 s)
+  // Acknowledge receipt immediately (Mobile Money will retry if we take > 5 s)
   res.json({ ResultCode: 0, ResultDesc: 'Accepted' });
 
   try {
@@ -128,7 +128,7 @@ router.post('/callback', async (req, res) => {
         amountUsdc,
         stellarTxId: stellarTxHash,
         mpesaTxId:   payload.mpesaReceiptNumber ?? dbTx.mpesaTxId,
-        memo:        `M-Pesa receipt: ${payload.mpesaReceiptNumber}`,
+        memo:        `Mobile Money receipt: ${payload.mpesaReceiptNumber}`,
       },
     });
 
@@ -142,7 +142,7 @@ router.post('/callback', async (req, res) => {
 });
 
 // ── POST /api/mpesa/withdraw ───────────────────────────────────────────────────
-// User withdraws USDC → TZS via M-Pesa B2C.
+// User withdraws USDC → TZS via Mobile Money B2C.
 
 router.post('/withdraw', requireAuth, depositLimiter, async (req: AuthRequest, res) => {
   const parse = z.object({
@@ -188,7 +188,7 @@ router.post('/withdraw', requireAuth, depositLimiter, async (req: AuthRequest, r
       memo:            `OlomiPay withdrawal ${tx.id}`,
     });
 
-    // Send TZS via M-Pesa B2C
+    // Send TZS via Mobile Money B2C
     const b2cResult = await initiateB2C({
       phone:     user.phone,
       amountTzs,
@@ -207,7 +207,7 @@ router.post('/withdraw', requireAuth, depositLimiter, async (req: AuthRequest, r
     });
 
     return res.json({
-      message:       'Withdrawal initiated. Funds will arrive on M-Pesa shortly.',
+      message:       'Withdrawal initiated. Funds will arrive on Mobile Money shortly.',
       transactionId: tx.id,
       amountTzs,
     });

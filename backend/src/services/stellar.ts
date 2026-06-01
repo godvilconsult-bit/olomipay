@@ -251,7 +251,7 @@ export async function contractTransfer(params: {
 
 /**
  * Simple USDC transfer NOT through the Soroban contract (used by the anchor
- * when crediting user accounts after M-Pesa deposit confirmation).
+ * when crediting user accounts after Mobile Money deposit confirmation).
  */
 export async function platformSendUsdc(
   toPublicKey: string,

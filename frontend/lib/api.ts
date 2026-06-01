@@ -144,16 +144,16 @@ export const wallet = {
     apiFetch(`/api/wallet/history?limit=${limit}&offset=${offset}`),
 };
 
-// ── M-Pesa ────────────────────────────────────────────────────────────────────
+// ── Mobile Money ────────────────────────────────────────────────────────────────────
 
-export const mpesa = {
+export const mobile_money = {
   deposit:  (amountTzs: number) =>
-    apiFetch('/api/mpesa/deposit', { method: 'POST', body: JSON.stringify({ amountTzs }) }),
+    apiFetch('/api/mobile_money/deposit', { method: 'POST', body: JSON.stringify({ amountTzs }) }),
 
   withdraw: (amountUsdc: number, pin: string) =>
-    apiFetch('/api/mpesa/withdraw', { method: 'POST', body: JSON.stringify({ amountUsdc, pin }) }),
+    apiFetch('/api/mobile_money/withdraw', { method: 'POST', body: JSON.stringify({ amountUsdc, pin }) }),
 
-  rate: () => apiFetch('/api/mpesa/rate', { skipAuth: true }),
+  rate: () => apiFetch('/api/mobile_money/rate', { skipAuth: true }),
 };
 
 // ── Send ──────────────────────────────────────────────────────────────────────

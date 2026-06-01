@@ -5,7 +5,7 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title:       'OlomiPay — Building Trust Through Blockchain',
-  description: 'OlomiPay — Send money instantly via M-Pesa, chat with friends, earn interest. Building Trust Through Blockchain.',
+  description: 'OlomiPay — Send money instantly via Mobile Money, chat with friends, earn interest. Building Trust Through Blockchain.',
   manifest:    '/manifest.json',
   appleWebApp: {
     capable:           true,
@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   openGraph: {
     type:        'website',
     title:       'OlomiPay',
-    description: 'M-Pesa ↔ Stellar bridge for Tanzania',
+    description: 'Mobile Money ↔ Stellar bridge for Tanzania',
     siteName:    'OlomiPay',
   },
 };

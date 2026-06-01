@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 import { ArrowLeft, CheckCircle2 } from 'lucide-react';
 import BottomNav from '../../components/BottomNav';
 import PinInput from '../../components/PinInput';
-import { mpesa, wallet } from '../../lib/api';
+import { mobile_money, wallet } from '../../lib/api';
 import { formatTzs, formatUsdc } from '../../lib/utils';
 
 type Step = 'amount' | 'pin' | 'success';
@@ -22,7 +22,7 @@ export default function WithdrawPage() {
   const [txId,      setTxId]      = useState('');
 
   useEffect(() => {
-    Promise.all([mpesa.rate(), wallet.balance()]).then(([r, b]) => {
+    Promise.all([mobile_money.rate(), wallet.balance()]).then(([r, b]) => {
       setRate(r.usdcToTzs ?? 2600);
       setBalance(b.balance.usdc ?? '0');
     }).catch(() => {});
@@ -37,7 +37,7 @@ export default function WithdrawPage() {
     if (pin.length < 6) { toast.error('Enter your PIN'); return; }
     setLoading(true);
     try {
-      const res = await mpesa.withdraw(amountUsdc, pin);
+      const res = await mobile_money.withdraw(amountUsdc, pin);
       setTxId(res.transactionId);
       setStep('success');
     } catch (err: any) {
@@ -57,7 +57,7 @@ export default function WithdrawPage() {
           </div>
           <h2 className="text-2xl font-bold">Withdrawal initiated!</h2>
           <p className="text-slate-500 text-sm">
-            {formatTzs(amountTzs)} will arrive on your M-Pesa shortly.
+            {formatTzs(amountTzs)} will arrive on your Mobile Money shortly.
           </p>
           <button onClick={() => router.push('/dashboard')} className="btn-primary w-full">
             Back to home
@@ -75,7 +75,7 @@ export default function WithdrawPage() {
           className="p-2 -ml-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 min-h-[44px] min-w-[44px] flex items-center justify-center">
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-lg font-semibold">{step === 'pin' ? 'Confirm withdrawal' : 'Withdraw to M-Pesa'}</h1>
+        <h1 className="text-lg font-semibold">{step === 'pin' ? 'Confirm withdrawal' : 'Cash Out'}</h1>
       </div>
 
       <div className="px-5 max-w-md mx-auto mt-6 space-y-5">
@@ -120,7 +120,7 @@ export default function WithdrawPage() {
                   <span className="font-semibold text-danger">−{formatUsdc(amountUsdc)}</span>
                 </div>
                 <div className="border-t border-slate-200 dark:border-slate-700 pt-2 flex justify-between font-semibold">
-                  <span className="text-slate-700 dark:text-slate-200">M-Pesa receives</span>
+                  <span className="text-slate-700 dark:text-slate-200">You receive</span>
                   <span className="text-success">{formatTzs(amountTzs)}</span>
                 </div>
               </div>
@@ -141,7 +141,7 @@ export default function WithdrawPage() {
             <div className="card w-full text-center">
               <p className="text-sm text-slate-500 mb-1">Withdrawing</p>
               <p className="text-3xl font-bold">{formatUsdc(amountUsdc)}</p>
-              <p className="text-sm text-slate-400 mt-1">≈ {formatTzs(amountTzs)} to M-Pesa</p>
+              <p className="text-sm text-slate-400 mt-1">≈ {formatTzs(amountTzs)} to your mobile money</p>
             </div>
             <p className="text-sm text-slate-500">Enter PIN to confirm</p>
             <PinInput value={pin} onChange={setPin} autoFocus />

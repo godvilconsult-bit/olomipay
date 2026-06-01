@@ -18,8 +18,8 @@ const TYPE_META: Record<Transaction['type'], {
   color: string;
   sign:  '+' | '-' | '';
 }> = {
-  DEPOSIT:    { label: 'M-Pesa Deposit',  icon: ArrowDownLeft,  color: 'text-success bg-success/10', sign: '+' },
-  WITHDRAWAL: { label: 'Withdraw to M-Pesa', icon: ArrowUpRight, color: 'text-amber-600 bg-amber-100 dark:bg-amber-900/30', sign: '-' },
+  DEPOSIT:    { label: 'Mobile Money Deposit',  icon: ArrowDownLeft,  color: 'text-success bg-success/10', sign: '+' },
+  WITHDRAWAL: { label: 'Withdraw to Mobile Money', icon: ArrowUpRight, color: 'text-amber-600 bg-amber-100 dark:bg-amber-900/30', sign: '-' },
   SEND:       { label: 'Sent',            icon: ArrowUpRight,   color: 'text-primary bg-primary/10',  sign: '-' },
   RECEIVE:    { label: 'Received',        icon: ArrowDownLeft,  color: 'text-success bg-success/10',  sign: '+' },
   FEE:        { label: 'Platform Fee',    icon: DollarSign,     color: 'text-slate-500 bg-slate-100 dark:bg-slate-700', sign: '-' },

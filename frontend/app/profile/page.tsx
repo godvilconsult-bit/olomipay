@@ -218,18 +218,18 @@ export default function ProfilePage() {
           </p>
         </div>
 
-        {/* ── M-Pesa → Olomi Wallet info ── */}
+        {/* ── Mobile Money → Olomi Wallet info ── */}
         <div className="bg-gradient-to-r from-[#1a3a6b] to-[#1a56db] rounded-3xl p-5 text-white">
           <div className="flex items-center gap-2 mb-2">
             <img src="/logo.svg" alt="" className="w-6 h-6" />
-            <h3 className="font-bold">M-Pesa → Olomi Wallet</h3>
+            <h3 className="font-bold">Mobile Money → Olomi Wallet</h3>
           </div>
           <p className="text-sm text-white/80 mb-3">
-            Deposit via M-Pesa and your money is instantly available in your Olomi Wallet. Send, save, or convert anytime.
+            Deposit via Mobile Money and your money is instantly available in your Olomi Wallet. Send, save, or convert anytime.
           </p>
           <div className="space-y-2">
             {[
-              'Go to Deposit → enter amount → pay via M-Pesa',
+              'Go to Deposit → enter amount → pay via Mobile Money',
               'Money is instantly credited to your Olomi Wallet',
               'Send to anyone, save for interest, or convert currencies',
             ].map((s, i) => (
@@ -241,7 +241,7 @@ export default function ProfilePage() {
           </div>
           <button onClick={() => router.push('/deposit')}
             className="mt-4 w-full bg-white text-primary font-bold py-3 rounded-2xl text-sm">
-            Deposit via M-Pesa →
+            Deposit via Mobile Money →
           </button>
         </div>
 
