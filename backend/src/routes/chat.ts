@@ -76,16 +76,19 @@ router.get('/users/search', requireAuth, async (req: AuthRequest, res) => {
 
   const users = await prisma.user.findMany({
     where,
-    select: { id: true, kycName: true, phone: true, chatPublicKey: true, isOnline: true, lastSeenAt: true },
-    orderBy: [{ isOnline: 'desc' }, { createdAt: 'desc' }],
+    select: { id: true, kycName: true, phone: true, chatPublicKey: true, isOnline: true, lastSeenAt: true, createdAt: true },
+    orderBy: [{ createdAt: 'desc' }],
     take: 50,
   });
 
-  // Show partial phone for privacy: +255****1234
   const result = users.map(u => ({
-    ...u,
-    phoneMasked: u.phone.slice(0, 5) + '****' + u.phone.slice(-4),
-    displayName: u.kycName ?? u.phone.slice(0, 5) + '****' + u.phone.slice(-4),
+    id:           u.id,
+    kycName:      u.kycName,
+    chatPublicKey: u.chatPublicKey,
+    isOnline:     u.isOnline,
+    lastSeenAt:   u.lastSeenAt,
+    phoneMasked:  u.phone.slice(0, 5) + '****' + u.phone.slice(-4),
+    displayName:  u.kycName ?? (u.phone.slice(0, 5) + '****' + u.phone.slice(-4)),
   }));
 
   return res.json(ok({ users: result }));

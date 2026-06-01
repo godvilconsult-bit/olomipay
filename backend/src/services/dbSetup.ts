@@ -34,7 +34,7 @@ export async function setupDatabase(): Promise<void> {
 
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "User" (
-        "id" TEXT NOT NULL PRIMARY KEY,
+        "id" TEXT NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
         "phone" TEXT NOT NULL UNIQUE,
         "pinHash" TEXT NOT NULL,
         "stellarPubKey" TEXT NOT NULL UNIQUE,
@@ -46,10 +46,31 @@ export async function setupDatabase(): Promise<void> {
         "dailyVolumeTzs" DOUBLE PRECISION NOT NULL DEFAULT 0,
         "dailyVolumeDate" TIMESTAMP,
         "country" TEXT NOT NULL DEFAULT 'TZ',
+        "chatPublicKey" TEXT,
+        "chatSecretKeyEnc" TEXT,
+        "isOnline" BOOLEAN NOT NULL DEFAULT false,
+        "lastSeenAt" TIMESTAMP,
         "createdAt" TIMESTAMP NOT NULL DEFAULT NOW(),
         "updatedAt" TIMESTAMP NOT NULL DEFAULT NOW()
       );
     `);
+
+    // Add missing columns to existing User table safely
+    const userCols = [
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "kycName" TEXT`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "kycIdType" TEXT`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "kycIdNumber" TEXT`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "chatPublicKey" TEXT`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "chatSecretKeyEnc" TEXT`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "isOnline" BOOLEAN NOT NULL DEFAULT false`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "lastSeenAt" TIMESTAMP`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "country" TEXT NOT NULL DEFAULT 'TZ'`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "dailyVolumeTzs" DOUBLE PRECISION NOT NULL DEFAULT 0`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "dailyVolumeDate" TIMESTAMP`,
+    ];
+    for (const sql of userCols) {
+      await prisma.$executeRawUnsafe(sql).catch(() => {});
+    }
 
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "RefreshToken" (

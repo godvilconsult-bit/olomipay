@@ -76,24 +76,31 @@ router.post('/register', authLimiter, async (req, res) => {
   const encryptedSecret          = encryptSecret(secretKey, pin, phone);
   const pinHash                  = hashPin(pin);
 
-  // Generate chat encryption keypair (NaCl box)
-  const { default: nacl } = await import('tweetnacl');
-  const { encodeBase64 } = await import('tweetnacl-util');
-  const chatKp = nacl.box.keyPair();
-  const chatPublicKey    = encodeBase64(chatKp.publicKey);
-  const chatSecretKeyEnc = encryptSecret(encodeBase64(chatKp.secretKey), pin, phone);
+  // Generate chat keypair safely (don't crash registration if it fails)
+  let chatPublicKey:    string | null = null;
+  let chatSecretKeyEnc: string | null = null;
+  try {
+    const nacl       = require('tweetnacl');
+    const { encodeBase64 } = require('tweetnacl-util');
+    const chatKp     = nacl.box.keyPair();
+    chatPublicKey    = encodeBase64(chatKp.publicKey);
+    chatSecretKeyEnc = encryptSecret(encodeBase64(chatKp.secretKey), pin, phone);
+  } catch (e: any) {
+    console.warn('[auth] chat keygen skipped:', e.message);
+  }
 
-  const user = await prisma.user.create({
-    data: {
-      phone,
-      pinHash,
-      stellarPubKey:    publicKey,
-      stellarSecret:    encryptedSecret,
-      chatPublicKey,
-      chatSecretKeyEnc,
-      kycName:          name ?? null,
-    },
-  });
+  // Build user data — only include fields that exist in DB
+  const userData: any = {
+    phone,
+    pinHash,
+    stellarPubKey: publicKey,
+    stellarSecret: encryptedSecret,
+  };
+  if (chatPublicKey)    userData.chatPublicKey    = chatPublicKey;
+  if (chatSecretKeyEnc) userData.chatSecretKeyEnc = chatSecretKeyEnc;
+  if (name)             userData.kycName          = name;
+
+  const user = await prisma.user.create({ data: userData });
 
   // Fund the account asynchronously (don't block registration)
   createAndFundAccount(publicKey).catch(err =>
