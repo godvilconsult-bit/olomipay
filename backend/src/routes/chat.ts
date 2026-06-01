@@ -5,6 +5,7 @@ import nacl from 'tweetnacl';
 import { encodeBase64 } from 'tweetnacl-util';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 import { encryptSecret } from '../services/crypto';
+import { emitToUser } from '../socket';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -93,13 +94,16 @@ router.get('/users/search', requireAuth, async (req: AuthRequest, res) => {
     });
 
     const result = users.map(u => ({
-      id:           u.id,
-      kycName:      u.kycName,
+      id:            u.id,
+      kycName:       u.kycName,
       chatPublicKey: u.chatPublicKey,
-      isOnline:     u.isOnline ?? false,
-      lastSeenAt:   u.lastSeenAt,
-      phoneMasked:  u.phone.slice(0, 5) + '****' + u.phone.slice(-4),
-      displayName:  u.kycName ?? (u.phone.slice(0, 5) + '****' + u.phone.slice(-4)),
+      isOnline:      u.isOnline ?? false,
+      lastSeenAt:    u.lastSeenAt,
+      // Show full phone if it's an exact phone search (so user can confirm)
+      phoneMasked:   q.length >= 9 && u.phone.includes(q.replace(/\s/g, ''))
+                       ? u.phone
+                       : u.phone.slice(0, 5) + '****' + u.phone.slice(-4),
+      displayName:   u.kycName ?? (u.phone.slice(0, 5) + '****' + u.phone.slice(-4)),
     }));
 
     console.log(`[chat/search] myId=${myId} q="${q}" found=${result.length}`);
@@ -187,7 +191,22 @@ router.post('/conversations', requireAuth, async (req: AuthRequest, res) => {
       include: { participants: { include: { user: { select: { id: true, kycName: true, phone: true, chatPublicKey: true, isOnline: true } } } } },
     });
 
-    if (existing) return res.json(ok({ conversation: existing, isNew: false }));
+    if (existing) {
+      // Shape existing conversation for frontend
+      const myId = req.userId!;
+      const shaped = {
+        ...existing,
+        otherParticipants: existing.participants
+          .filter(p => p.userId !== myId)
+          .map(p => ({
+            ...p.user,
+            phoneMasked:  p.user.phone.slice(0, 5) + '****' + p.user.phone.slice(-4),
+            displayName:  p.user.kycName ?? (p.user.phone.slice(0, 5) + '****' + p.user.phone.slice(-4)),
+          })),
+        unreadCount: 0,
+      };
+      return res.json(ok({ conversation: shaped, isNew: false }));
+    }
 
     // Create new conversation
     const conversation = await prisma.conversation.create({
@@ -203,14 +222,39 @@ router.post('/conversations', requireAuth, async (req: AuthRequest, res) => {
           create: {
             senderId:     req.userId!,
             type:         'SYSTEM',
-            plainContent: `You are now connected with ${target.kycName ?? target.phone} on Tuma 🌟`,
+            plainContent: `You are now connected with ${target.kycName ?? target.phone} on OlomiPay 🌟`,
           },
         },
       },
-      include: { participants: { include: { user: { select: { id: true, kycName: true, phone: true, chatPublicKey: true, isOnline: true } } } } },
+      include: {
+        participants: {
+          include: {
+            user: { select: { id: true, kycName: true, phone: true, chatPublicKey: true, isOnline: true, lastSeenAt: true } },
+          },
+        },
+      },
     });
 
-    return res.status(201).json(ok({ conversation, isNew: true }));
+    const myId = req.userId!;
+
+    // Shape the response with otherParticipants (what frontend expects)
+    const shaped = {
+      ...conversation,
+      otherParticipants: conversation.participants
+        .filter(p => p.userId !== myId)
+        .map(p => ({
+          ...p.user,
+          phoneMasked:  p.user.phone.slice(0, 5) + '****' + p.user.phone.slice(-4),
+          displayName:  p.user.kycName ?? (p.user.phone.slice(0, 5) + '****' + p.user.phone.slice(-4)),
+        })),
+      unreadCount: 0,
+    };
+
+    // Notify the OTHER user in real-time so their conversation list updates
+    // without needing a page refresh
+    emitToUser(target.id, 'new_conversation', shaped);
+
+    return res.status(201).json(ok({ conversation: shaped, isNew: true }));
   }
 
   // GROUP conversation

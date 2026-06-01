@@ -112,11 +112,30 @@ export default function ChatPage() {
     const u1 = on('new_message', (msg: any) => {
       setConversations(prev => {
         const idx = prev.findIndex(c => c.id === msg.conversationId);
-        if (idx === -1) return prev;
+        if (idx === -1) {
+          // Unknown conversation — fetch it and prepend to list
+          chatApi(`/conversations`).then(r => {
+            if (r.success) setConversations(r.data.conversations ?? []);
+          });
+          return prev;
+        }
         const updated = [...prev];
-        updated[idx] = { ...updated[idx], lastMessageAt: msg.createdAt, unreadCount: (updated[idx].unreadCount ?? 0) + 1 };
+        updated[idx] = {
+          ...updated[idx],
+          lastMessageAt:      msg.createdAt,
+          lastMessagePreview: msg.encryptedContent ?? '[Media]',
+          unreadCount:        (updated[idx].unreadCount ?? 0) + 1,
+        };
         const [item] = updated.splice(idx, 1);
         return [item, ...updated];
+      });
+    });
+
+    // Someone started a new conversation with us — add it immediately
+    const uNew = on('new_conversation', (conv: any) => {
+      setConversations(prev => {
+        if (prev.some(c => c.id === conv.id)) return prev; // already have it
+        return [{ ...conv, unreadCount: 0 }, ...prev];
       });
     });
 
@@ -139,13 +158,24 @@ export default function ChatPage() {
       );
     });
 
-    return () => { u1(); u2(); u3(); u4(); };
+    return () => { u1(); uNew(); u2(); u3(); u4(); };
   }, [on]);
 
-  async function startChat(userId: string) {
-    const r = await chatApi('/conversations', 'POST', { toUserId: userId });
-    if (r.success) router.push(`/chat/${r.data.conversation.id}`);
-    else toast.error(r.error ?? 'Could not start chat');
+  async function startChat(userId: string, phone?: string) {
+    const body = userId ? { toUserId: userId } : { toPhone: phone };
+    const r = await chatApi('/conversations', 'POST', body);
+    if (r.success) {
+      const convId = r.data.conversation.id;
+      // If new conversation, also add it to local list
+      if (r.data.isNew) {
+        setConversations(prev =>
+          prev.some(c => c.id === convId) ? prev : [{ ...r.data.conversation, unreadCount: 0 }, ...prev]
+        );
+      }
+      router.push(`/chat/${convId}`);
+    } else {
+      toast.error(r.error ?? 'Could not start chat');
+    }
   }
 
   async function loadContacts() {

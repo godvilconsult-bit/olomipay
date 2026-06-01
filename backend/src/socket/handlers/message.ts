@@ -1,5 +1,5 @@
 import { Server, Socket } from 'socket.io';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient }   from '@prisma/client';
 import { sendPushToUser } from '../../services/notifications';
 
 const prisma = new PrismaClient();
@@ -21,7 +21,6 @@ export async function handleSendMessage(io: Server, socket: Socket, data: any) {
       return;
     }
 
-    // Validate size
     if (encryptedContent && encryptedContent.length > 8_000) {
       socket.emit('error', { message: 'Message is too long (max 8000 chars).' });
       return;
@@ -40,7 +39,7 @@ export async function handleSendMessage(io: Server, socket: Socket, data: any) {
         deliveredAt:      new Date(),
       },
       include: {
-        sender: { select: { id: true, phone: true, kycName: true, chatPublicKey: true } },
+        sender:  { select: { id: true, phone: true, kycName: true, chatPublicKey: true } },
         replyTo: { select: { id: true, encryptedContent: true, senderId: true } },
       },
     });
@@ -48,26 +47,43 @@ export async function handleSendMessage(io: Server, socket: Socket, data: any) {
     // Update conversation preview
     await prisma.conversation.update({
       where: { id: conversationId },
-      data: {
+      data:  {
         lastMessageAt:      new Date(),
         lastMessagePreview: encryptedContent ?? '[Media]',
       },
     });
 
-    // Emit to all in room
+    // ── Delivery strategy: room + personal rooms ────────────────────────────
+    // io.to(conversationId) only reaches sockets that have already joined the room.
+    // If the recipient just logged in or hasn't opened this conversation yet,
+    // they won't be in the room — so we ALSO emit to their personal user:<id> room.
+    // This guarantees delivery regardless of conversation room membership.
+
+    // Emit to conversation room (reaches anyone already in it)
     io.to(conversationId).emit('new_message', message);
 
-    // Push to offline members
+    // Get all members except sender
     const members = await prisma.conversationMember.findMany({
       where:   { conversationId, userId: { not: senderId } },
-      include: { user: { select: { id: true, isOnline: true } } },
+      include: { user: { select: { id: true, isOnline: true, kycName: true, phone: true } } },
     });
 
     for (const m of members) {
+      // Also emit directly to the recipient's personal room (user:<id>)
+      // so they receive it even if not in the conversation room yet
+      io.to(`user:${m.user.id}`).emit('new_message', message);
+
+      // Auto-join the recipient to this conversation room if they're online
+      const recipientSockets = await io.in(`user:${m.user.id}`).fetchSockets();
+      for (const s of recipientSockets) {
+        s.join(conversationId);
+      }
+
+      // Push notification for offline users
       if (!m.user.isOnline) {
-        await sendPushToUser(m.user.id, {
-          title: socket.data.user?.kycName ?? 'Tuma',
-          body:  '🔒 Ujumbe mpya wa siri',
+        sendPushToUser(m.user.id, {
+          title: socket.data.user?.kycName ?? 'OlomiPay',
+          body:  '🔒 Ujumbe mpya / New message',
           type:  'chat',
           data:  { conversationId, type: 'chat' },
         }).catch(() => {});
@@ -78,3 +94,4 @@ export async function handleSendMessage(io: Server, socket: Socket, data: any) {
     socket.emit('error', { message: 'Network error. Please try again.' });
   }
 }
+
