@@ -166,14 +166,14 @@ router.post('/conversations', requireAuth, async (req: AuthRequest, res) => {
       ? await prisma.user.findUnique({ where: { id: toUserId } })
       : await prisma.user.findUnique({ where: { phone: toPhone } });
 
-    if (!target) return res.status(404).json(fail('Mtumiaji hakupatikana. Waambie kusajili Tuma kwanza.'));
-    if (target.id === req.userId) return res.status(400).json(fail('Huwezi kuzungumza na wewe mwenyewe.'));
+    if (!target) return res.status(404).json(fail('User not found. Ask them to register on Tuma first.'));
+    if (target.id === req.userId) return res.status(400).json(fail('You cannot chat with yourself.'));
 
     // Check block
     const blocked = await prisma.blockedUser.findUnique({
       where: { blockerId_blockedId: { blockerId: target.id, blockedId: req.userId! } },
     });
-    if (blocked) return res.status(403).json(fail('Huwezi kuzungumza na mtumiaji huyu.'));
+    if (blocked) return res.status(403).json(fail('You cannot chat with this user.'));
 
     // Find existing direct conversation
     const existing = await prisma.conversation.findFirst({
@@ -203,7 +203,7 @@ router.post('/conversations', requireAuth, async (req: AuthRequest, res) => {
           create: {
             senderId:     req.userId!,
             type:         'SYSTEM',
-            plainContent: `Umeunganishwa na ${target.kycName ?? target.phone} kwenye Tuma 🌟`,
+            plainContent: `You are now connected with ${target.kycName ?? target.phone} on Tuma 🌟`,
           },
         },
       },
@@ -214,7 +214,7 @@ router.post('/conversations', requireAuth, async (req: AuthRequest, res) => {
   }
 
   // GROUP conversation
-  if (!groupName) return res.status(400).json(fail('Jina la kikundi linahitajika.'));
+  if (!groupName) return res.status(400).json(fail('Group name is required.'));
 
   const phones  = memberPhones ?? [];
   const members = await prisma.user.findMany({ where: { phone: { in: phones } } });
@@ -246,7 +246,7 @@ router.get('/conversations/:id/messages', requireAuth, async (req: AuthRequest, 
   const member = await prisma.conversationMember.findUnique({
     where: { conversationId_userId: { conversationId: id, userId: req.userId! } },
   });
-  if (!member) return res.status(403).json(fail('Huna ruhusa.'));
+  if (!member) return res.status(403).json(fail('Access denied.'));
 
   const messages = await prisma.message.findMany({
     where: {
@@ -286,10 +286,10 @@ router.post('/conversations/:id/read', requireAuth, async (req: AuthRequest, res
 router.delete('/messages/:id', requireAuth, async (req: AuthRequest, res) => {
   const message = await prisma.message.findUnique({ where: { id: req.params.id } });
   if (!message || message.senderId !== req.userId) {
-    return res.status(403).json(fail('Huwezi kufuta ujumbe huu.'));
+    return res.status(403).json(fail('You cannot delete this message.'));
   }
   if (Date.now() - message.createdAt.getTime() > 60_000) {
-    return res.status(400).json(fail('Muda wa kufuta umepita.'));
+    return res.status(400).json(fail('Delete window has expired (60 seconds).'));
   }
   await prisma.message.update({
     where: { id: req.params.id },
@@ -305,7 +305,7 @@ router.post('/users/:id/block', requireAuth, async (req: AuthRequest, res) => {
     update: {},
     create: { blockerId: req.userId!, blockedId: req.params.id },
   });
-  return res.json(ok({ message: 'Mtumiaji amezuiwa.' }));
+  return res.json(ok({ message: 'User blocked.' }));
 });
 
 // ── POST /api/chat/users/:id/unblock ─────────────────────────────────────────
@@ -313,7 +313,7 @@ router.post('/users/:id/unblock', requireAuth, async (req: AuthRequest, res) => 
   await prisma.blockedUser.deleteMany({
     where: { blockerId: req.userId!, blockedId: req.params.id },
   });
-  return res.json(ok({ message: 'Mtumiaji amefunguliwa.' }));
+  return res.json(ok({ message: 'User unblocked.' }));
 });
 
 export { router as chatRouter };

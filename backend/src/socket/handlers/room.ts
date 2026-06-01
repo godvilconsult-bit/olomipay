@@ -54,11 +54,11 @@ export async function handleDeleteMessage(io: Server, socket: Socket, data: any)
   try {
     const message = await prisma.message.findUnique({ where: { id: messageId } });
     if (!message || message.senderId !== userId) {
-      socket.emit('error', { message: 'Huwezi kufuta ujumbe huu.' });
+      socket.emit('error', { message: 'You cannot delete this message.' });
       return;
     }
     if (Date.now() - message.createdAt.getTime() > 60_000) {
-      socket.emit('error', { message: 'Muda wa kufuta umepita.' });
+      socket.emit('error', { message: 'Delete window has expired.' });
       return;
     }
     await prisma.message.update({

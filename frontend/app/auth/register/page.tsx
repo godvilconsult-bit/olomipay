@@ -28,23 +28,23 @@ export default function RegisterPage() {
 
   function validatePhone() {
     if (!/^\+\d{10,15}$/.test(phone)) {
-      toast.error('Weka nambari sahihi ya simu, mfano: +255712345678');
+      toast.error('Enter a valid phone number, e.g. +255712345678');
       return false;
     }
     return true;
   }
 
   async function handleSubmit() {
-    if (pin !== confirm) { toast.error('Nambari za siri hazifanani'); return; }
-    if (pin.length !== 6) { toast.error('Nambari ya siri lazima iwe na tarakimu 6'); return; }
+    if (pin !== confirm) { toast.error('PINs do not match'); return; }
+    if (pin.length !== 6) { toast.error('PIN must be 6 digits'); return; }
     setLoading(true);
     try {
       const data = await auth.register(phone, pin, name);
       setTokens(data.accessToken, data.refreshToken);
-      toast.success(`Karibu Tuma, ${name || 'rafiki'}! 🎉`);
+      toast.success(`Welcome to Tuma, ${name || 'friend'}! 🎉`);
       router.push('/dashboard');
     } catch (err: any) {
-      toast.error(err.message ?? 'Usajili umeshindwa. Jaribu tena.');
+      toast.error(err.message ?? 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -55,13 +55,12 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-900 flex flex-col">
-      {/* Header */}
       <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100 dark:border-slate-800">
         <button onClick={() => stepIndex > 0 ? setStep(steps[stepIndex - 1]) : router.push('/')}
           className="p-2 -ml-2 rounded-full hover:bg-slate-100 min-h-[44px] min-w-[44px] flex items-center justify-center">
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-lg font-semibold">Fungua akaunti</h1>
+        <h1 className="text-lg font-semibold">Create account</h1>
       </div>
 
       <div className="flex-1 flex flex-col px-5 py-8 max-w-md mx-auto w-full gap-8">
@@ -76,8 +75,8 @@ export default function RegisterPage() {
         {step === 'phone' && (
           <div className="flex flex-col gap-6">
             <div>
-              <h2 className="text-2xl font-bold mb-1">Nambari yako ya simu</h2>
-              <p className="text-slate-500 text-sm">Tutaunganisha M-Pesa yako na nambari hii</p>
+              <h2 className="text-2xl font-bold mb-1">Your phone number</h2>
+              <p className="text-slate-500 text-sm">We'll link your M-Pesa to this number</p>
             </div>
             <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800 rounded-2xl px-4 min-h-[56px]">
               <Phone size={18} className="text-slate-400 flex-shrink-0" />
@@ -87,11 +86,11 @@ export default function RegisterPage() {
                 autoFocus autoComplete="tel" />
             </div>
             <button onClick={() => { if (validatePhone()) setStep('name'); }} className="btn-primary w-full text-base">
-              Endelea
+              Continue
             </button>
             <p className="text-center text-sm text-slate-500">
-              Una akaunti?{' '}
-              <Link href="/auth/login" className="text-primary font-semibold">Ingia</Link>
+              Already have an account?{' '}
+              <Link href="/auth/login" className="text-primary font-semibold">Sign in</Link>
             </p>
           </div>
         )}
@@ -100,18 +99,15 @@ export default function RegisterPage() {
         {step === 'name' && (
           <div className="flex flex-col gap-6">
             <div>
-              <h2 className="text-2xl font-bold mb-1">Jina lako</h2>
-              <p className="text-slate-500 text-sm">Hivi ndivyo wenzako watakuona kwenye chat</p>
+              <h2 className="text-2xl font-bold mb-1">Your name</h2>
+              <p className="text-slate-500 text-sm">This is how others will see you in chat</p>
             </div>
             <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800 rounded-2xl px-4 min-h-[56px]">
               <User size={18} className="text-slate-400 flex-shrink-0" />
-              <input type="text" placeholder="Jina lako kamili" value={name}
+              <input type="text" placeholder="Your full name" value={name}
                 onChange={e => setName(e.target.value)}
-                className="flex-1 bg-transparent text-base outline-none py-3"
-                autoFocus />
+                className="flex-1 bg-transparent text-base outline-none py-3" autoFocus />
             </div>
-
-            {/* Avatar preview */}
             {name.length > 0 && (
               <div className="flex items-center gap-3 bg-primary/5 rounded-2xl p-4">
                 <div className="w-14 h-14 rounded-full bg-primary flex items-center justify-center text-white text-xl font-bold">
@@ -123,14 +119,11 @@ export default function RegisterPage() {
                 </div>
               </div>
             )}
-
-            <button onClick={() => setStep('pin')} disabled={name.length < 2}
-              className="btn-primary w-full text-base">
-              Endelea
+            <button onClick={() => setStep('pin')} disabled={name.length < 2} className="btn-primary w-full text-base">
+              Continue
             </button>
-            <button onClick={() => setStep('pin')}
-              className="text-sm text-slate-400 text-center underline">
-              Ruka (weka jina baadaye)
+            <button onClick={() => setStep('pin')} className="text-sm text-slate-400 text-center underline">
+              Skip (add name later)
             </button>
           </div>
         )}
@@ -139,13 +132,13 @@ export default function RegisterPage() {
         {step === 'pin' && (
           <div className="flex flex-col gap-6 items-center text-center">
             <div>
-              <h2 className="text-2xl font-bold mb-1">Weka nambari ya siri</h2>
-              <p className="text-slate-500 text-sm">Tarakimu 6 — itatumika kuthibitisha malipo yote</p>
+              <h2 className="text-2xl font-bold mb-1">Create your PIN</h2>
+              <p className="text-slate-500 text-sm">6 digits — used to authorise every transfer</p>
             </div>
             <PinInput value={pin} onChange={setPin} autoFocus />
             <button onClick={() => { if (pin.length === 6) setStep('confirm'); }}
               disabled={pin.length < 6} className="btn-primary w-full text-base">
-              Endelea
+              Continue
             </button>
           </div>
         )}
@@ -154,17 +147,17 @@ export default function RegisterPage() {
         {step === 'confirm' && (
           <div className="flex flex-col gap-6 items-center text-center">
             <div>
-              <h2 className="text-2xl font-bold mb-1">Thibitisha nambari ya siri</h2>
-              <p className="text-slate-500 text-sm">Ingiza nambari ya siri tena</p>
+              <h2 className="text-2xl font-bold mb-1">Confirm your PIN</h2>
+              <p className="text-slate-500 text-sm">Enter the same PIN again</p>
             </div>
             <PinInput value={confirm} onChange={setConfirm} autoFocus />
             {confirm.length === 6 && confirm !== pin && (
-              <p className="text-danger text-sm -mt-4">Nambari za siri hazifanani</p>
+              <p className="text-danger text-sm -mt-4">PINs don't match</p>
             )}
             <button onClick={handleSubmit}
               disabled={confirm.length < 6 || loading || confirm !== pin}
               className="btn-primary w-full text-base">
-              {loading ? 'Inafungua akaunti...' : 'Fungua akaunti'}
+              {loading ? 'Creating account...' : 'Create account'}
             </button>
           </div>
         )}

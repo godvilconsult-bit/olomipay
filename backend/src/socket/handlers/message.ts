@@ -17,13 +17,13 @@ export async function handleSendMessage(io: Server, socket: Socket, data: any) {
 
   try {
     if (!await verifyMembership(senderId, conversationId)) {
-      socket.emit('error', { message: 'Huna ruhusa katika mazungumzo haya.' });
+      socket.emit('error', { message: 'You are not a member of this conversation.' });
       return;
     }
 
     // Validate size
     if (encryptedContent && encryptedContent.length > 8_000) {
-      socket.emit('error', { message: 'Ujumbe ni mrefu sana.' });
+      socket.emit('error', { message: 'Message is too long (max 8000 chars).' });
       return;
     }
 
@@ -75,6 +75,6 @@ export async function handleSendMessage(io: Server, socket: Socket, data: any) {
     }
   } catch (e: any) {
     console.error('[socket:message]', e.message);
-    socket.emit('error', { message: 'Tatizo la mtandao. Jaribu tena.' });
+    socket.emit('error', { message: 'Network error. Please try again.' });
   }
 }

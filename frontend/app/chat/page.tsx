@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, X, MessageCircle, Users, Loader2, UserPlus, Share2, Phone, BookUser } from 'lucide-react';
 import BottomNav from '../../components/BottomNav';
@@ -14,21 +14,21 @@ const API = process.env.NEXT_PUBLIC_API_URL;
 function getToken() {
   return sessionStorage.getItem('olomipay_at') || sessionStorage.getItem('olomipay_rt') || '';
 }
-
 async function chatApi(path: string, method = 'GET', body?: any) {
-  const res = await fetch(`${API}/api/chat${path}`, {
+  const r = await fetch(`${API}/api/chat${path}`, {
     method,
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
     body: body ? JSON.stringify(body) : undefined,
   });
-  return res.json();
+  return r.json();
 }
-
-async function inviteApi(path: string) {
-  const res = await fetch(`${API}/api/invite${path}`, {
-    headers: { Authorization: `Bearer ${getToken()}` },
+async function inviteApi(path: string, method = 'GET', body?: any) {
+  const r = await fetch(`${API}/api/invite${path}`, {
+    method,
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+    body: body ? JSON.stringify(body) : undefined,
   });
-  return res.json();
+  return r.json();
 }
 
 function Avatar({ name, isOnline }: { name: string; isOnline?: boolean }) {
@@ -48,22 +48,21 @@ function Avatar({ name, isOnline }: { name: string; isOnline?: boolean }) {
 
 export default function ChatPage() {
   const router = useRouter();
-  const token  = typeof window !== 'undefined' ? sessionStorage.getItem('olomipay_rt') : null;
+  const token  = typeof window !== 'undefined' ? getToken() : null;
   const { on } = useSocket(token);
 
-  const [conversations, setConversations] = useState<any[]>([]);
-  const [allUsers,      setAllUsers]      = useState<any[]>([]);
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [contacts,      setContacts]      = useState<TumaContact[]>([]);
+  const [conversations,   setConversations]   = useState<any[]>([]);
+  const [allUsers,        setAllUsers]        = useState<any[]>([]);
+  const [searchResults,   setSearchResults]   = useState<any[]>([]);
+  const [contacts,        setContacts]        = useState<TumaContact[]>([]);
   const [loadingContacts, setLoadingContacts] = useState(false);
   const [contactsLoaded,  setContactsLoaded]  = useState(false);
-  const [query,         setQuery]         = useState('');
-  const [tab,           setTab]           = useState<'chats'|'people'>('chats');
-  const [loading,       setLoading]       = useState(true);
-  const [searching,     setSearching]     = useState(false);
-  const [inviteLink,    setInviteLink]    = useState('');
-  const [phoneCheck,    setPhoneCheck]    = useState<{registered: boolean; user: any}|null>(null);
-  const [checkingPhone, setCheckingPhone] = useState(false);
+  const [query,           setQuery]           = useState('');
+  const [tab,             setTab]             = useState<'chats'|'people'>('chats');
+  const [loading,         setLoading]         = useState(true);
+  const [searching,       setSearching]       = useState(false);
+  const [inviteLink,      setInviteLink]      = useState('');
+  const [phoneCheck,      setPhoneCheck]      = useState<{registered: boolean; user: any}|null>(null);
   const supportsContacts = typeof window !== 'undefined' && isContactPickerSupported();
 
   useEffect(() => {
@@ -71,13 +70,9 @@ export default function ChatPage() {
       if (r.success) setConversations(r.data.conversations ?? []);
       setLoading(false);
     });
-    // Pre-load invite link
-    inviteApi('/link').then(r => {
-      if (r.success) setInviteLink(r.data.link);
-    });
+    inviteApi('/link').then(r => { if (r.success) setInviteLink(r.data.link); });
   }, []);
 
-  // Load all users when People tab opens
   useEffect(() => {
     if (tab === 'people' && allUsers.length === 0) {
       setSearching(true);
@@ -88,29 +83,20 @@ export default function ChatPage() {
     }
   }, [tab]);
 
-  // Search / phone check
   useEffect(() => {
     if (query.length === 0) { setSearchResults([]); setPhoneCheck(null); return; }
-
     const t = setTimeout(async () => {
       setSearching(true);
-
-      // If looks like a phone number, check if registered
       const cleanPhone = query.replace(/\s/g, '');
       const isPhone = /^\+?\d{7,15}$/.test(cleanPhone);
-
       if (isPhone) {
         let phone = cleanPhone;
         if (phone.startsWith('0')) phone = '+255' + phone.slice(1);
         if (!phone.startsWith('+')) phone = '+255' + phone;
-
-        setCheckingPhone(true);
         const r = await inviteApi(`/check/${encodeURIComponent(phone)}`);
-        setCheckingPhone(false);
         if (r.success) {
           setPhoneCheck(r.data);
-          if (r.data.user) setSearchResults([r.data.user]);
-          else setSearchResults([]);
+          setSearchResults(r.data.user ? [r.data.user] : []);
         }
       } else {
         setPhoneCheck(null);
@@ -122,7 +108,6 @@ export default function ChatPage() {
     return () => clearTimeout(t);
   }, [query]);
 
-  // Real-time updates
   useEffect(() => {
     return on('new_message', (msg: any) => {
       setConversations(prev => {
@@ -139,47 +124,29 @@ export default function ChatPage() {
   async function startChat(userId: string) {
     const r = await chatApi('/conversations', 'POST', { toUserId: userId });
     if (r.success) router.push(`/chat/${r.data.conversation.id}`);
-    else toast.error(r.error ?? 'Failed to start chat');
+    else toast.error(r.error ?? 'Could not start chat');
   }
 
   async function loadContacts() {
-    if (!supportsContacts) {
-      toast.error('Kifaa chako hakisaidii kufikia orodha ya mawasiliano.');
-      return;
-    }
+    if (!supportsContacts) { toast.error('Contact picker not supported on this browser.'); return; }
     setLoadingContacts(true);
     try {
       const matched = await pickAndMatchContacts();
       setContacts(matched);
       setContactsLoaded(true);
-      if (matched.length === 0) {
-        toast('Hakuna mawasiliano yako yaliyopatikana kwenye Tuma.', { icon: '📱' });
-      } else {
-        toast.success(`Mawasiliano ${matched.length} yaliyopatikana kwenye Tuma!`);
-      }
+      if (matched.length === 0) toast('None of your contacts are on Tuma yet.', { icon: '📱' });
+      else toast.success(`${matched.length} contacts found on Tuma!`);
     } catch (e: any) {
-      if (e.message.includes('not supported')) {
-        toast.error('Kivinjari chako hakisaidii kipengele hiki. Tumia Chrome kwenye Android.');
-      } else {
-        toast.error('Imeshindwa kupakia mawasiliano.');
-      }
+      toast.error('Could not load contacts. Try Chrome on Android.');
     } finally {
       setLoadingContacts(false);
     }
   }
 
   function shareInvite() {
-    const shareData = {
-      title: 'Jiunge Tuma',
-      text:  `Jiunge nami kwenye Tuma — tumia pesa haraka na kuzungumza! ${inviteLink}`,
-      url:   inviteLink,
-    };
-    if (navigator.share) {
-      navigator.share(shareData).catch(() => {});
-    } else {
-      navigator.clipboard.writeText(inviteLink);
-      toast.success('Kiungo kimekopwa! Shiriki na marafiki.');
-    }
+    const msg = `Join me on Tuma — send money, chat, and do business instantly! ${inviteLink}`;
+    if (navigator.share) navigator.share({ title: 'Join Tuma', text: msg, url: inviteLink });
+    else { navigator.clipboard.writeText(msg); toast.success('Invite link copied!'); }
   }
 
   const displayedUsers = query.length >= 2 ? searchResults : allUsers;
@@ -192,10 +159,9 @@ export default function ChatPage() {
           <h1 className="text-xl font-bold flex-1">Tuma Chat</h1>
           <button onClick={shareInvite}
             className="flex items-center gap-1.5 bg-primary/10 text-primary px-3 py-1.5 rounded-full text-xs font-semibold">
-            <UserPlus size={14} /> Alika
+            <UserPlus size={14} /> Invite
           </button>
         </div>
-
         {/* Tabs */}
         <div className="flex border-b border-slate-100 dark:border-slate-800">
           {(['chats','people'] as const).map(t => (
@@ -204,9 +170,8 @@ export default function ChatPage() {
                 tab === t ? 'border-primary text-primary' : 'border-transparent text-slate-400'
               }`}>
               {t === 'chats'
-                ? <><MessageCircle size={15}/> Mazungumzo {conversations.filter(c => (c.unreadCount??0)>0).length > 0 && <span className="bg-primary text-white text-[9px] px-1.5 rounded-full">{conversations.reduce((s,c)=>s+(c.unreadCount??0),0)}</span>}</>
-                : <><Users size={15}/> Watu ({allUsers.length})</>
-              }
+                ? <><MessageCircle size={15}/> Chats {conversations.reduce((s,c)=>s+(c.unreadCount??0),0) > 0 && <span className="bg-primary text-white text-[9px] px-1.5 rounded-full">{conversations.reduce((s,c)=>s+(c.unreadCount??0),0)}</span>}</>
+                : <><Users size={15}/> People ({allUsers.length})</>}
             </button>
           ))}
         </div>
@@ -214,51 +179,49 @@ export default function ChatPage() {
 
       {/* ── CHATS TAB ── */}
       {tab === 'chats' && (
-        <>
-          {loading ? (
-            <div className="flex items-center justify-center py-20"><Loader2 size={24} className="animate-spin text-slate-300" /></div>
-          ) : conversations.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 px-8 text-center">
-              <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-4">
-                <MessageCircle size={36} className="text-primary" />
-              </div>
-              <h3 className="font-bold text-lg mb-2">Hakuna mazungumzo bado</h3>
-              <p className="text-slate-400 text-sm mb-6">Nenda kwa "Watu" kuona watu wote kwenye Tuma</p>
-              <button onClick={() => setTab('people')} className="btn-primary px-8">Tafuta watu</button>
-              <button onClick={shareInvite} className="mt-3 flex items-center gap-2 text-sm text-primary">
-                <Share2 size={14}/> Alika marafiki
-              </button>
+        loading ? (
+          <div className="flex justify-center py-20"><Loader2 size={24} className="animate-spin text-slate-300" /></div>
+        ) : conversations.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 px-8 text-center">
+            <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+              <MessageCircle size={36} className="text-primary" />
             </div>
-          ) : (
-            conversations.map(conv => {
-              const other  = conv.otherParticipants?.[0];
-              const name   = conv.groupName ?? other?.displayName ?? other?.kycName ?? other?.phoneMasked ?? 'Unknown';
-              const unread = conv.unreadCount ?? 0;
-              return (
-                <button key={conv.id} onClick={() => router.push(`/chat/${conv.id}`)}
-                  className="w-full flex items-center gap-3 px-4 py-3.5 border-b border-slate-50 dark:border-slate-800 hover:bg-slate-50 text-left">
-                  <Avatar name={name} isOnline={other?.isOnline} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-baseline mb-0.5">
-                      <p className={`text-sm truncate ${unread > 0 ? 'font-bold' : 'font-medium'}`}>{name}</p>
-                      <p className="text-xs text-slate-400 ml-2 flex-shrink-0">{conv.lastMessageAt ? timeAgo(conv.lastMessageAt) : ''}</p>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs text-slate-400 truncate">
-                        {conv.lastMessagePreview ? '🔒 Ujumbe wa siri' : 'Gonga kuanza mazungumzo'}
-                      </p>
-                      {unread > 0 && (
-                        <span className="flex-shrink-0 ml-2 bg-primary text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
-                          {unread > 99 ? '99+' : unread}
-                        </span>
-                      )}
-                    </div>
+            <h3 className="font-bold text-lg mb-2">No conversations yet</h3>
+            <p className="text-slate-400 text-sm mb-6">Go to People tab to find Tuma users and start chatting</p>
+            <button onClick={() => setTab('people')} className="btn-primary px-8">Find People</button>
+            <button onClick={shareInvite} className="mt-3 flex items-center gap-2 text-sm text-primary">
+              <Share2 size={14}/> Invite friends
+            </button>
+          </div>
+        ) : (
+          conversations.map(conv => {
+            const other  = conv.otherParticipants?.[0];
+            const name   = conv.groupName ?? other?.displayName ?? other?.kycName ?? other?.phoneMasked ?? 'Unknown';
+            const unread = conv.unreadCount ?? 0;
+            return (
+              <button key={conv.id} onClick={() => router.push(`/chat/${conv.id}`)}
+                className="w-full flex items-center gap-3 px-4 py-3.5 border-b border-slate-50 dark:border-slate-800 hover:bg-slate-50 text-left">
+                <Avatar name={name} isOnline={other?.isOnline} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between items-baseline mb-0.5">
+                    <p className={`text-sm truncate ${unread > 0 ? 'font-bold' : 'font-medium'}`}>{name}</p>
+                    <p className="text-xs text-slate-400 ml-2 flex-shrink-0">{conv.lastMessageAt ? timeAgo(conv.lastMessageAt) : ''}</p>
                   </div>
-                </button>
-              );
-            })
-          )}
-        </>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-slate-400 truncate">
+                      {conv.lastMessagePreview ? '🔒 Encrypted message' : 'Tap to start chatting'}
+                    </p>
+                    {unread > 0 && (
+                      <span className="flex-shrink-0 ml-2 bg-primary text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                        {unread > 99 ? '99+' : unread}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </button>
+            );
+          })
+        )
       )}
 
       {/* ── PEOPLE TAB ── */}
@@ -268,7 +231,7 @@ export default function ChatPage() {
           <div className="px-4 py-3 sticky top-[105px] bg-white dark:bg-slate-900 z-30">
             <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 rounded-2xl px-4 py-2.5">
               <Search size={16} className="text-slate-400 flex-shrink-0" />
-              <input type="text" placeholder="Tafuta jina au nambari ya simu..."
+              <input type="text" placeholder="Search by name or phone number..."
                 value={query} onChange={e => setQuery(e.target.value)}
                 className="bg-transparent flex-1 text-sm outline-none" />
               {searching && <Loader2 size={14} className="animate-spin text-slate-400 flex-shrink-0" />}
@@ -276,54 +239,45 @@ export default function ChatPage() {
             </div>
           </div>
 
-          {/* Phone not registered — show invite */}
+          {/* Phone not registered */}
           {phoneCheck && !phoneCheck.registered && (
-            <div className="mx-4 mb-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-4">
+            <div className="mx-4 mb-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 rounded-2xl p-4">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
                   <Phone size={18} className="text-amber-600" />
                 </div>
                 <div className="flex-1">
-                  <p className="font-semibold text-sm text-amber-800 dark:text-amber-400 mb-1">
-                    Nambari hii haijajiandikisha Tuma
-                  </p>
-                  <p className="text-xs text-amber-600 dark:text-amber-500 mb-3">
-                    Tuma kiungo cha usajili ili waweze kujiunga na kuzungumza nawe
-                  </p>
+                  <p className="font-semibold text-sm text-amber-800 mb-1">This number is not on Tuma</p>
+                  <p className="text-xs text-amber-600 mb-3">Send them an invite link so they can join and chat with you</p>
                   <button onClick={() => {
-                    const msg = `Habari! Nikualike Tuma — app ya kutuma pesa na kuzungumza haraka. Jiunge bure: ${inviteLink}`;
-                    if (navigator.share) navigator.share({ title: 'Jiunge Tuma', text: msg, url: inviteLink });
-                    else { navigator.clipboard.writeText(msg); toast.success('Ujumbe wa mwaliko umekopwa!'); }
-                  }}
-                    className="flex items-center gap-2 bg-amber-500 text-white text-sm font-semibold px-4 py-2 rounded-xl">
-                    <Share2 size={14}/> Tuma kiungo cha usajili
+                    const msg = `Hey! I'm inviting you to Tuma — send money and chat instantly. Join free: ${inviteLink}`;
+                    if (navigator.share) navigator.share({ title: 'Join Tuma', text: msg, url: inviteLink });
+                    else { navigator.clipboard.writeText(msg); toast.success('Invite message copied!'); }
+                  }} className="flex items-center gap-2 bg-amber-500 text-white text-sm font-semibold px-4 py-2 rounded-xl">
+                    <Share2 size={14}/> Send invite link
                   </button>
                 </div>
               </div>
             </div>
           )}
 
-          {/* ── Contacts from phonebook ── */}
+          {/* Contacts section */}
           {!query && (
             <div className="mb-1">
-              {/* Header */}
               <div className="flex items-center justify-between px-4 py-2">
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide flex items-center gap-1.5">
-                  <BookUser size={12} /> Mawasiliano yako
+                  <BookUser size={12} /> Your Contacts
                 </p>
                 {supportsContacts && (
                   <button onClick={loadContacts} disabled={loadingContacts}
                     className="flex items-center gap-1.5 text-xs text-primary font-semibold">
-                    {loadingContacts
-                      ? <><Loader2 size={12} className="animate-spin" /> Inapakia...</>
-                      : contactsLoaded
-                      ? <><BookUser size={12} /> Onyesha tena</>
-                      : <><BookUser size={12} /> Soma mawasiliano</>}
+                    {loadingContacts ? <><Loader2 size={12} className="animate-spin" /> Loading...</>
+                      : contactsLoaded ? <><BookUser size={12} /> Refresh</>
+                      : <><BookUser size={12} /> Sync contacts</>}
                   </button>
                 )}
               </div>
 
-              {/* Contacts not yet loaded */}
               {!contactsLoaded && !loadingContacts && (
                 <div className={`mx-4 mb-3 rounded-2xl p-4 ${supportsContacts ? 'bg-primary/5 border border-primary/10' : 'bg-slate-50 dark:bg-slate-800'}`}>
                   {supportsContacts ? (
@@ -332,92 +286,79 @@ export default function ChatPage() {
                         <BookUser size={18} className="text-primary" />
                       </div>
                       <div className="flex-1">
-                        <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Onyesha marafiki wako</p>
-                        <p className="text-xs text-slate-400 mt-0.5">Gonga ili kuona ni mawasiliano gani yako yaliyopo kwenye Tuma</p>
+                        <p className="text-sm font-semibold">Find your contacts on Tuma</p>
+                        <p className="text-xs text-slate-400 mt-0.5">See which of your saved contacts are already on Tuma</p>
                       </div>
-                      <button onClick={loadContacts}
-                        className="bg-primary text-white text-xs font-bold px-3 py-2 rounded-xl flex-shrink-0">
-                        Fungua
+                      <button onClick={loadContacts} className="bg-primary text-white text-xs font-bold px-3 py-2 rounded-xl flex-shrink-0">
+                        Sync
                       </button>
                     </div>
                   ) : (
                     <p className="text-xs text-slate-400 text-center py-1">
-                      📱 Fungua kwenye Chrome (Android) kuona mawasiliano yako
+                      📱 Open in Chrome on Android to sync contacts
                     </p>
                   )}
                 </div>
               )}
 
-              {/* Matched contacts */}
               {contactsLoaded && contacts.length > 0 && (
                 <>
-                  <p className="px-4 pb-1 text-xs text-slate-400">
-                    {contacts.length} marafiki wako wapo kwenye Tuma
-                  </p>
-                  {contacts.map(c => (
-                    <ContactRow key={c.id} contact={c} onChat={() => startChat(c.id)} />
-                  ))}
+                  <p className="px-4 pb-1 text-xs text-slate-400">{contacts.length} of your contacts are on Tuma</p>
+                  {contacts.map(c => <ContactRow key={c.id} contact={c} onChat={() => startChat(c.id)} />)}
                   <div className="mx-4 my-2 border-b border-slate-100 dark:border-slate-800" />
                 </>
               )}
 
               {contactsLoaded && contacts.length === 0 && (
                 <div className="mx-4 mb-3 bg-slate-50 dark:bg-slate-800 rounded-2xl p-4 text-center">
-                  <p className="text-sm text-slate-400">Hakuna mawasiliano yako kwenye Tuma bado</p>
-                  <button onClick={shareInvite} className="text-xs text-primary font-semibold mt-2">
-                    Walika marafiki →
-                  </button>
+                  <p className="text-sm text-slate-400">None of your contacts are on Tuma yet</p>
+                  <button onClick={shareInvite} className="text-xs text-primary font-semibold mt-2">Invite them →</button>
                 </div>
               )}
             </div>
           )}
 
-          {/* ── All Tuma users ── */}
+          {/* All Tuma users */}
           {searching && displayedUsers.length === 0 ? (
             <div className="flex justify-center py-10"><Loader2 size={20} className="animate-spin text-slate-300" /></div>
           ) : displayedUsers.length === 0 && query.length >= 2 ? (
             <div className="text-center py-10 px-8">
               <Users size={36} className="mx-auto mb-3 text-slate-200" />
-              <p className="text-sm text-slate-400 mb-4">Hakuna mtumiaji "{query}" aliyepatikana</p>
-              <button onClick={shareInvite}
-                className="flex items-center gap-2 mx-auto text-sm text-primary font-semibold">
-                <Share2 size={14}/> Alika {query} Tuma
+              <p className="text-sm text-slate-400 mb-4">No user found for "{query}"</p>
+              <button onClick={shareInvite} className="flex items-center gap-2 mx-auto text-sm text-primary font-semibold">
+                <Share2 size={14}/> Invite them to Tuma
               </button>
             </div>
           ) : (
             <>
               {!query && displayedUsers.length > 0 && (
                 <p className="px-4 pt-1 pb-2 text-xs font-semibold text-slate-400 uppercase tracking-wide">
-                  Watumiaji {displayedUsers.length} wa Tuma
+                  All Tuma users ({displayedUsers.length})
                 </p>
               )}
               {displayedUsers.map(user => {
                 const name = user.displayName ?? user.kycName ?? user.phoneMasked;
                 return (
                   <button key={user.id} onClick={() => startChat(user.id)}
-                    className="w-full flex items-center gap-3 px-4 py-3.5 border-b border-slate-50 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 text-left">
+                    className="w-full flex items-center gap-3 px-4 py-3.5 border-b border-slate-50 dark:border-slate-800 hover:bg-slate-50 text-left">
                     <Avatar name={name} isOnline={user.isOnline} />
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-sm truncate">{name}</p>
                       <p className="text-xs text-slate-400">
-                        {user.isOnline ? '🟢 Mtandaoni sasa' : user.lastSeenAt ? `Alionekana ${timeAgo(user.lastSeenAt)}` : 'Mtumiaji wa Tuma'}
+                        {user.isOnline ? '🟢 Online now' : user.lastSeenAt ? `Last seen ${timeAgo(user.lastSeenAt)}` : 'Tuma user'}
                       </p>
                     </div>
-                    <div className="bg-primary text-white text-xs font-semibold px-3 py-1.5 rounded-full flex-shrink-0">
-                      Chat
-                    </div>
+                    <div className="bg-primary text-white text-xs font-semibold px-3 py-1.5 rounded-full flex-shrink-0">Chat</div>
                   </button>
                 );
               })}
-
-              {/* Invite section at bottom */}
               {!query && (
                 <div className="mx-4 my-4 bg-primary/5 rounded-2xl p-4 text-center">
-                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Rafiki yako hayupo hapa?</p>
-                  <p className="text-xs text-slate-400 mb-3">Walika wajiunga Tuma bure</p>
+                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Can't find someone?</p>
+                  <p className="text-xs text-slate-400 mb-3">Invite them to join Tuma for free</p>
                   <button onClick={shareInvite}
                     className="flex items-center gap-2 mx-auto bg-primary text-white text-sm font-semibold px-5 py-2.5 rounded-xl">
-                    <Share2 size={14}/> Shiriki kiungo cha mwaliko
+                    <Share2 size={14}/> Share invite link
                   </button>
                 </div>
               )}
@@ -431,13 +372,12 @@ export default function ChatPage() {
   );
 }
 
-// ── Contact row — shows SAVED NAME from phonebook ─────────────────────────────
 function ContactRow({ contact, onChat }: { contact: TumaContact; onChat: () => void }) {
   const colors = ['bg-primary','bg-purple-500','bg-teal-500','bg-orange-500','bg-pink-500','bg-indigo-500'];
   const color  = colors[contact.savedName.charCodeAt(0) % colors.length];
   return (
     <button onClick={onChat}
-      className="w-full flex items-center gap-3 px-4 py-3 border-b border-slate-50 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 text-left">
+      className="w-full flex items-center gap-3 px-4 py-3 border-b border-slate-50 dark:border-slate-800 hover:bg-slate-50 text-left">
       <div className="relative flex-shrink-0">
         <div className={`w-12 h-12 rounded-full ${color} flex items-center justify-center text-white font-bold text-sm`}>
           {contact.savedName.slice(0, 2).toUpperCase()}
@@ -445,18 +385,13 @@ function ContactRow({ contact, onChat }: { contact: TumaContact; onChat: () => v
         <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${contact.isOnline ? 'bg-green-500' : 'bg-slate-300'}`} />
       </div>
       <div className="flex-1 min-w-0">
-        {/* Saved name from phone contacts — shown prominently */}
         <p className="font-semibold text-sm truncate">{contact.savedName}</p>
         <p className="text-xs text-slate-400">
-          {contact.kycName && contact.kycName !== contact.savedName
-            ? `Tuma: ${contact.kycName} · `
-            : ''}
-          {contact.isOnline ? '🟢 Mtandaoni' : 'Tuma'}
+          {contact.kycName && contact.kycName !== contact.savedName ? `Tuma: ${contact.kycName} · ` : ''}
+          {contact.isOnline ? '🟢 Online' : 'Tuma'}
         </p>
       </div>
-      <span className="bg-green-500 text-white text-xs font-semibold px-3 py-1.5 rounded-full flex-shrink-0">
-        Chat
-      </span>
+      <span className="bg-green-500 text-white text-xs font-semibold px-3 py-1.5 rounded-full flex-shrink-0">Chat</span>
     </button>
   );
 }
