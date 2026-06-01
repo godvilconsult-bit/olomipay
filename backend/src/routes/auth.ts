@@ -55,20 +55,37 @@ async function storeRefreshToken(userId: string, token: string): Promise<void> {
 // ── POST /api/auth/register ────────────────────────────────────────────────────
 
 router.post('/register', authLimiter, async (req, res) => {
+  console.log('[register] attempt:', req.body?.phone);
+
+  // Accept any phone format — Tanzania or international
   const parse = z.object({
-    phone: phoneSchema,
-    pin:   pinSchema,
-    name:  z.string().min(2).max(100).optional(),
+    phone: z.string().min(7).max(20).transform(v => {
+      const clean = v.replace(/\s+/g, '');
+      if (clean.startsWith('0')) return '+255' + clean.slice(1);
+      if (!clean.startsWith('+')) return '+255' + clean;
+      return clean;
+    }),
+    pin:  z.string().regex(/^\d{6}$/, 'PIN must be 6 digits'),
+    name: z.string().min(1).max(100).optional(),
   }).safeParse(req.body);
+
   if (!parse.success) {
+    console.log('[register] validation failed:', parse.error.errors[0].message);
     return res.status(400).json({ error: parse.error.errors[0].message });
   }
 
   const { phone, pin, name } = parse.data;
+  console.log('[register] registering:', phone, 'name:', name);
 
-  const existing = await prisma.user.findUnique({ where: { phone } });
-  if (existing) {
-    return res.status(409).json({ error: 'Phone number already registered' });
+  try {
+    const existing = await prisma.user.findUnique({ where: { phone } });
+    if (existing) {
+      console.log('[register] already exists:', phone);
+      return res.status(409).json({ error: 'Phone number already registered' });
+    }
+  } catch (e: any) {
+    console.error('[register] DB check failed:', e.message);
+    return res.status(500).json({ error: 'Database error. Please try again.' });
   }
 
   // Generate Stellar keypair
@@ -76,31 +93,50 @@ router.post('/register', authLimiter, async (req, res) => {
   const encryptedSecret          = encryptSecret(secretKey, pin, phone);
   const pinHash                  = hashPin(pin);
 
-  // Generate chat keypair safely (don't crash registration if it fails)
-  let chatPublicKey:    string | null = null;
-  let chatSecretKeyEnc: string | null = null;
+  // Generate chat keypair safely
+  let chatPublicKey:    string | undefined;
+  let chatSecretKeyEnc: string | undefined;
   try {
-    const nacl       = require('tweetnacl');
+    const nacl             = require('tweetnacl');
     const { encodeBase64 } = require('tweetnacl-util');
-    const chatKp     = nacl.box.keyPair();
-    chatPublicKey    = encodeBase64(chatKp.publicKey);
-    chatSecretKeyEnc = encryptSecret(encodeBase64(chatKp.secretKey), pin, phone);
+    const kp               = nacl.box.keyPair();
+    chatPublicKey          = encodeBase64(kp.publicKey);
+    chatSecretKeyEnc       = encryptSecret(encodeBase64(kp.secretKey), pin, phone);
   } catch (e: any) {
-    console.warn('[auth] chat keygen skipped:', e.message);
+    console.warn('[register] chat keygen skipped:', e.message);
   }
 
-  // Build user data — only include fields that exist in DB
-  const userData: any = {
-    phone,
-    pinHash,
-    stellarPubKey: publicKey,
-    stellarSecret: encryptedSecret,
-  };
-  if (chatPublicKey)    userData.chatPublicKey    = chatPublicKey;
-  if (chatSecretKeyEnc) userData.chatSecretKeyEnc = chatSecretKeyEnc;
-  if (name)             userData.kycName          = name;
-
-  const user = await prisma.user.create({ data: userData });
+  let user: any;
+  try {
+    user = await prisma.user.create({
+      data: {
+        phone,
+        pinHash,
+        stellarPubKey:    publicKey,
+        stellarSecret:    encryptedSecret,
+        kycName:          name ?? null,
+        chatPublicKey:    chatPublicKey ?? null,
+        chatSecretKeyEnc: chatSecretKeyEnc ?? null,
+      },
+    });
+    console.log('[register] user created:', user.id, phone);
+  } catch (e: any) {
+    console.error('[register] create failed:', e.message);
+    // Try minimal create without optional fields
+    try {
+      user = await prisma.$executeRawUnsafe(
+        `INSERT INTO "User" (id, phone, "pinHash", "stellarPubKey", "stellarSecret", "kycName", "kycStatus", "createdAt", "updatedAt")
+         VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, 'PENDING', NOW(), NOW()) RETURNING id, phone`,
+        phone, pinHash, publicKey, encryptedSecret, name ?? null,
+      );
+      // Re-fetch
+      user = await prisma.user.findUnique({ where: { phone } });
+      console.log('[register] fallback create succeeded:', user?.id);
+    } catch (e2: any) {
+      console.error('[register] fallback failed:', e2.message);
+      return res.status(500).json({ error: 'Registration failed. Please try again.' });
+    }
+  }
 
   // Fund the account asynchronously (don't block registration)
   createAndFundAccount(publicKey).catch(err =>

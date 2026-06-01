@@ -72,6 +72,21 @@ async function loadRoutes() {
   console.log('[routes] All routes loaded');
 }
 
+// ── Debug: list all users (remove in production) ─────────────────────────────
+app.get('/debug/users', async (_req, res) => {
+  try {
+    const { PrismaClient } = await import('@prisma/client');
+    const p = new PrismaClient();
+    const users = await p.user.findMany({
+      select: { id: true, phone: true, kycName: true, kycStatus: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    return res.json({ count: users.length, users });
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
 // ── Setup DB endpoint ─────────────────────────────────────────────────────────
 app.get('/setup-db', async (_req, res) => {
   try {
