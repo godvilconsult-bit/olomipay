@@ -548,8 +548,49 @@ export async function setupDatabase(): Promise<void> {
       );
     `);
 
+    // Add admin columns if missing
+    await prisma.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "isAdmin" BOOLEAN NOT NULL DEFAULT false`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "isFeeCollector" BOOLEAN NOT NULL DEFAULT false`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "profilePicUrl" TEXT`).catch(() => {});
+
     console.log('[db] All tables created successfully ✓');
+
+    // ── Seed admin user ───────────────────────────────────────────────────────
+    await seedAdmin();
+
   } catch (e: any) {
     console.error('[db] Setup error:', e.message);
+  }
+}
+
+async function seedAdmin() {
+  const ADMIN_PHONE   = process.env.ADMIN_PHONE   ?? '+255752401012';
+  const PLATFORM_KEY  = process.env.STELLAR_SECRET_KEY;
+
+  try {
+    // Find the admin user by phone
+    const admin = await prisma.user.findUnique({ where: { phone: ADMIN_PHONE } });
+    if (!admin) {
+      console.log(`[db] Admin user ${ADMIN_PHONE} not found — will be set when they register`);
+      return;
+    }
+
+    // Update admin flags
+    const updateData: any = { isAdmin: true, isFeeCollector: true };
+
+    // If platform stellar key is set and admin doesn't have it, link it
+    if (PLATFORM_KEY && admin.stellarSecret !== PLATFORM_KEY) {
+      const { generateKeypair } = await import('./stellar').catch(() => ({ generateKeypair: null }));
+      // Keep existing keypair — just set the fee collector flag
+    }
+
+    await prisma.user.update({
+      where: { phone: ADMIN_PHONE },
+      data:  updateData,
+    });
+
+    console.log(`[db] Admin seeded: ${ADMIN_PHONE} (${admin.kycName ?? 'unnamed'})`);
+  } catch (e: any) {
+    console.error('[db] Admin seed error:', e.message);
   }
 }

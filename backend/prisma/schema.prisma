@@ -156,6 +156,8 @@ model User {
   country            Country           @default(TZ)
   chatPublicKey      String?
   profilePicUrl      String?
+  isAdmin            Boolean   @default(false)
+  isFeeCollector     Boolean   @default(false)
   chatSecretKeyEnc   String?
   isOnline           Boolean           @default(false)
   lastSeenAt         DateTime?
