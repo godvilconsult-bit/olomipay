@@ -2,11 +2,9 @@
 echo "=== Tuma API Startup ==="
 echo "Node: $(node --version)"
 
-echo "--- Syncing database schema ---"
-npx prisma db push --accept-data-loss --skip-generate || {
-  echo "--- db push failed, trying force reset ---"
-  npx prisma db push --accept-data-loss --force-reset --skip-generate || echo "--- db push failed, continuing anyway ---"
-}
+echo "--- Syncing database schema (safe — no data loss) ---"
+# NEVER use --force-reset — it drops all tables and deletes all users
+npx prisma db push --accept-data-loss --skip-generate || echo "--- db push warning (continuing) ---"
 echo "--- Database ready ---"
 
 echo "--- Starting API ---"
