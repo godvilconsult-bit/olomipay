@@ -1,27 +1,46 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { ArrowLeft, ChevronDown, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, QrCode, CheckCircle2, ExternalLink } from 'lucide-react';
 import BottomNav from '../../components/BottomNav';
 import PinInput from '../../components/PinInput';
 import FeePreview from '../../components/FeePreview';
 import { send } from '../../lib/api';
-import { parseRecipient, parseAmount, calcFee, isValidTanzaniaPhone, isValidStellarAddress } from '../../lib/utils';
+import { parseRecipient, parseAmount, calcFee, isValidStellarAddress } from '../../lib/utils';
+
+const API = process.env.NEXT_PUBLIC_API_URL;
+function getToken() {
+  return sessionStorage.getItem('olomipay_at') || sessionStorage.getItem('olomipay_rt') || '';
+}
 
 type Step = 'form' | 'pin' | 'success';
 
-export default function SendPage() {
-  const router = useRouter();
+function SendPageInner() {
+  const router       = useRouter();
+  const searchParams = useSearchParams();
   const [step,      setStep]      = useState<Step>('form');
   const [recipient, setRecipient] = useState('');
   const [amount,    setAmount]    = useState('');
-  const [asset,     setAsset]     = useState<'USDC' | 'XLM'>('USDC');
+  const [asset,     setAsset]     = useState<'USDC' | 'XLM'>('XLM');
   const [memo,      setMemo]      = useState('');
   const [pin,       setPin]       = useState('');
   const [loading,   setLoading]   = useState(false);
   const [txHash,    setTxHash]    = useState('');
+  const [isTestnet, setIsTestnet] = useState(true);
+
+  // Pre-fill from QR scan params
+  useEffect(() => {
+    const to     = searchParams.get('to');
+    const amt    = searchParams.get('amount');
+    const ast    = searchParams.get('asset');
+    const m      = searchParams.get('memo');
+    if (to)  setRecipient(to);
+    if (amt) setAmount(amt);
+    if (ast) setAsset(ast.toUpperCase() as 'XLM' | 'USDC');
+    if (m)   setMemo(m);
+  }, [searchParams]);
 
   const recipientType = parseRecipient(recipient);
   const amountNum     = parseAmount(amount);
@@ -33,12 +52,23 @@ export default function SendPage() {
     setLoading(true);
     try {
       let result: any;
-      if (recipientType === 'phone') {
+      if (asset === 'XLM') {
+        // Direct XLM send
+        const r = await fetch(`${API}/api/send/xlm`, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+          body:    JSON.stringify({ toAddress: recipient, amount: amountNum, memo, pin }),
+        });
+        result = await r.json();
+        if (!result.success && result.error) throw new Error(result.error);
+        setTxHash(result.hash ?? '');
+      } else if (recipientType === 'phone') {
         result = await send.toPhone({ toPhone: recipient, amount: amountNum, asset, pin });
+        setTxHash(result.hash ?? '');
       } else {
         result = await send.toAddress({ toAddress: recipient, amount: amountNum, asset, memo, pin });
+        setTxHash(result.hash ?? result.transactionId ?? '');
       }
-      setTxHash(result.hash ?? '');
       setStep('success');
     } catch (err: any) {
       toast.error(err.message ?? 'Transfer failed');
@@ -62,9 +92,15 @@ export default function SendPage() {
               : recipient}
           </p>
           {txHash && (
-            <p className="text-xs text-slate-400 font-mono break-all bg-slate-100 dark:bg-slate-800 p-3 rounded-xl">
-              {txHash}
-            </p>
+            <div className="bg-slate-100 dark:bg-slate-800 rounded-xl p-3 space-y-2">
+              <p className="text-xs text-slate-400 font-mono break-all">{txHash}</p>
+              <a
+                href={`https://stellar.expert/explorer/testnet/tx/${txHash}`}
+                target="_blank" rel="noopener noreferrer"
+                className="flex items-center justify-center gap-1.5 text-xs text-primary font-semibold">
+                <ExternalLink size={12} /> View on Stellar Explorer
+              </a>
+            </div>
           )}
           <div className="flex flex-col gap-3">
             <button onClick={() => router.push('/dashboard')} className="btn-primary w-full">
@@ -96,10 +132,16 @@ export default function SendPage() {
           <>
             {/* Recipient */}
             <div className="card space-y-3">
-              <label className="text-sm font-medium text-slate-600 dark:text-slate-400">To</label>
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-slate-600 dark:text-slate-400">To</label>
+                <button onClick={() => router.push('/scan')}
+                  className="flex items-center gap-1.5 text-xs text-primary font-semibold bg-primary/10 px-3 py-1.5 rounded-xl">
+                  <QrCode size={13} /> Scan QR
+                </button>
+              </div>
               <input
                 type="text"
-                placeholder="+255712345678 or wallet address"
+                placeholder="+255712345678 or G... Stellar address"
                 value={recipient}
                 onChange={e => setRecipient(e.target.value.trim())}
                 className="input"
@@ -206,5 +248,17 @@ export default function SendPage() {
 
       <BottomNav />
     </div>
+  );
+}
+
+export default function SendPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    }>
+      <SendPageInner />
+    </Suspense>
   );
 }

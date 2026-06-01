@@ -3,7 +3,7 @@ import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { PrismaClient } from '@prisma/client';
 import { requireAuth, AuthRequest } from '../middleware/auth';
-import { contractTransfer } from '../services/stellar';
+import { contractTransfer, userSendXlm } from '../services/stellar';
 import { verifyPin } from '../services/crypto';
 
 const router = Router();
@@ -152,6 +152,57 @@ router.post('/phone', requireAuth, sendLimiter, async (req: AuthRequest, res) =>
       return { success: true, data: { hash, message: 'Sent successfully' } };
     })()
   );
+});
+
+// ── POST /api/send/xlm ────────────────────────────────────────────────────────
+// Direct XLM send for testnet testing — 1% fee auto-collected to platform wallet
+
+router.post('/xlm', requireAuth, sendLimiter, async (req: AuthRequest, res) => {
+  const parse = z.object({
+    toAddress: stellarAddressSchema,
+    amount:    z.number().positive().max(100_000),
+    memo:      z.string().max(28).optional().default(''),
+    pin:       z.string().regex(/^\d{6}$/),
+  }).safeParse(req.body);
+
+  if (!parse.success) return res.status(400).json({ error: parse.error.errors[0].message });
+  const { toAddress, amount, memo, pin } = parse.data;
+
+  const user = await prisma.user.findUnique({ where: { id: req.userId! } });
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  if (user.stellarPubKey === toAddress) return res.status(400).json({ error: 'Cannot send to yourself' });
+
+  const validPin = await verifyPin(pin, user.pinHash);
+  if (!validPin) return res.status(403).json({ error: 'Incorrect PIN' });
+
+  const dbTx = await prisma.transaction.create({
+    data: { userId: user.id, type: 'SEND', status: 'PENDING', amountXlm: amount, toAddress, memo: memo || undefined },
+  });
+
+  try {
+    const hash = await userSendXlm({
+      encryptedSecret: user.stellarSecret,
+      pin, phone: user.phone,
+      publicKey: user.stellarPubKey,
+      toAddress, amountXlm: amount, memo,
+    });
+
+    await prisma.transaction.update({ where: { id: dbTx.id }, data: { status: 'CONFIRMED', stellarTxId: hash } });
+
+    // Record receive for recipient if they're an OlomiPay user
+    const recipient = await prisma.user.findUnique({ where: { stellarPubKey: toAddress } });
+    if (recipient) {
+      await prisma.transaction.create({ data: {
+        userId: recipient.id, type: 'RECEIVE', status: 'CONFIRMED',
+        amountXlm: amount * 0.99, stellarTxId: hash, memo: memo || undefined,
+      }});
+    }
+
+    return res.json({ success: true, hash, netAmount: amount * 0.99, fee: amount * 0.01 });
+  } catch (err: any) {
+    await prisma.transaction.update({ where: { id: dbTx.id }, data: { status: 'FAILED', errorMsg: err.message } });
+    return res.status(502).json({ error: err.message });
+  }
 });
 
 // ── GET /api/send/fee-preview ──────────────────────────────────────────────────

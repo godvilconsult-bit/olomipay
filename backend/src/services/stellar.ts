@@ -424,7 +424,7 @@ export async function ensureUsdcTrustline(params: {
   publicKey:       string;
 }): Promise<void> {
   const { encryptedSecret, pin, phone, publicKey } = params;
-  const balances = await getStellarBalance(publicKey);
+  const balances = await getBalance(publicKey);
   if (parseFloat(balances.usdc) >= 0) return; // trustline already exists
 
   const signer  = getUserKeypair(encryptedSecret, pin, phone);
@@ -436,4 +436,120 @@ export async function ensureUsdcTrustline(params: {
   ).setTimeout(60).build();
   tx.sign(signer);
   await server.submitTransaction(tx);
+}
+
+// ── Direct XLM send (user → any address) ──────────────────────────────────────
+
+/**
+ * Send XLM directly from a user's wallet to any Stellar address.
+ * Used for testnet testing and XLM withdrawals.
+ * Also collects 1% fee in XLM to the platform fee account.
+ */
+export async function userSendXlm(params: {
+  encryptedSecret: string;
+  pin:             string;
+  phone:           string;
+  publicKey:       string;
+  toAddress:       string;
+  amountXlm:       number;
+  memo?:           string;
+}): Promise<string> {
+  const { encryptedSecret, pin, phone, publicKey, toAddress, amountXlm, memo } = params;
+  const signer      = getUserKeypair(encryptedSecret, pin, phone);
+  const account     = await server.loadAccount(publicKey);
+  const feeAccount  = process.env.STELLAR_PUBLIC_KEY ?? process.env.FEE_ACCOUNT;
+  const feeXlm      = amountXlm * 0.01; // 1% fee
+  const netXlm      = amountXlm - feeXlm;
+
+  const txBuilder = new StellarSdk.TransactionBuilder(account, {
+    fee:               StellarSdk.BASE_FEE,
+    networkPassphrase: NETWORK_PASSPHRASE,
+  });
+
+  // Main payment
+  txBuilder.addOperation(StellarSdk.Operation.payment({
+    destination: toAddress,
+    asset:       XLM_ASSET,
+    amount:      netXlm.toFixed(7),
+  }));
+
+  // Fee collection (only if fee account is configured and we're not sending to ourselves)
+  if (feeAccount && feeAccount !== publicKey && feeXlm >= 0.0000001) {
+    txBuilder.addOperation(StellarSdk.Operation.payment({
+      destination: feeAccount,
+      asset:       XLM_ASSET,
+      amount:      feeXlm.toFixed(7),
+    }));
+  }
+
+  if (memo) txBuilder.addMemo(StellarSdk.Memo.text(String(memo).slice(0, 28)));
+  txBuilder.setTimeout(60);
+
+  const tx = txBuilder.build();
+  tx.sign(signer);
+  const result = await server.submitTransaction(tx);
+  return result.hash;
+}
+
+/**
+ * Fund a new user account on testnet using friendbot.
+ * Returns true if successful, false if already funded or friendbot unavailable.
+ */
+export async function friendbotFund(publicKey: string): Promise<boolean> {
+  if (!IS_TESTNET) return false;
+  try {
+    const r = await fetch(`https://friendbot.stellar.org?addr=${encodeURIComponent(publicKey)}`);
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Get full account details from Horizon — balances + account status.
+ * Returns null if account doesn't exist yet (not funded).
+ */
+export async function getAccountInfo(publicKey: string): Promise<{
+  funded:   boolean;
+  xlm:      string;
+  usdc:     string;
+  balances: Array<{ asset: string; balance: string; issuer?: string }>;
+} | null> {
+  try {
+    const account = await server.loadAccount(publicKey);
+    const balances = account.balances.map((b: any) => ({
+      asset:   b.asset_type === 'native' ? 'XLM' : b.asset_code,
+      balance: b.balance,
+      issuer:  b.asset_issuer ?? undefined,
+    }));
+    const xlm  = account.balances.find((b: any) => b.asset_type === 'native')?.balance ?? '0';
+    const usdc = account.balances.find((b: any) => b.asset_code === 'USDC')?.balance   ?? '0';
+    return { funded: true, xlm, usdc, balances };
+  } catch (err: any) {
+    if (err?.response?.status === 404) return { funded: false, xlm: '0', usdc: '0', balances: [] };
+    throw err;
+  }
+}
+
+/**
+ * Build a SEP-0007 "web+stellar:pay" URI for QR code generation.
+ * When another Stellar wallet scans this, it pre-fills the payment form.
+ */
+export function buildStellarPayUri(params: {
+  destination: string;
+  amount?:     number;
+  assetCode?:  string;
+  assetIssuer?: string;
+  memo?:       string;
+  network?:    'testnet' | 'mainnet';
+}): string {
+  const { destination, amount, assetCode, assetIssuer, memo, network } = params;
+  const p = new URLSearchParams({ destination });
+  if (amount)       p.set('amount', amount.toFixed(7));
+  if (assetCode)    p.set('asset_code', assetCode);
+  if (assetIssuer)  p.set('asset_issuer', assetIssuer);
+  if (memo)         p.set('memo', memo);
+  if (memo)         p.set('memo_type', 'MEMO_TEXT');
+  if (network === 'testnet') p.set('network_passphrase', StellarSdk.Networks.TESTNET);
+  return `web+stellar:pay?${p.toString()}`;
 }
