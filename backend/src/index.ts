@@ -79,10 +79,27 @@ app.get('/debug/users', async (_req, res) => {
     const { PrismaClient } = await import('@prisma/client');
     const p = new PrismaClient();
     const users = await p.user.findMany({
-      select: { id: true, phone: true, kycName: true, kycStatus: true, createdAt: true },
+      select: { id: true, phone: true, kycName: true, kycStatus: true, stellarPubKey: true, createdAt: true },
       orderBy: { createdAt: 'desc' },
     });
     return res.json({ count: users.length, users });
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// Check wallet balance for any address
+app.get('/debug/wallet/:address', async (req, res) => {
+  try {
+    const address = req.params.address;
+    const r = await fetch(`https://horizon-testnet.stellar.org/accounts/${address}`);
+    if (r.status === 404) return res.json({ funded: false, address, balances: [] });
+    const data = await r.json();
+    const balances = data.balances?.map((b: any) => ({
+      asset: b.asset_type === 'native' ? 'XLM' : b.asset_code,
+      balance: b.balance,
+    }));
+    return res.json({ funded: true, address, balances });
   } catch (e: any) {
     return res.status(500).json({ error: e.message });
   }
