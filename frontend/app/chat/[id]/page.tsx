@@ -198,6 +198,14 @@ function Bubble({
   onAccept: (messageId: string, amount: number) => void;
   onReject: (messageId: string) => void;
 }) {
+  const [hearts, setHearts] = useState<number[]>([]);
+  const inAnim = isMine ? 'msg-in-right' : 'msg-in-left';
+  function react() {
+    const id = Date.now();
+    setHearts(h => [...h, id]);
+    setTimeout(() => setHearts(h => h.filter(x => x !== id)), 1000);
+  }
+
   if (msg.isDeleted) return (
     <div className={`flex ${isMine ? 'justify-end' : 'justify-start'} mb-0.5 px-3`}>
       <p className="italic text-xs text-slate-400 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-2xl">
@@ -207,8 +215,8 @@ function Bubble({
   );
 
   if (msg.type === 'SYSTEM') return (
-    <div className="flex justify-center my-3">
-      <p className="text-xs text-slate-400 bg-white dark:bg-slate-800 px-4 py-1.5 rounded-full shadow-sm">
+    <div className="flex justify-center my-4">
+      <p className="text-[11px] text-slate-500 dark:text-slate-400 bg-white/70 dark:bg-white/5 backdrop-blur px-4 py-1.5 rounded-full border border-slate-200/60 dark:border-white/10">
         {msg.plainContent}
       </p>
     </div>
@@ -238,15 +246,20 @@ function Bubble({
   const isRead  = (msg.receipts?.length ?? 0) > 0;
 
   return (
-    <div className={`flex ${isMine ? 'justify-end' : 'justify-start'} mb-0.5 px-3`}>
-      <div className={`max-w-[78%] px-3.5 py-2 rounded-2xl ${
+    <div className={`flex ${isMine ? 'justify-end' : 'justify-start'} mb-1 px-3 ${inAnim}`}>
+      <div onDoubleClick={react}
+        className={`group relative max-w-[78%] select-none px-3.5 py-2 shadow-sm transition-transform active:scale-[0.98] ${
         isMine
-          ? 'bg-primary text-white rounded-br-sm'
-          : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-bl-sm shadow-sm border border-slate-100 dark:border-slate-700'
+          ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-2xl rounded-br-md shadow-blue-500/20'
+          : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-2xl rounded-bl-md border border-slate-100 dark:border-white/10'
       }`}>
-        <p className="text-sm leading-relaxed break-words whitespace-pre-wrap">{text}</p>
+        {/* floating hearts on double-tap */}
+        {hearts.map(id => (
+          <span key={id} className="heart-float pointer-events-none absolute -top-2 right-2 text-base">❤️</span>
+        ))}
+        <p className="text-[15px] leading-relaxed break-words whitespace-pre-wrap">{text}</p>
         <div className={`flex items-center gap-1 mt-0.5 ${isMine ? 'justify-end' : 'justify-start'}`}>
-          <span className={`text-[10px] ${isMine ? 'text-white/60' : 'text-slate-400'}`}>
+          <span className={`text-[10px] ${isMine ? 'text-white/70' : 'text-slate-400'}`}>
             {timeAgo(msg.createdAt)}
           </span>
           {isMine && <Ticks isRead={isRead} isDelivered />}
@@ -505,29 +518,34 @@ export default function ChatThread() {
   const name = other?.kycName ?? other?.displayName ?? other?.phoneMasked ?? '...';
 
   return (
-    <div className="h-screen flex flex-col bg-slate-100 dark:bg-slate-900">
+    <div className="h-screen flex flex-col bg-slate-50 dark:bg-[#0a1120] chat-bg">
 
-      {/* Header */}
-      <div className="flex-shrink-0 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-3 py-2.5 flex items-center gap-3 shadow-sm">
+      {/* Header — glass with animated presence */}
+      <div className="flex-shrink-0 z-20 bg-white/80 dark:bg-[#0b1426]/80 backdrop-blur-xl border-b border-slate-200/60 dark:border-white/10 px-3 py-2.5 flex items-center gap-3">
         <button onClick={() => router.push('/chat')}
-          className="p-2 -ml-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800">
+          className="p-2 -ml-1 rounded-full hover:bg-slate-100 dark:hover:bg-white/10 transition-colors">
           <ArrowLeft size={20} />
         </button>
         <div className="relative">
-          <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-bold text-sm">
+          <div className={`w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-emerald-500 flex items-center justify-center text-white font-bold text-sm ${other?.isOnline ? 'presence-ring' : ''}`}>
             {name.slice(0, 2).toUpperCase()}
           </div>
           {other?.isOnline && (
-            <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white" />
+            <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white dark:border-[#0b1426]" />
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-sm truncate">{name}</p>
-          <p className="text-xs text-slate-400">
-            {isTyping ? '⌨️ Anaandika...' :
-             other?.isOnline ? '🟢 Mtandaoni' :
-             other?.lastSeenAt ? `Alionekana ${timeAgo(other.lastSeenAt)}` : 'Tuma'}
+          <p className="font-semibold text-sm truncate text-slate-800 dark:text-white">{name}</p>
+          <p className="text-xs">
+            {isTyping ? <span className="text-emerald-500 font-medium">typing…</span> :
+             other?.isOnline ? <span className="text-emerald-500">● online</span> :
+             other?.lastSeenAt ? <span className="text-slate-400">last seen {timeAgo(other.lastSeenAt)}</span> :
+             <span className="text-slate-400">OlomiPay</span>}
           </p>
+        </div>
+        {/* encrypted badge */}
+        <div className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-1 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+          🔒 Encrypted
         </div>
       </div>
 
@@ -535,13 +553,16 @@ export default function ChatThread() {
       <div className="flex-1 overflow-y-auto py-3">
         {loading ? (
           <div className="flex justify-center items-center h-full">
-            <Loader2 size={24} className="animate-spin text-slate-300" />
+            <Loader2 size={24} className="animate-spin text-blue-400" />
           </div>
         ) : messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center px-8">
-            <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-3 text-3xl">👋</div>
-            <p className="font-semibold text-slate-600 dark:text-slate-400">Anza mazungumzo</p>
-            <p className="text-xs text-slate-400 mt-1">Tuma ujumbe wako wa kwanza kwa {name}</p>
+            <div className="relative mb-4">
+              <div className="anim-glow absolute -inset-3 rounded-full bg-gradient-to-tr from-blue-500/30 to-emerald-500/30 blur-xl" />
+              <div className="relative w-20 h-20 bg-gradient-to-br from-blue-500 to-emerald-500 rounded-3xl flex items-center justify-center text-4xl anim-float">👋</div>
+            </div>
+            <p className="font-bold text-slate-700 dark:text-slate-200">Say hello to {name}</p>
+            <p className="text-xs text-slate-400 mt-1">Messages are end-to-end encrypted. Double-tap any message to react ❤️</p>
           </div>
         ) : (
           <>
@@ -564,34 +585,41 @@ export default function ChatThread() {
         )}
       </div>
 
-      {/* Input bar */}
-      <div className="flex-shrink-0 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 px-2 py-2 flex items-end gap-2">
+      {/* Input bar — glass composer */}
+      <div className="flex-shrink-0 z-20 bg-white/80 dark:bg-[#0b1426]/80 backdrop-blur-xl border-t border-slate-200/60 dark:border-white/10 px-2.5 py-2.5 flex items-end gap-2">
+        {/* Money — prominent gradient */}
+        <button onClick={() => setShowMoney(true)}
+          className="relative w-11 h-11 rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center flex-shrink-0 shadow-lg shadow-emerald-500/30 active:scale-95 transition-transform">
+          <DollarSign size={19} className="text-white" />
+        </button>
+
+        {/* Image */}
         <button onClick={() => imgRef.current?.click()} disabled={uploadingImg}
-          className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center flex-shrink-0 mb-0.5">
+          className="w-11 h-11 rounded-full bg-slate-100 dark:bg-white/10 flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform">
           {uploadingImg
-            ? <Loader2 size={16} className="animate-spin text-slate-400" />
-            : <ImageIcon size={16} className="text-slate-500" />}
+            ? <Loader2 size={17} className="animate-spin text-slate-400" />
+            : <ImageIcon size={17} className="text-slate-500 dark:text-slate-300" />}
         </button>
         <input ref={imgRef} type="file" accept="image/*" className="hidden" onChange={sendImage} />
 
-        <button onClick={() => setShowMoney(true)}
-          className="w-10 h-10 rounded-full bg-green-50 dark:bg-green-900/20 flex items-center justify-center flex-shrink-0 mb-0.5">
-          <DollarSign size={18} className="text-green-600" />
-        </button>
-
-        <div className="flex-1 bg-slate-100 dark:bg-slate-800 rounded-3xl px-4 py-2 flex items-end min-h-[42px]">
+        {/* Text field */}
+        <div className="flex-1 bg-slate-100 dark:bg-white/[0.07] rounded-3xl px-4 py-2.5 flex items-end min-h-[44px] border border-transparent focus-within:border-blue-400/40 transition-colors">
           <textarea ref={inputRef} value={text}
             onChange={e => handleChange(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-            placeholder="Andika ujumbe..." rows={1}
-            className="flex-1 bg-transparent text-sm outline-none resize-none max-h-32 leading-relaxed"
+            placeholder="Type a message…" rows={1}
+            className="flex-1 bg-transparent text-[15px] text-slate-800 dark:text-white outline-none resize-none max-h-32 leading-relaxed placeholder:text-slate-400"
             style={{ minHeight: '22px' }} />
         </div>
+
+        {/* Send */}
         <button onClick={sendMessage} disabled={!text.trim()}
-          className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 mb-0.5 transition-all ${
-            text.trim() ? 'bg-primary text-white shadow-md active:scale-95' : 'bg-slate-200 dark:bg-slate-700 text-slate-400'
+          className={`w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${
+            text.trim()
+              ? 'bg-gradient-to-br from-blue-500 to-emerald-500 text-white shadow-lg shadow-blue-500/30 active:scale-95'
+              : 'bg-slate-200 dark:bg-white/10 text-slate-400'
           }`}>
-          <Send size={16} />
+          <Send size={17} />
         </button>
       </div>
 

@@ -153,7 +153,7 @@ export default function ChatPage() {
 
     const u4 = on('money_sent', ({ amount, asset }: any) => {
       toast.success(
-        `✅ Umetuma ${asset === 'XLM' ? `${Number(amount).toFixed(4)} XLM` : `$${Number(amount).toFixed(2)} USDC`}`,
+        `✅ Sent ${asset === 'XLM' ? `${Number(amount).toFixed(4)} XLM` : `$${Number(amount).toFixed(2)}`}`,
         { duration: 4000 }
       );
     });
@@ -204,24 +204,28 @@ export default function ChatPage() {
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-900 pb-24">
-      {/* Header */}
-      <div className="sticky top-0 z-40 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800">
-        <div className="px-4 py-3 flex items-center gap-3">
-          <h1 className="text-xl font-bold flex-1">OlomiPay Chat</h1>
+      {/* Header — gradient brand band */}
+      <div className="sticky top-0 z-40 bg-white/85 dark:bg-[#0b1426]/85 backdrop-blur-xl border-b border-slate-200/60 dark:border-white/10">
+        <div className="bg-gradient-to-r from-blue-600 to-emerald-500 px-4 py-4 flex items-center gap-3">
+          <img src="/logo.svg" alt="" className="h-7 w-7 brightness-0 invert" />
+          <div className="flex-1">
+            <h1 className="text-lg font-bold leading-tight text-white">Chats</h1>
+            <p className="text-[10px] text-white/70 leading-tight">Encrypted · pay inside the conversation</p>
+          </div>
           <button onClick={shareInvite}
-            className="flex items-center gap-1.5 bg-primary/10 text-primary px-3 py-1.5 rounded-full text-xs font-semibold">
+            className="flex items-center gap-1.5 bg-white/20 text-white px-3 py-1.5 rounded-full text-xs font-semibold backdrop-blur active:scale-95 transition-transform">
             <UserPlus size={14} /> Invite
           </button>
         </div>
         {/* Tabs */}
-        <div className="flex border-b border-slate-100 dark:border-slate-800">
+        <div className="flex">
           {(['chats','people'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
               className={`flex-1 py-3 text-sm font-semibold flex items-center justify-center gap-2 border-b-2 transition-colors ${
-                tab === t ? 'border-primary text-primary' : 'border-transparent text-slate-400'
+                tab === t ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-slate-400'
               }`}>
               {t === 'chats'
-                ? <><MessageCircle size={15}/> Chats {conversations.reduce((s,c)=>s+(c.unreadCount??0),0) > 0 && <span className="bg-primary text-white text-[9px] px-1.5 rounded-full">{conversations.reduce((s,c)=>s+(c.unreadCount??0),0)}</span>}</>
+                ? <><MessageCircle size={15}/> Chats {conversations.reduce((s,c)=>s+(c.unreadCount??0),0) > 0 && <span className="bg-gradient-to-r from-blue-500 to-emerald-500 text-white text-[9px] px-1.5 py-0.5 rounded-full">{conversations.reduce((s,c)=>s+(c.unreadCount??0),0)}</span>}</>
                 : <><Users size={15}/> People ({allUsers.length})</>}
             </button>
           ))}
