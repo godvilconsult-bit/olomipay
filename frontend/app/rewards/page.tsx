@@ -113,6 +113,13 @@ export default function RewardsPage() {
 
         {/* Redeem catalog */}
         <h3 className="text-sm font-semibold text-slate-500">Redeem rewards</h3>
+        {(!data?.catalog || data.catalog.length === 0) && (
+          <div className="card text-center py-8 text-slate-400">
+            <p className="text-3xl mb-2">🎁</p>
+            <p className="text-sm font-medium">No rewards to redeem yet</p>
+            <p className="text-xs mt-1">Keep transacting to unlock redeemable rewards.</p>
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-3">
           {data?.catalog?.map((item: any) => (
             <button key={item.id} onClick={() => handleRedeem(item.id, item.points)}

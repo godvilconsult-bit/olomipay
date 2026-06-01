@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { ArrowLeft, TrendingUp, HandCoins, Clock } from 'lucide-react';
 import BottomNav from '../../components/BottomNav';
+import EmptyState from '../../components/EmptyState';
 import { formatUsdc, timeAgo } from '../../lib/utils';
 
 async function lendApi(path: string, method = 'GET', body?: any) {
@@ -104,10 +105,8 @@ export default function LendingPage() {
         {/* Borrow tab */}
         {tab === 'borrow' && (
           loans.length === 0 ? (
-            <div className="text-center py-10 text-slate-400">
-              <HandCoins size={36} className="mx-auto mb-2 opacity-50" />
-              <p>No loans available right now</p>
-            </div>
+            <EmptyState icon={HandCoins} title="No loans available yet"
+              subtitle="When borrowers post loan requests they'll appear here for you to fund." />
           ) : (
             loans.map(loan => (
               <div key={loan.id} className="card space-y-3">
@@ -189,10 +188,8 @@ export default function LendingPage() {
               </div>
             ))}
             {(!myLoans.taken || myLoans.taken.length === 0) && (!myLoans.given || myLoans.given.length === 0) && (
-              <div className="text-center py-10 text-slate-400">
-                <Clock size={36} className="mx-auto mb-2 opacity-50" />
-                <p>No active loans</p>
-              </div>
+              <EmptyState icon={Clock} title="No active loans"
+                subtitle="Loans you borrow or fund will show up here with their repayment status." />
             )}
           </div>
         )}
