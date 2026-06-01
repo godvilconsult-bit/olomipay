@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import {
   ArrowRight, MessageCircle, TrendingUp, ShieldCheck, Globe2,
-  Zap, Send, PiggyBank, Sparkles, Check,
+  Zap, Send, PiggyBank, Sparkles, Check, Clock, Eye, Lock, X,
 } from 'lucide-react';
 import Reveal from '../components/Reveal';
 import CountUp from '../components/CountUp';
@@ -60,8 +60,9 @@ export default function LandingPage() {
         </h1>
 
         <p className="hero-rise hd4 mt-6 max-w-xl text-lg text-slate-300/90">
-          Deposit from any mobile money or bank in Africa, chat with anyone, and send
-          cash inside the conversation — settled on-chain in seconds.
+          Others promise "98% within 10 minutes." We settle <span className="font-semibold text-white">100% in seconds</span> —
+          on-chain, around the clock. Deposit from any mobile money or bank, then send cash
+          right inside the conversation.
         </p>
 
         <div className="hero-rise hd5 mt-9 flex flex-col items-center gap-3 sm:flex-row">
@@ -145,6 +146,88 @@ export default function LandingPage() {
           <div className="pointer-events-none absolute inset-y-0 left-0 w-20 bg-gradient-to-r from-[#060b18] to-transparent" />
           <div className="pointer-events-none absolute inset-y-0 right-0 w-20 bg-gradient-to-l from-[#060b18] to-transparent" />
         </div>
+      </section>
+
+      {/* ── The fundamental difference: Speed · Security · Social ────────────── */}
+      <section className="relative z-10 mx-auto max-w-6xl px-5 py-24">
+        <Reveal className="mx-auto mb-4 max-w-3xl text-center">
+          <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-xs text-slate-300">
+            <Sparkles size={13} className="text-cyan-300" /> The fundamental difference
+          </p>
+          <h2 className="text-3xl font-bold sm:text-5xl">
+            Built different at the <span className="text-gradient-anim">core</span>
+          </h2>
+          <p className="mx-auto mt-4 max-w-xl text-slate-400">
+            Transfer apps move money between strangers' bank pipes. OlomiPay rewires
+            the rails themselves — so speed, security and connection aren't features, they're the foundation.
+          </p>
+        </Reveal>
+
+        <div className="mt-12 grid gap-5 lg:grid-cols-3">
+          {[
+            {
+              icon: Clock,
+              tag: 'SPEED',
+              color: 'from-blue-500 to-cyan-500',
+              headline: 'Seconds — guaranteed, not 98% of the time',
+              them: '“98% arrive within 10 minutes.” The other 2% wait. It crawls at night, on weekends, on holidays — because the money hops through partner banks and payout networks.',
+              us: 'Every transfer settles on-chain in 3–5 seconds. No intermediaries, no banking hours, no liquidity gaps. 100% of the time — even at 3AM on a Sunday. Finality is mathematics, not a promise.',
+            },
+            {
+              icon: Eye,
+              tag: 'SECURITY',
+              color: 'from-indigo-500 to-blue-500',
+              headline: 'Verify it yourself — don\'t just trust us',
+              them: 'Your money sits inside a company\'s custody pipeline. Your messages live on their servers. Security is a promise you\'re asked to believe.',
+              us: 'Every shilling settles on a public ledger with a receipt you can check yourself. Chats are end-to-end encrypted — even we can\'t read them. Your wallet is keyed to your phone. Provable, not promised.',
+            },
+            {
+              icon: MessageCircle,
+              tag: 'SOCIAL',
+              color: 'from-emerald-500 to-teal-500',
+              headline: 'Send money while you talk',
+              them: 'You open the app, type an account number, send, and leave. The money is a transaction. The relationship ends at “sent.”',
+              us: 'Money lives inside the conversation. Split a bill, request a loan from mum, pay a friend — all in the same thread you\'re chatting in. The transaction becomes part of the relationship.',
+            },
+          ].map((p, i) => (
+            <Reveal key={p.tag} delay={(i + 1) as 1 | 2 | 3} className="glass flex flex-col rounded-3xl p-6">
+              <div className="mb-4 flex items-center gap-3">
+                <div className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br ${p.color}`}>
+                  <p.icon size={20} />
+                </div>
+                <span className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">{p.tag}</span>
+              </div>
+
+              <h3 className="mb-4 text-lg font-semibold leading-snug">{p.headline}</h3>
+
+              {/* Them */}
+              <div className="mb-3 rounded-2xl border border-white/5 bg-white/[0.02] p-3">
+                <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                  <X size={12} className="text-red-400/80" /> Transfer apps
+                </div>
+                <p className="text-sm leading-relaxed text-slate-400">{p.them}</p>
+              </div>
+
+              {/* Us */}
+              <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.06] p-3">
+                <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-emerald-300">
+                  <Check size={12} /> OlomiPay
+                </div>
+                <p className="text-sm leading-relaxed text-slate-200">{p.us}</p>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+
+        {/* Punch line */}
+        <Reveal delay={2} className="mx-auto mt-12 max-w-3xl text-center">
+          <p className="text-xl font-semibold leading-relaxed text-slate-200 sm:text-2xl">
+            A transfer is an <span className="text-slate-500">event</span>.
+            A conversation is a <span className="text-gradient-anim">relationship</span>.
+            <br className="hidden sm:block" />
+            People don&apos;t want to send money and leave — they want to send money while they talk.
+          </p>
+        </Reveal>
       </section>
 
       {/* ── Differentiators (what we have that Nala doesn't) ─────────────────── */}
