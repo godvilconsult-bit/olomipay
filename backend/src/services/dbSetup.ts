@@ -10,6 +10,28 @@ const prisma = new PrismaClient();
 export async function setupDatabase(): Promise<void> {
   console.log('[db] Setting up database tables...');
   try {
+    // ── Create enums first ────────────────────────────────────────────────────
+    const enums = [
+      `DO $$ BEGIN CREATE TYPE "KycStatus" AS ENUM ('PENDING','SUBMITTED','APPROVED','REJECTED'); EXCEPTION WHEN duplicate_object THEN null; END $$`,
+      `DO $$ BEGIN CREATE TYPE "TxType" AS ENUM ('DEPOSIT','SEND','RECEIVE','WITHDRAW','BILL','SCHEDULED','SWAP','STAKE','UNSTAKE','LOAN','REPAY'); EXCEPTION WHEN duplicate_object THEN null; END $$`,
+      `DO $$ BEGIN CREATE TYPE "TxStatus" AS ENUM ('PENDING','CONFIRMED','FAILED','EXPIRED'); EXCEPTION WHEN duplicate_object THEN null; END $$`,
+      `DO $$ BEGIN CREATE TYPE "Frequency" AS ENUM ('DAILY','WEEKLY','BIWEEKLY','MONTHLY'); EXCEPTION WHEN duplicate_object THEN null; END $$`,
+      `DO $$ BEGIN CREATE TYPE "ClaimStatus" AS ENUM ('PENDING','CLAIMED','EXPIRED'); EXCEPTION WHEN duplicate_object THEN null; END $$`,
+      `DO $$ BEGIN CREATE TYPE "StakeStatus" AS ENUM ('ACTIVE','UNLOCKED','WITHDRAWN'); EXCEPTION WHEN duplicate_object THEN null; END $$`,
+      `DO $$ BEGIN CREATE TYPE "ChamaStatus" AS ENUM ('FORMING','ACTIVE','COMPLETED','PAUSED'); EXCEPTION WHEN duplicate_object THEN null; END $$`,
+      `DO $$ BEGIN CREATE TYPE "LoanStatus" AS ENUM ('OPEN','FUNDED','REPAID','DEFAULTED'); EXCEPTION WHEN duplicate_object THEN null; END $$`,
+      `DO $$ BEGIN CREATE TYPE "RewardTier" AS ENUM ('BRONZE','SILVER','GOLD','PLATINUM'); EXCEPTION WHEN duplicate_object THEN null; END $$`,
+      `DO $$ BEGIN CREATE TYPE "BusinessPlan" AS ENUM ('STARTER','PROFESSIONAL','ENTERPRISE'); EXCEPTION WHEN duplicate_object THEN null; END $$`,
+      `DO $$ BEGIN CREATE TYPE "BondStatus" AS ENUM ('OPEN','CLOSED','MATURED','REDEEMED'); EXCEPTION WHEN duplicate_object THEN null; END $$`,
+      `DO $$ BEGIN CREATE TYPE "Country" AS ENUM ('TZ','KE','UG','RW','ZM'); EXCEPTION WHEN duplicate_object THEN null; END $$`,
+      `DO $$ BEGIN CREATE TYPE "ConvType" AS ENUM ('DIRECT','GROUP'); EXCEPTION WHEN duplicate_object THEN null; END $$`,
+      `DO $$ BEGIN CREATE TYPE "MessageType" AS ENUM ('TEXT','PAYMENT','PAYMENT_REQUEST','IMAGE','SYSTEM'); EXCEPTION WHEN duplicate_object THEN null; END $$`,
+      `DO $$ BEGIN CREATE TYPE "PaymentStatus" AS ENUM ('PENDING','CONFIRMED','FAILED','EXPIRED'); EXCEPTION WHEN duplicate_object THEN null; END $$`,
+    ];
+    for (const sql of enums) {
+      await prisma.$executeRawUnsafe(sql);
+    }
+
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "User" (
         "id" TEXT NOT NULL PRIMARY KEY,
