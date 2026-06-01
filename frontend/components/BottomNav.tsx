@@ -9,7 +9,7 @@ import {
   Star, Shield, History, User, Bell, Calendar, X,
   QrCode, Landmark, Building2, Users, TrendingDown,
 } from 'lucide-react';
-import { useSocket } from '../lib/useSocket';
+import { useChatUnread, chatState } from '../lib/chatState';
 
 const MAIN_NAV = [
   { href: '/dashboard', label: 'Home',    icon: Home          },
@@ -44,40 +44,15 @@ export default function BottomNav() {
   const path    = usePathname();
   const router  = useRouter();
   const [sheet, setSheet] = useState(false);
-  const [unread, setUnread] = useState(0);
+  // Read unread count from global shared state (updated by ChatNotifier)
+  const unread = useChatUnread();
 
   // Don't render on public/auth pages
   if (HIDE_ON_PATHS.includes(path) || HIDE_ON_PREFIXES.some(p => path.startsWith(p))) return null;
 
-  const token = typeof window !== 'undefined' ? sessionStorage.getItem('olomipay_rt') : null;
-  const { on } = useSocket(token);
-
-  // Fetch unread count + listen for new messages
+  // Clear unread count when user opens chat list
   useEffect(() => {
-    if (!token) return;
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/chat/conversations`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then(r => r.json())
-      .then(r => {
-        if (r.success) {
-          const total = r.data.conversations.reduce((sum: number, c: any) => sum + (c.unreadCount ?? 0), 0);
-          setUnread(total);
-        }
-      })
-      .catch(() => {});
-  }, [token]);
-
-  useEffect(() => {
-    const unsub = on('new_message', () => {
-      if (!path.startsWith('/chat')) setUnread(u => u + 1);
-    });
-    return unsub;
-  }, [on, path]);
-
-  // Clear unread when entering /chat
-  useEffect(() => {
-    if (path.startsWith('/chat')) setUnread(0);
+    if (path === '/chat') chatState.clear();
   }, [path]);
 
   return (

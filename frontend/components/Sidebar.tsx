@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { useChatUnread, chatState } from '../lib/chatState';
 import {
   Home, Send, MessageCircle, PiggyBank, TrendingUp,
   Users, Receipt, ArrowUpDown, HandCoins, CreditCard,
@@ -45,7 +46,13 @@ const NAV_ITEMS = [
 export default function Sidebar() {
   const path    = usePathname();
   const router  = useRouter();
+  const unread  = useChatUnread();
   const [authed, setAuthed] = useState(false);
+
+  // Clear unread when user navigates to /chat
+  useEffect(() => {
+    if (path === '/chat') chatState.clear();
+  }, [path]);
 
   useEffect(() => {
     // Check both session storage and cookie
@@ -80,7 +87,8 @@ export default function Sidebar() {
       {/* Nav items */}
       <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-0.5">
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-          const active = path === href || path.startsWith(href + '/');
+          const active   = path === href || path.startsWith(href + '/');
+          const showBadge = href === '/chat' && unread > 0 && !active;
           return (
             <Link key={href} href={href}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${
@@ -88,8 +96,20 @@ export default function Sidebar() {
                   ? 'bg-primary text-white font-semibold'
                   : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200'
               }`}>
-              <Icon size={18} strokeWidth={active ? 2.5 : 1.8} />
-              <span className="text-sm">{label}</span>
+              <div className="relative flex-shrink-0">
+                <Icon size={18} strokeWidth={active ? 2.5 : 1.8} />
+                {showBadge && (
+                  <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-0.5">
+                    {unread > 99 ? '99+' : unread}
+                  </span>
+                )}
+              </div>
+              <span className="text-sm flex-1">{label}</span>
+              {showBadge && (
+                <span className="bg-red-500 text-white text-[9px] font-bold rounded-full min-w-[18px] h-4.5 flex items-center justify-center px-1 ml-auto">
+                  {unread > 99 ? '99+' : unread}
+                </span>
+              )}
             </Link>
           );
         })}
