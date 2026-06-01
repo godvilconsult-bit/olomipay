@@ -62,3 +62,23 @@
     @apply bg-slate-200 dark:bg-slate-700 rounded-xl animate-pulse;
   }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Tablet & desktop responsiveness
+   Mobile-first pages use `max-w-md mx-auto` (448px). On tablets/desktop that
+   leaves a narrow strip floating in empty space. Widen ONLY the centered
+   page-level columns (max-w-md + mx-auto) so content fills the area nicely.
+   Modals/sheets/inline cards that use max-w-md WITHOUT mx-auto are untouched.
+   ───────────────────────────────────────────────────────────────────────────── */
+@media (min-width: 768px) {
+  .mx-auto.max-w-md  { max-width: 38rem !important; }
+  .mx-auto.max-w-sm  { max-width: 32rem !important; }
+}
+@media (min-width: 1024px) {
+  .mx-auto.max-w-md  { max-width: 44rem !important; }
+}
+
+/* Give breathing room around content on larger screens */
+@media (min-width: 768px) {
+  .page-pad { padding-left: 1.5rem; padding-right: 1.5rem; }
+}

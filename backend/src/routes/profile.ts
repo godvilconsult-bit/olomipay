@@ -88,10 +88,13 @@ router.get('/me', requireAuth, async (req: AuthRequest, res) => {
     where:  { id: req.userId! },
     select: { id: true, phone: true, kycName: true, kycStatus: true,
               stellarPubKey: true, profilePicUrl: true, createdAt: true,
-              chatPublicKey: true, isOnline: true, lastSeenAt: true },
+              chatPublicKey: true, isOnline: true, lastSeenAt: true,
+              isAdmin: true, isFeeCollector: true },
   });
   if (!user) return res.status(404).json(fail('User not found'));
-  return res.json(ok({ user }));
+  const clean  = user.id.replace(/[^a-z0-9]/gi, '').toUpperCase();
+  const userTag = `OP-${(clean.slice(-8) + clean.slice(0, 4)).slice(0, 8)}`;
+  return res.json(ok({ user: { ...user, userTag } }));
 });
 
 // ── PUT /api/profile/name ─────────────────────────────────────────────────────

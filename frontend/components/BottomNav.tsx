@@ -80,7 +80,7 @@ export default function BottomNav() {
         </div>
       )}
 
-      <nav className="fixed bottom-0 inset-x-0 z-40 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 lg:hidden">
+      <nav className="fixed bottom-0 inset-x-0 z-40 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 md:hidden">
         <div className="flex justify-around items-center h-16 max-w-md mx-auto px-2">
           {MAIN_NAV.map(({ href, label, icon: Icon, hasBadge }) => {
             const active = path.startsWith(href);

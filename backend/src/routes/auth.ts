@@ -237,11 +237,26 @@ router.post('/refresh', authLimiter, async (req, res) => {
 router.get('/me', requireAuth, async (req: AuthRequest, res) => {
   const user = await prisma.user.findUnique({
     where:  { id: req.userId },
-    select: { id: true, phone: true, stellarPubKey: true, kycStatus: true, createdAt: true },
+    select: {
+      id: true, phone: true, stellarPubKey: true,
+      kycStatus: true, kycName: true, profilePicUrl: true,
+      isAdmin: true, isFeeCollector: true, createdAt: true,
+    },
   });
   if (!user) return res.status(404).json({ error: 'User not found' });
-  return res.json({ user });
+  return res.json({ user: { ...user, userTag: makeUserTag(user.id) } });
 });
+
+/** Derive a short unique display tag from the user's DB id.
+ *  Format: OP-XXXXXXXX (8 uppercase alphanumeric chars)
+ *  Deterministic — same user always gets the same tag, no extra DB column.
+ */
+function makeUserTag(id: string): string {
+  // Take chars from positions spread across the cuid
+  const clean = id.replace(/[^a-z0-9]/gi, '').toUpperCase();
+  const tag   = (clean.slice(-8) + clean.slice(0, 4)).slice(0, 8);
+  return `OP-${tag}`;
+}
 
 // ── POST /api/auth/logout ─────────────────────────────────────────────────────
 

@@ -19,7 +19,7 @@ function isPublic(path: string): boolean {
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   return (
-    <div className={isPublic(path) ? '' : 'lg:ml-64'}>
+    <div className={isPublic(path) ? '' : 'md:ml-56 lg:ml-64'}>
       {children}
     </div>
   );

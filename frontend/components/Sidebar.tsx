@@ -72,7 +72,7 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="hidden lg:flex flex-col w-64 min-h-screen bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 fixed left-0 top-0 z-50">
+    <aside className="hidden md:flex flex-col w-56 lg:w-64 min-h-screen bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 fixed left-0 top-0 z-50">
       {/* Logo */}
       <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800">
         <div className="flex items-center gap-2.5">
