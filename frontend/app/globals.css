@@ -50,18 +50,19 @@
   .btn-primary {
     @apply inline-flex items-center justify-center
            min-h-[48px] px-6 rounded-2xl
-           bg-primary text-white font-semibold text-base
+           bg-gradient-to-r from-blue-500 to-emerald-500 text-white font-semibold text-base
+           shadow-lg shadow-blue-500/25
            active:scale-95 transition-transform duration-100
            disabled:opacity-50 disabled:pointer-events-none
-           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50;
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/50;
   }
 
   .btn-secondary {
-    @apply btn-primary bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white;
+    @apply btn-primary bg-none bg-slate-100 dark:bg-white/10 text-slate-900 dark:text-white shadow-none;
   }
 
   .btn-danger {
-    @apply btn-primary bg-danger text-white;
+    @apply btn-primary bg-none bg-danger text-white shadow-none;
   }
 
   /* Full-width mobile card */
@@ -294,6 +295,21 @@
 /* Make authenticated page roots transparent so the mesh shows through.
    (Cards, sticky headers, sheets keep their own bg — they aren't min-h-screen.) */
 .app-canvas .min-h-screen { background-color: transparent !important; }
+
+/* Glass-blur the sticky page headers so they blend into the backdrop
+   instead of looking like a hard solid bar. */
+.app-canvas .sticky.top-0 {
+  background-color: rgba(255,255,255,0.65) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-color: rgba(255,255,255,0.5) !important;
+}
+@media (prefers-color-scheme: dark) {
+  .app-canvas .sticky.top-0 {
+    background-color: rgba(10,17,32,0.65) !important;
+    border-color: rgba(255,255,255,0.08) !important;
+  }
+}
 
 /* Soften the flat card surfaces into glassy 2030 panels app-wide */
 .app-canvas .card {
