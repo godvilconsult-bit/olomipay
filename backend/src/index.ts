@@ -68,6 +68,7 @@ async function loadRoutes() {
   try { const { developerRouter }     = await import('./routes/developer');     app.use('/api/developer',     developerRouter);     } catch(e: any) { console.error('[route] developer failed:', e.message); }
   try { const { chatRouter }          = await import('./routes/chat');          app.use('/api/chat',          chatRouter);          } catch(e: any) { console.error('[route] chat failed:', e.message); }
   try { const { mediaRouter }         = await import('./routes/media');         app.use('/api/chat/media',    mediaRouter);         } catch(e: any) { console.error('[route] media failed:', e.message); }
+  try { const { inviteRouter }        = await import('./routes/invite');        app.use('/api/invite',        inviteRouter);        } catch(e: any) { console.error('[route] invite failed:', e.message); }
   console.log('[routes] All routes loaded');
 }
 
