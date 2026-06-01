@@ -12,7 +12,7 @@ import { isContactPickerSupported, pickAndMatchContacts, type TumaContact } from
 const API = process.env.NEXT_PUBLIC_API_URL;
 
 function getToken() {
-  return sessionStorage.getItem('olomipay_at') || sessionStorage.getItem('olomipay_rt') || '';
+  return sessionStorage.getItem('olomipay_at') || (sessionStorage.getItem('olomipay_at') || sessionStorage.getItem('olomipay_rt')) || '';
 }
 async function chatApi(path: string, method = 'GET', body?: any) {
   const r = await fetch(`${API}/api/chat${path}`, {

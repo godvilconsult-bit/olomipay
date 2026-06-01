@@ -7,7 +7,7 @@ import {
   Home, Send, MessageCircle, PiggyBank, MoreHorizontal,
   Receipt, ArrowUpDown, HandCoins, CreditCard, TrendingUp,
   Star, Shield, History, User, Bell, Calendar, X,
-  QrCode, Landmark, Building2, Users, TrendingDown,
+  QrCode, Landmark, Building2, Users, TrendingDown, Briefcase,
 } from 'lucide-react';
 import { useChatUnread, chatState } from '../lib/chatState';
 
@@ -27,6 +27,7 @@ const MORE_ITEMS = [
   { href: '/card',          label: 'Card',       icon: CreditCard },
   { href: '/invest',        label: 'Bonds',      icon: Landmark   },
   { href: '/merchant',      label: 'Merchant',   icon: QrCode     },
+  { href: '/payroll',       label: 'Payroll',    icon: Briefcase  },
   { href: '/rewards',       label: 'Rewards',    icon: Star       },
   { href: '/credit',        label: 'Credit',     icon: Shield     },
   { href: '/history',       label: 'History',    icon: History    },

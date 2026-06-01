@@ -9,7 +9,7 @@ import PinInput from '../../components/PinInput';
 import { formatTzs } from '../../lib/utils';
 
 async function billsApi(path: string, body?: any) {
-  const token = sessionStorage.getItem('olomipay_rt');
+  const token = (sessionStorage.getItem('olomipay_at') || sessionStorage.getItem('olomipay_rt'));
   const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/bills${path}`, {
     method:  body ? 'POST' : 'GET',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },

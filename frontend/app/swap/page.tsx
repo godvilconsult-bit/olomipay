@@ -8,7 +8,7 @@ import BottomNav from '../../components/BottomNav';
 import PinInput from '../../components/PinInput';
 
 async function swapApi(path: string, method = 'GET', body?: any) {
-  const token = sessionStorage.getItem('olomipay_rt');
+  const token = (sessionStorage.getItem('olomipay_at') || sessionStorage.getItem('olomipay_rt'));
   const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/swap${path}`, {
     method,
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },

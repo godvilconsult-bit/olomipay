@@ -34,7 +34,8 @@ function signAccessToken(userId: string, phone: string): string {
   return jwt.sign(
     { userId, phone },
     process.env.JWT_SECRET!,
-    { expiresIn: '15m' },
+    // 7d so the PWA "just works" across sessions; refresh-token flow still rotates it.
+    { expiresIn: '7d' },
   );
 }
 

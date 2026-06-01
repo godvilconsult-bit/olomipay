@@ -12,7 +12,7 @@ import { formatUsdc } from '../../lib/utils';
 const APY = 4.5;
 
 async function savingsApi(path: string, body?: any) {
-  const token = typeof window !== 'undefined' ? sessionStorage.getItem('olomipay_rt') : null;
+  const token = typeof window !== 'undefined' ? (sessionStorage.getItem('olomipay_at') || sessionStorage.getItem('olomipay_rt')) : null;
   const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/savings${path}`, {
     method:  body ? 'POST' : 'GET',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },

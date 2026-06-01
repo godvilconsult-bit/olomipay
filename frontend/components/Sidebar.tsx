@@ -8,7 +8,7 @@ import {
   Home, Send, MessageCircle, PiggyBank, TrendingUp,
   Users, Receipt, ArrowUpDown, HandCoins, CreditCard,
   Star, Shield, History, User, Bell, Calendar,
-  QrCode, Landmark, Building2, TrendingDown, LogOut,
+  QrCode, Landmark, Building2, TrendingDown, LogOut, Briefcase,
 } from 'lucide-react';
 
 // Routes where the sidebar must NEVER appear
@@ -33,6 +33,7 @@ const NAV_ITEMS = [
   { href: '/card',          label: 'Card',        icon: CreditCard   },
   { href: '/invest',        label: 'Bonds',       icon: Landmark     },
   { href: '/merchant',      label: 'Merchant',    icon: QrCode       },
+  { href: '/payroll',       label: 'Payroll',     icon: Briefcase    },
   { href: '/rewards',       label: 'Rewards',     icon: Star         },
   { href: '/credit',        label: 'Credit',      icon: Shield       },
   { href: '/history',       label: 'History',     icon: History      },

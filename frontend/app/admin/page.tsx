@@ -11,7 +11,7 @@ import BottomNav from '../../components/BottomNav';
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 function getToken() {
-  return sessionStorage.getItem('olomipay_at') || sessionStorage.getItem('olomipay_rt') || '';
+  return sessionStorage.getItem('olomipay_at') || (sessionStorage.getItem('olomipay_at') || sessionStorage.getItem('olomipay_rt')) || '';
 }
 async function adminApi(path: string, params: Record<string, string> = {}) {
   const q = new URLSearchParams(params).toString();

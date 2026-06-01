@@ -8,7 +8,7 @@ import BottomNav from '../../components/BottomNav';
 import { formatUsdc } from '../../lib/utils';
 
 async function merchantApi(path: string, method = 'GET', body?: any) {
-  const token = sessionStorage.getItem('olomipay_rt');
+  const token = (sessionStorage.getItem('olomipay_at') || sessionStorage.getItem('olomipay_rt'));
   const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/merchant${path}`, {
     method,
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },

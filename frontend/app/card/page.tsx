@@ -7,7 +7,7 @@ import { ArrowLeft, Eye, EyeOff, Lock, Unlock } from 'lucide-react';
 import BottomNav from '../../components/BottomNav';
 
 async function cardApi(path: string, method = 'GET', body?: any) {
-  const token = sessionStorage.getItem('olomipay_rt');
+  const token = (sessionStorage.getItem('olomipay_at') || sessionStorage.getItem('olomipay_rt'));
   const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/card${path}`, {
     method,
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },

@@ -7,7 +7,7 @@ import BottomNav from '../../components/BottomNav';
 import { timeAgo } from '../../lib/utils';
 
 async function notifApi(path: string, body?: any) {
-  const token = sessionStorage.getItem('olomipay_rt');
+  const token = (sessionStorage.getItem('olomipay_at') || sessionStorage.getItem('olomipay_rt'));
   const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications${path}`, {
     method:  body ? 'POST' : 'GET',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },

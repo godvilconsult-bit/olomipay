@@ -7,7 +7,7 @@ import { ArrowLeft, Share2, Copy, ShieldCheck } from 'lucide-react';
 import BottomNav from '../../components/BottomNav';
 
 async function creditApi(path: string, method = 'GET', body?: any) {
-  const token = sessionStorage.getItem('olomipay_rt');
+  const token = (sessionStorage.getItem('olomipay_at') || sessionStorage.getItem('olomipay_rt'));
   const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/credit${path}`, {
     method,
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
