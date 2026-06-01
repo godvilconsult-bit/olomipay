@@ -109,7 +109,7 @@ router.post('/execute', requireAuth, limiter, async (req: AuthRequest, res) => {
           where:  { phone: recipient.phone },
           select: { stellarPubKey: true },
         });
-        toAddress = found?.stellarPubKey;
+        toAddress = found?.stellarPubKey ?? null;
       }
 
       if (!toAddress) {
