@@ -40,21 +40,34 @@ const PORT = process.env.PORT ?? 3001;
 app.set('trust proxy', 1);
 
 // ── Security ──────────────────────────────────────────────────────────────────
-app.use(helmet());
+app.use(helmet({ crossOriginResourcePolicy: false }));
 
 const allowedOrigins = [
   process.env.CORS_ORIGIN ?? 'http://localhost:3000',
+  process.env.FRONTEND_URL ?? 'http://localhost:3000',
   'http://localhost:3000',
+  'http://localhost:3001',
   'https://olomipay.vercel.app',
+  'https://www.olomipay.vercel.app',
 ].filter(Boolean);
 
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    // Allow requests with no origin (mobile apps, curl, Postman)
+    if (!origin) return cb(null, true);
+    if (allowedOrigins.includes(origin)) return cb(null, true);
+    // Allow all vercel.app subdomains
+    if (origin.endsWith('.vercel.app')) return cb(null, true);
     cb(new Error('Not allowed by CORS'));
   },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  optionsSuccessStatus: 200,
 }));
+
+// Handle preflight requests
+app.options('*', cors());
 
 app.use(express.json({ limit: '10kb' }));
 app.use(rateLimit({ windowMs: 60_000, max: 100, standardHeaders: true, legacyHeaders: false }));
