@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -8,6 +9,15 @@ import {
   Star, Shield, History, User, Bell, Calendar,
   QrCode, Landmark, Building2, TrendingDown, LogOut,
 } from 'lucide-react';
+
+// Routes where the sidebar must NEVER appear
+const PUBLIC_PATHS = ['/', '/auth/login', '/auth/register'];
+const PUBLIC_PREFIXES = ['/auth/', '/claim/', '/join/'];
+
+function isPublicPath(path: string): boolean {
+  if (PUBLIC_PATHS.includes(path)) return true;
+  return PUBLIC_PREFIXES.some(p => path.startsWith(p));
+}
 
 const NAV_ITEMS = [
   { href: '/dashboard',     label: 'Home',       icon: Home         },
@@ -33,11 +43,24 @@ const NAV_ITEMS = [
 ];
 
 export default function Sidebar() {
-  const path   = usePathname();
-  const router = useRouter();
+  const path    = usePathname();
+  const router  = useRouter();
+  const [authed, setAuthed] = useState(false);
+
+  useEffect(() => {
+    // Check both session storage and cookie
+    const hasToken  = !!(sessionStorage.getItem('olomipay_at') || sessionStorage.getItem('olomipay_rt'));
+    const hasCookie = document.cookie.includes('olomipay_session=1');
+    setAuthed(hasToken || hasCookie);
+  }, [path]); // re-check on every navigation
+
+  // Don't render on public pages or when not authenticated
+  if (isPublicPath(path) || !authed) return null;
 
   function handleLogout() {
     sessionStorage.clear();
+    // Expire session cookie
+    document.cookie = 'olomipay_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax';
     router.push('/');
   }
 

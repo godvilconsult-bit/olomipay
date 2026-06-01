@@ -37,11 +37,17 @@ const MORE_ITEMS = [
   { href: '/profile',       label: 'Profile',    icon: User       },
 ];
 
+const HIDE_ON_PATHS    = ['/', '/auth/login', '/auth/register'];
+const HIDE_ON_PREFIXES = ['/auth/', '/claim/', '/join/'];
+
 export default function BottomNav() {
   const path    = usePathname();
   const router  = useRouter();
   const [sheet, setSheet] = useState(false);
   const [unread, setUnread] = useState(0);
+
+  // Don't render on public/auth pages
+  if (HIDE_ON_PATHS.includes(path) || HIDE_ON_PREFIXES.some(p => path.startsWith(p))) return null;
 
   const token = typeof window !== 'undefined' ? sessionStorage.getItem('olomipay_rt') : null;
   const { on } = useSocket(token);

@@ -1,10 +1,13 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowRight, Zap, Globe, Shield, MessageCircle, TrendingUp } from 'lucide-react';
+import AlreadyAuthed from '../components/AlreadyAuthed';
 
 export default function LandingPage() {
   return (
     <main className="min-h-screen bg-gradient-to-b from-[#0a1628] to-[#1a2744] text-white flex flex-col">
+      {/* Redirect already-logged-in users straight to dashboard */}
+      <AlreadyAuthed />
       {/* Nav */}
       <nav className="flex items-center justify-between px-5 py-4 max-w-5xl mx-auto w-full">
         <div className="flex items-center gap-2.5">

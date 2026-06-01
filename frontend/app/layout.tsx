@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Toaster } from 'react-hot-toast';
 import Sidebar from '../components/Sidebar';
+import AppShell from '../components/AppShell';
 import PushRegistrar from '../components/PushRegistrar';
 import './globals.css';
 
@@ -47,9 +48,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="font-sans bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-50 antialiased">
         <PushRegistrar />
         <Sidebar />
-        <div className="lg:ml-64">
-          {children}
-        </div>
+        <AppShell>{children}</AppShell>
         <Toaster
           position="top-center"
           toastOptions={{

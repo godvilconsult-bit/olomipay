@@ -17,8 +17,13 @@ export function setTokens(access: string, refresh: string) {
   accessToken  = access;
   refreshToken = refresh;
   if (typeof window !== 'undefined') {
-    sessionStorage.setItem('olomipay_rt',  refresh);
-    sessionStorage.setItem('olomipay_at',  access);   // store access token too
+    sessionStorage.setItem('olomipay_rt', refresh);
+    sessionStorage.setItem('olomipay_at', access);
+    // Also write a cookie so Next.js middleware can protect routes server-side.
+    // HttpOnly is NOT set here (JS needs to read it for logout), but it's enough
+    // to gate route access. Expires in 7 days to match refresh token lifetime.
+    const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toUTCString();
+    document.cookie = `olomipay_session=1; path=/; expires=${expires}; SameSite=Lax`;
   }
 }
 
@@ -28,6 +33,8 @@ export function clearTokens() {
   if (typeof window !== 'undefined') {
     sessionStorage.removeItem('olomipay_rt');
     sessionStorage.removeItem('olomipay_at');
+    // Expire the session cookie
+    document.cookie = 'olomipay_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax';
   }
 }
 

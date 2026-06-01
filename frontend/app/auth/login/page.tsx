@@ -29,7 +29,9 @@ export default function LoginPage() {
       const data = await auth.login(phone, pin);
       setTokens(data.accessToken, data.refreshToken);
       toast.success('Welcome back!');
-      router.push('/dashboard');
+      // Redirect to originally-requested page if middleware stored it in ?next=
+      const nextUrl = new URLSearchParams(window.location.search).get('next');
+      router.push(nextUrl && nextUrl.startsWith('/') ? nextUrl : '/dashboard');
     } catch (err: any) {
       toast.error(err.message ?? 'Login failed');
       setPin('');
