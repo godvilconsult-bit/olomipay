@@ -423,7 +423,7 @@ export default function DepositPage() {
                   <div className="flex justify-between"><span className="text-slate-500">You pay (M-Pesa)</span><span className="font-semibold">TZS {amountNum.toLocaleString()}</span></div>
                   <div className="flex justify-between"><span className="text-slate-500">Mid-market rate</span><span>1 USD = TZS {Math.round(feePreview.midRate).toLocaleString()}</span></div>
                   <div className="flex justify-between"><span className="text-slate-500">Yellow Card rate</span><span>1 USD = TZS {Math.round(feePreview.ycBuyRate).toLocaleString()}</span></div>
-                  <div className="flex justify-between text-slate-500"><span className="flex items-center gap-1">YC spread ({feePreview.ycSpreadPct}%)<span className="text-[9px] bg-blue-100 text-blue-600 px-1 rounded">liquidity provider</span></span><span>− ${feePreview.ycSpreadAmount.toFixed(4)}</span></div>
+                  <div className="flex justify-between text-slate-500"><span className="flex items-center gap-1">YC spread ({feePreview.ycSpreadPct}%)<span className="text-[9px] bg-blue-100 text-blue-600 px-1 rounded">liquidity provider</span></span><span>− ${(feePreview.ycSpreadUsdc ?? 0).toFixed(4)}</span></div>
                   <div className="border-t border-slate-100 dark:border-slate-800 pt-2">
                     <div className="flex justify-between"><span className="text-slate-500">Gross USDC</span><span>${feePreview.grossUsdc.toFixed(4)}</span></div>
                   </div>
@@ -444,7 +444,7 @@ export default function DepositPage() {
                     <span className="text-green-600">${feePreview.netUsdc.toFixed(4)} USDC</span>
                   </div>
                   <div className="text-xs text-slate-400 text-center">
-                    Settlement: ~{feePreview.estimatedMinutes === 0 ? 'instant (testnet)' : `${feePreview.estimatedMinutes} min`}
+                    Settlement: ~{feePreview.estimatedMins === 0 ? 'instant (testnet)' : `${feePreview.estimatedMins} min`}
                     {' · '}via {feePreview.provider}
                   </div>
                 </div>
