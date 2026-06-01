@@ -90,6 +90,143 @@
   }
 }
 
+/* ═════════════════════════════════════════════════════════════════════════════
+   LANDING PAGE — futuristic animation system (pure CSS, zero dependencies)
+   ═════════════════════════════════════════════════════════════════════════════ */
+
+/* Floating orbs / cards */
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50%      { transform: translateY(-18px) rotate(2deg); }
+}
+@keyframes floatSlow {
+  0%, 100% { transform: translateY(0) translateX(0); }
+  50%      { transform: translateY(-26px) translateX(10px); }
+}
+
+/* Aurora / mesh gradient drift */
+@keyframes auroraDrift {
+  0%   { transform: translate(0,0) scale(1); }
+  33%  { transform: translate(6%, -4%) scale(1.1); }
+  66%  { transform: translate(-5%, 5%) scale(0.95); }
+  100% { transform: translate(0,0) scale(1); }
+}
+
+/* Animated gradient text */
+@keyframes gradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  50%      { background-position: 100% 50%; }
+}
+
+/* Glow pulse */
+@keyframes glowPulse {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50%      { opacity: 0.9; transform: scale(1.08); }
+}
+
+/* Reveal on scroll / load */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(28px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* Infinite marquee for the partner/currency ticker */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+/* Shimmer sweep across glass cards */
+@keyframes shimmer {
+  0%   { transform: translateX(-150%); }
+  100% { transform: translateX(150%); }
+}
+
+/* Slow orbit for decorative rings */
+@keyframes spinSlow { to { transform: rotate(360deg); } }
+
+/* Pop count-in */
+@keyframes popIn {
+  0%   { opacity: 0; transform: scale(0.8); }
+  60%  { transform: scale(1.05); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* ── Utility classes ── */
+.anim-float      { animation: float 6s ease-in-out infinite; }
+.anim-float-slow { animation: floatSlow 9s ease-in-out infinite; }
+.anim-aurora     { animation: auroraDrift 18s ease-in-out infinite; }
+.anim-glow       { animation: glowPulse 5s ease-in-out infinite; }
+.anim-spin-slow  { animation: spinSlow 28s linear infinite; }
+.anim-marquee    { animation: marquee 26s linear infinite; }
+.anim-pop        { animation: popIn 0.7s cubic-bezier(.22,1,.36,1) both; }
+
+/* Reveal — start hidden, animate when .in-view is added (IntersectionObserver) */
+.reveal       { opacity: 0; }
+.reveal.in-view { animation: fadeUp 0.8s cubic-bezier(.22,1,.36,1) both; }
+.reveal-d1.in-view { animation-delay: 0.08s; }
+.reveal-d2.in-view { animation-delay: 0.16s; }
+.reveal-d3.in-view { animation-delay: 0.24s; }
+.reveal-d4.in-view { animation-delay: 0.32s; }
+
+/* On-load staggered hero reveal */
+.hero-rise { animation: fadeUp 0.9s cubic-bezier(.22,1,.36,1) both; }
+.hd1 { animation-delay: 0.05s; }
+.hd2 { animation-delay: 0.18s; }
+.hd3 { animation-delay: 0.31s; }
+.hd4 { animation-delay: 0.44s; }
+.hd5 { animation-delay: 0.57s; }
+
+/* Animated gradient text */
+.text-gradient-anim {
+  background: linear-gradient(110deg, #3b82f6, #22d3ee, #22c55e, #3b82f6);
+  background-size: 250% 250%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gradientShift 6s ease infinite;
+}
+
+/* Glass card with shimmer sweep on hover */
+.glass {
+  background: rgba(255,255,255,0.06);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255,255,255,0.12);
+  position: relative;
+  overflow: hidden;
+}
+.glass::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.18) 50%, transparent 70%);
+  transform: translateX(-150%);
+  transition: opacity .3s;
+  opacity: 0;
+}
+.glass:hover::after { opacity: 1; animation: shimmer 1.1s ease; }
+.glass:hover { border-color: rgba(59,130,246,0.5); transform: translateY(-4px); }
+.glass { transition: transform .35s cubic-bezier(.22,1,.36,1), border-color .35s; }
+
+/* Glowing CTA */
+.cta-glow { position: relative; }
+.cta-glow::before {
+  content: ''; position: absolute; inset: -2px; border-radius: inherit;
+  background: linear-gradient(110deg, #3b82f6, #22c55e, #22d3ee);
+  filter: blur(14px); opacity: 0.55; z-index: -1;
+  transition: opacity .3s;
+}
+.cta-glow:hover::before { opacity: 0.9; }
+
+/* Respect reduced-motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .anim-float, .anim-float-slow, .anim-aurora, .anim-glow, .anim-spin-slow,
+  .anim-marquee, .anim-pop, .reveal, .reveal.in-view, .hero-rise,
+  .text-gradient-anim { animation: none !important; opacity: 1 !important; }
+  .reveal { opacity: 1 !important; }
+}
+
 /* ─────────────────────────────────────────────────────────────────────────────
    Tablet & desktop responsiveness
    Mobile-first pages use `max-w-md mx-auto` (448px). On tablets/desktop that
