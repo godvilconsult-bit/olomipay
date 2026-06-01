@@ -56,8 +56,19 @@ export default function DepositPage() {
   const [fundLoading, setFundLoading] = useState(false);
   const [accountInfo, setAccountInfo] = useState<any>(null);
 
+  const [rateData,    setRateData]    = useState<any>(null);
+  const [feePreview,  setFeePreview]  = useState<any>(null);
+  const [feeLoading,  setFeeLoading]  = useState(false);
+
   useEffect(() => {
-    mobile_money.rate().then(r => setRate(r.usdcToTzs ?? 2600)).catch(() => {});
+    // Load rate with full fee schedule
+    fetch(`${API}/api/mpesa/rate?currency=TZS`)
+      .then(r => r.json())
+      .then(d => {
+        setRateData(d);
+        setRate(d.usdBuyRate ?? d.usdcToTzs ?? 2600);
+      })
+      .catch(() => {});
     loadReceiveData();
   }, []);
 
@@ -114,6 +125,23 @@ export default function DepositPage() {
   const amountUsdc = amountNum / rate;
   const fee        = amountUsdc * 0.01;
   const netUsdc    = amountUsdc - fee;
+
+  // Fetch full fee breakdown when amount changes
+  useEffect(() => {
+    if (amountNum < 500) { setFeePreview(null); return; }
+    const t = setTimeout(async () => {
+      setFeeLoading(true);
+      try {
+        const r = await fetch(`${API}/api/mpesa/fee-preview?amount=${amountNum}&currency=TZS&type=deposit`, {
+          headers: { Authorization: `Bearer ${getToken()}` },
+        });
+        const d = await r.json();
+        if (d.success) setFeePreview(d.fees);
+      } catch {}
+      finally { setFeeLoading(false); }
+    }, 600);
+    return () => clearTimeout(t);
+  }, [amountNum]);
 
   async function handleDeposit() {
     if (amountNum < 500) { toast.error('Minimum deposit is 500 local currency'); return; }
@@ -383,16 +411,52 @@ export default function DepositPage() {
           </div>
           {amountNum >= 500 && (
             <div className="rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-900">
-              <div className="bg-slate-50 dark:bg-slate-800 px-4 py-2.5 border-b border-slate-200 dark:border-slate-700">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Breakdown</p>
+              <div className="bg-slate-50 dark:bg-slate-800 px-4 py-2.5 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Full Fee Breakdown</p>
+                {rateData?.isSandbox && (
+                  <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">TESTNET — mirrors mainnet fees</span>
+                )}
               </div>
-              <div className="px-4 py-3 space-y-2 text-sm">
-                <div className="flex justify-between"><span className="text-slate-500">You pay</span><span className="font-semibold">{amountNum.toLocaleString()}</span></div>
-                <div className="flex justify-between"><span className="text-slate-500">Rate</span><span>1 USD ≈ {rate.toLocaleString()} local</span></div>
-                <div className="flex justify-between"><span className="text-slate-500">Converted</span><span>{formatUsdc(amountUsdc)}</span></div>
-                <div className="flex justify-between text-amber-600"><span>Fee (1%)</span><span>− {formatUsdc(fee)}</span></div>
-                <div className="flex justify-between font-bold border-t pt-2"><span>You receive</span><span className="text-green-600">{formatUsdc(netUsdc)} USD</span></div>
-              </div>
+              {feePreview ? (
+                <div className="px-4 py-3 space-y-2 text-sm">
+                  {/* Exchange */}
+                  <div className="flex justify-between"><span className="text-slate-500">You pay (M-Pesa)</span><span className="font-semibold">TZS {amountNum.toLocaleString()}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">Mid-market rate</span><span>1 USD = TZS {Math.round(feePreview.midRate).toLocaleString()}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">Yellow Card rate</span><span>1 USD = TZS {Math.round(feePreview.ycBuyRate).toLocaleString()}</span></div>
+                  <div className="flex justify-between text-slate-500"><span className="flex items-center gap-1">YC spread ({feePreview.ycSpreadPct}%)<span className="text-[9px] bg-blue-100 text-blue-600 px-1 rounded">liquidity provider</span></span><span>− ${feePreview.ycSpreadAmount.toFixed(4)}</span></div>
+                  <div className="border-t border-slate-100 dark:border-slate-800 pt-2">
+                    <div className="flex justify-between"><span className="text-slate-500">Gross USDC</span><span>${feePreview.grossUsdc.toFixed(4)}</span></div>
+                  </div>
+                  {/* Platform fee */}
+                  <div className="flex justify-between text-amber-600">
+                    <span className="flex items-center gap-1">OlomiPay fee (1%)<span className="text-[9px] bg-amber-100 text-amber-700 px-1 rounded">to fee wallet</span></span>
+                    <span>− ${feePreview.platformFeeUsdc.toFixed(4)}</span>
+                  </div>
+                  {/* Stellar network fee */}
+                  <div className="flex justify-between text-slate-400 text-xs">
+                    <span className="flex items-center gap-1">Stellar network fee<span className="text-[9px] bg-purple-100 text-purple-600 px-1 rounded">{feePreview.stellarOps} op</span></span>
+                    <span>{feePreview.stellarFeeXlm} XLM ≈ ${feePreview.stellarFeeUsd.toFixed(5)}</span>
+                  </div>
+                  <div className="text-[10px] text-slate-400 -mt-1 pl-2">XLM price: ${feePreview.xlmPriceUsd} · paid by platform wallet</div>
+                  {/* Total */}
+                  <div className="border-t border-slate-200 dark:border-slate-700 pt-2 flex justify-between font-bold text-base">
+                    <span>You receive</span>
+                    <span className="text-green-600">${feePreview.netUsdc.toFixed(4)} USDC</span>
+                  </div>
+                  <div className="text-xs text-slate-400 text-center">
+                    Settlement: ~{feePreview.estimatedMinutes === 0 ? 'instant (testnet)' : `${feePreview.estimatedMinutes} min`}
+                    {' · '}via {feePreview.provider}
+                  </div>
+                </div>
+              ) : (
+                <div className="px-4 py-3 space-y-2 text-sm">
+                  <div className="flex justify-between"><span className="text-slate-500">You pay</span><span className="font-semibold">TZS {amountNum.toLocaleString()}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">Rate (YC)</span><span>1 USD ≈ TZS {Math.round(rate).toLocaleString()}</span></div>
+                  <div className="flex justify-between text-amber-600"><span>OlomiPay fee (1%)</span><span>− {formatUsdc(fee)}</span></div>
+                  <div className="flex justify-between font-bold border-t pt-2"><span>~You receive</span><span className="text-green-600">{formatUsdc(netUsdc)} USDC</span></div>
+                  {feeLoading && <p className="text-xs text-slate-400 text-center animate-pulse">Fetching exact fees...</p>}
+                </div>
+              )}
             </div>
           )}
           <button onClick={handleDeposit} disabled={amountNum < 500 || loading} className="btn-primary w-full text-base">

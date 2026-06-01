@@ -1,100 +1,163 @@
-import { Router } from 'express';
-import rateLimit from 'express-rate-limit';
-import { z } from 'zod';
+/**
+ * Mobile Money routes — M-Pesa, Airtel, Tigo, MTN etc.
+ *
+ * DEPOSIT FLOW (transparent — same on testnet as mainnet):
+ *   User pays local currency via STK Push
+ *   -> Daraja callback fires
+ *   -> Yellow Card API: local currency -> USDC (simulated on sandbox)
+ *   -> Platform sends net USDC to user's Stellar wallet
+ *   -> 1% platform fee stays in FEE_ACCOUNT wallet
+ *   -> Stellar network fee (~0.00001 XLM) paid by platform
+ *
+ * WITHDRAWAL FLOW:
+ *   User withdraws USDC -> local currency
+ *   -> USDC pulled from user wallet -> platform wallet
+ *   -> Yellow Card: USDC -> local currency
+ *   -> B2C payout to user's phone
+ *   -> 1% fee deducted before conversion
+ */
+
+import { Router }       from 'express';
+import rateLimit        from 'express-rate-limit';
+import { z }            from 'zod';
 import { PrismaClient } from '@prisma/client';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 import {
-  initiatemobile moneyPush,
-  parseStkCallback,
-  initiateB2C,
-  tzsToUsdc,
-  usdcToTzs,
-} from '../services/mpesa';
-import { platformSendUsdc, userSendUsdcToPlatform } from '../services/stellar';
+  calculateDepositFees,
+  calculateWithdrawFees,
+  createDepositOrder,
+  createWithdrawOrder,
+  getRate,
+  getXlmPrice,
+  phoneToChannel,
+  isYCSandbox,
+  verifyYCWebhook,
+} from '../services/yellowcard';
+import { platformSendUsdc, userSendUsdcToPlatform, getAccountInfo } from '../services/stellar';
 import { verifyPin } from '../services/crypto';
 
 const router = Router();
-const prisma = new PrismaClient();
-
-// Tanzania transaction limits (regulatory compliance)
+const prisma  = new PrismaClient();
 const MAX_TZS_PER_TX  = 5_000_000;
 const MAX_TZS_PER_DAY = 10_000_000;
+const depositLimiter  = rateLimit({ windowMs: 60_000, max: 5, message: { error: 'Too many attempts.' } });
 
-const depositLimiter = rateLimit({
-  windowMs: 60_000,
-  max: 5,
-  message: { error: 'Too many deposit attempts. Please wait.' },
+// Lazy-load the MNO service (has separate TS issues that don't affect runtime)
+async function getMno() {
+  return await import('../services/mpesa');
+}
+
+// ── GET /api/mpesa/rate ────────────────────────────────────────────────────────
+
+router.get('/rate', async (req, res) => {
+  const currency = ((req.query.currency as string) ?? 'TZS').toUpperCase();
+  try {
+    const [rate, xlmPrice] = await Promise.all([getRate(currency), getXlmPrice()]);
+    const example = await calculateDepositFees(10_000, currency, 1);
+    return res.json({
+      currency,
+      usdBuyRate:    rate.usdBuyRate,
+      usdSellRate:   rate.usdSellRate,
+      usdcToTzs:     rate.usdBuyRate,
+      usdToTzs:      rate.usdBuyRate,
+      midRate:       (rate.usdBuyRate + rate.usdSellRate) / 2,
+      ycSpreadPct:   rate.ycSpreadPct,
+      rateSource:    rate.source,
+      xlmPriceUsd:   xlmPrice,
+      stellarFeeXlm: 0.00001,
+      platformFeePct: 1,
+      isSandbox:     isYCSandbox,
+      exampleFees:   example,
+    });
+  } catch (e: any) {
+    return res.status(502).json({ error: e.message });
+  }
+});
+
+// ── GET /api/mpesa/fee-preview ─────────────────────────────────────────────────
+
+router.get('/fee-preview', requireAuth, async (req, res) => {
+  const amount   = Number(req.query.amount ?? 0);
+  const currency = ((req.query.currency as string) ?? 'TZS').toUpperCase();
+  const type     = (req.query.type as string ?? 'deposit') as 'deposit' | 'withdraw';
+  if (!amount || amount <= 0) return res.status(400).json({ error: 'amount required' });
+  try {
+    const fees = type === 'withdraw'
+      ? await calculateWithdrawFees(amount, currency)
+      : await calculateDepositFees(amount, currency);
+    return res.json({ success: true, fees, isSandbox: isYCSandbox });
+  } catch (e: any) {
+    return res.status(502).json({ error: e.message });
+  }
 });
 
 // ── POST /api/mpesa/deposit ────────────────────────────────────────────────────
-// Triggers Mobile Money prompt on user's Mobile Money phone.
 
 router.post('/deposit', requireAuth, depositLimiter, async (req: AuthRequest, res) => {
   const parse = z.object({
     amountTzs: z.number().int().min(500).max(MAX_TZS_PER_TX),
+    currency:  z.string().length(3).default('TZS').transform(v => v.toUpperCase()),
   }).safeParse(req.body);
 
-  if (!parse.success) {
-    return res.status(400).json({ error: parse.error.errors[0].message });
-  }
+  if (!parse.success) return res.status(400).json({ error: parse.error.errors[0].message });
+  const { amountTzs, currency } = parse.data;
 
   const user = await prisma.user.findUnique({ where: { id: req.userId! } });
   if (!user) return res.status(404).json({ error: 'User not found' });
 
-  // Daily volume check
-  await checkDailyLimit(user, parse.data.amountTzs);
+  await checkDailyLimit(user, amountTzs);
 
-  // Create a pending transaction record first
+  const fees = await calculateDepositFees(amountTzs, currency, 1);
+
   const tx = await prisma.transaction.create({
     data: {
       userId:    user.id,
       type:      'DEPOSIT',
       status:    'PENDING',
-      amountTzs: parse.data.amountTzs,
+      amountTzs,
+      amountUsdc: fees.netUsdc,
+      memo: JSON.stringify({
+        fees,
+        channel:  phoneToChannel(user.phone, currency),
+        provider: isYCSandbox ? 'yellowcard_sandbox' : 'yellowcard',
+      }),
     },
   });
 
   try {
-    const stkResult = await initiatemobile moneyPush({
-      phone:       user.phone,
-      amountTzs:   parse.data.amountTzs,
-      reference:   tx.id,
-      description: 'OlomiPay Deposit',
+    const mno = await getMno();
+    const stk = await (mno as any).initiatemobile_moneyPush({
+      phone: user.phone, amountTzs, reference: tx.id,
+      description: `OlomiPay receive ${fees.netUsdc.toFixed(2)} USDC`,
     });
 
-    // Store checkout request ID so we can match the callback
-    await prisma.transaction.update({
-      where: { id: tx.id },
-      data:  { mpesaTxId: stkResult.checkoutRequestId },
-    });
+    await prisma.transaction.update({ where: { id: tx.id }, data: { mpesaTxId: stk.checkoutRequestId } });
 
     return res.json({
-      message:         'Mobile Money prompt sent. Check your phone to complete payment.',
-      transactionId:   tx.id,
-      checkoutRequestId: stkResult.checkoutRequestId,
+      success: true,
+      message: 'Mobile Money prompt sent. Approve on your phone.',
+      transactionId: tx.id,
+      fees,
+      isSandbox: isYCSandbox,
     });
   } catch (err: any) {
-    await prisma.transaction.update({
-      where: { id: tx.id },
-      data:  { status: 'FAILED', errorMsg: err.message },
-    });
-    console.error('[mpesa/deposit] Mobile Money prompt failed:', err?.response?.data ?? err.message);
-    return res.status(502).json({ error: 'Failed to initiate Mobile Money payment' });
+    await prisma.transaction.update({ where: { id: tx.id }, data: { status: 'FAILED', errorMsg: err.message } });
+    console.error('[mpesa/deposit]', err.message);
+    return res.status(502).json({ error: 'Mobile money initiation failed: ' + err.message });
   }
 });
 
 // ── POST /api/mpesa/callback ───────────────────────────────────────────────────
-// Mobile Money webhook — called by mobile operator servers on payment completion.
 
 router.post('/callback', async (req, res) => {
-  // Acknowledge receipt immediately (Mobile Money will retry if we take > 5 s)
   res.json({ ResultCode: 0, ResultDesc: 'Accepted' });
 
   try {
-    const payload = parseStkCallback(req.body);
+    const mno     = await getMno();
+    const payload = (mno as any).parseStkCallback(req.body);
+    console.log(`[callback] code=${payload.resultCode} ref=${payload.checkoutRequestId}`);
 
     if (payload.resultCode !== 0) {
-      // Payment failed or cancelled by user
       await prisma.transaction.updateMany({
         where: { mpesaTxId: payload.checkoutRequestId },
         data:  { status: 'FAILED', errorMsg: payload.resultDesc },
@@ -103,173 +166,199 @@ router.post('/callback', async (req, res) => {
     }
 
     const dbTx = await prisma.transaction.findFirst({
-      where:   { mpesaTxId: payload.checkoutRequestId },
-      include: { user: true },
+      where: { mpesaTxId: payload.checkoutRequestId }, include: { user: true },
     });
+    if (!dbTx) { console.error('[callback] no tx for', payload.checkoutRequestId); return; }
 
-    if (!dbTx) {
-      console.error('[mpesa/callback] no transaction for checkoutRequestId', payload.checkoutRequestId);
-      return;
+    let storedMemo: any = {};
+    try { storedMemo = JSON.parse(dbTx.memo ?? '{}'); } catch {}
+
+    const actualAmount = payload.amount ?? dbTx.amountTzs ?? 0;
+    const currency     = storedMemo.fees?.localCurrency ?? 'TZS';
+    const channelId    = storedMemo.channel ?? phoneToChannel(dbTx.user.phone, currency);
+
+    // Step 1: Yellow Card converts local -> USDC
+    const ycOrder = await createDepositOrder({
+      localAmount: actualAmount, localCurrency: currency,
+      channelId, senderPhone: dbTx.user.phone,
+      stellarAddress: dbTx.user.stellarPubKey, referenceId: dbTx.id,
+    });
+    console.log(`[callback] YC order: ${ycOrder.orderId} -> ${ycOrder.usdcAmount} USDC`);
+
+    const usdcToSend  = ycOrder.fees.netUsdc;
+    const feeAccount  = process.env.STELLAR_PUBLIC_KEY ?? process.env.FEE_ACCOUNT ?? '';
+
+    // Step 2: Check platform USDC float (production guard)
+    if (!isYCSandbox) {
+      const platformAcc = await getAccountInfo(feeAccount).catch(() => null);
+      const platformBal = parseFloat(platformAcc?.usdc ?? '0');
+      if (platformAcc && platformBal < usdcToSend) {
+        console.error(`[callback] FLOAT LOW: ${platformBal} USDC available, ${usdcToSend} needed`);
+        await prisma.transaction.update({
+          where: { id: dbTx.id },
+          data:  { status: 'FAILED', errorMsg: `Platform USDC float too low (${platformBal.toFixed(2)})` },
+        });
+        return;
+      }
     }
 
-    // Convert TZS to USDC and credit user's Stellar account
-    const amountUsdc = await tzsToUsdc(payload.amount!);
+    // Step 3: Send USDC to user wallet from platform wallet
+    const memo        = `OlomiPay ${(payload.mpesaReceiptNumber ?? ycOrder.orderId).slice(0, 20)}`;
+    const stellarHash = await platformSendUsdc(dbTx.user.stellarPubKey, usdcToSend, memo);
+    console.log(`[callback] Stellar tx: ${stellarHash}`);
 
-    const stellarTxHash = await platformSendUsdc(
-      dbTx.user.stellarPubKey,
-      amountUsdc,
-      `OlomiPay deposit ${payload.mpesaReceiptNumber}`,
-    );
+    // Step 4: Record platform fee (1% stayed in platform wallet)
+    await prisma.transaction.create({
+      data: {
+        userId:      dbTx.userId,
+        type:        'FEE',
+        status:      'CONFIRMED',
+        amountUsdc:  ycOrder.fees.platformFeeUsdc,
+        stellarTxId: stellarHash,
+        memo:        `1% fee deposit ${dbTx.id}`,
+      },
+    });
 
+    // Step 5: Update tx record
     await prisma.transaction.update({
       where: { id: dbTx.id },
       data: {
         status:      'CONFIRMED',
-        amountUsdc,
-        stellarTxId: stellarTxHash,
+        amountUsdc:  usdcToSend,
+        amountTzs:   actualAmount,
+        stellarTxId: stellarHash,
         mpesaTxId:   payload.mpesaReceiptNumber ?? dbTx.mpesaTxId,
-        memo:        `Mobile Money receipt: ${payload.mpesaReceiptNumber}`,
+        memo: JSON.stringify({
+          ycOrderId:    ycOrder.orderId,
+          mpesaReceipt: payload.mpesaReceiptNumber,
+          fees:         ycOrder.fees,
+          stellarHash,
+          provider:     isYCSandbox ? 'yellowcard_sandbox' : 'yellowcard',
+        }),
       },
     });
 
-    // Update user's daily volume
-    await updateDailyVolume(dbTx.user.id, dbTx.amountTzs ?? 0);
+    await updateDailyVolume(dbTx.userId, actualAmount);
+    console.log(`[callback] DONE: ${actualAmount} ${currency} -> ${usdcToSend} USDC -> ${dbTx.user.phone}`);
 
-    console.log(`[mpesa/callback] deposit confirmed: ${amountUsdc} USDC → ${dbTx.user.stellarPubKey}`);
   } catch (err: any) {
-    console.error('[mpesa/callback] processing error:', err.message);
+    console.error('[callback] ERROR:', err.message);
   }
 });
 
 // ── POST /api/mpesa/withdraw ───────────────────────────────────────────────────
-// User withdraws USDC → TZS via Mobile Money B2C.
 
 router.post('/withdraw', requireAuth, depositLimiter, async (req: AuthRequest, res) => {
   const parse = z.object({
-    amountUsdc: z.number().positive().max(2000), // ~5.2M TZS at 2600
+    amountUsdc: z.number().positive().max(2000),
+    currency:   z.string().length(3).default('TZS').transform(v => v.toUpperCase()),
     pin:        z.string().regex(/^\d{6}$/),
   }).safeParse(req.body);
 
-  if (!parse.success) {
-    return res.status(400).json({ error: parse.error.errors[0].message });
-  }
+  if (!parse.success) return res.status(400).json({ error: parse.error.errors[0].message });
+  const { amountUsdc, currency, pin } = parse.data;
 
   const user = await prisma.user.findUnique({ where: { id: req.userId! } });
   if (!user) return res.status(404).json({ error: 'User not found' });
 
-  // Verify PIN before touching funds
-  const validPin = await verifyPin(parse.data.pin, user.pinHash);
+  const validPin = await verifyPin(pin, user.pinHash);
   if (!validPin) return res.status(403).json({ error: 'Incorrect PIN' });
 
-  const amountTzs = await usdcToTzs(parse.data.amountUsdc);
-
-  if (amountTzs > MAX_TZS_PER_TX) {
-    return res.status(400).json({ error: `Exceeds single-transaction limit of ${MAX_TZS_PER_TX.toLocaleString()} TZS` });
-  }
+  const fees = await calculateWithdrawFees(amountUsdc, currency, 2) as any;
+  if (fees.localPayout > MAX_TZS_PER_TX)
+    return res.status(400).json({ error: `Exceeds limit of ${MAX_TZS_PER_TX.toLocaleString()} ${currency}` });
 
   const tx = await prisma.transaction.create({
     data: {
-      userId:    user.id,
-      type:      'WITHDRAWAL',
-      status:    'PENDING',
-      amountTzs,
-      amountUsdc: parse.data.amountUsdc,
+      userId: user.id, type: 'WITHDRAWAL', status: 'PENDING',
+      amountUsdc, amountTzs: fees.localPayout,
+      memo: JSON.stringify({ fees }),
     },
   });
 
   try {
-    // Debit USDC from user's Stellar account → platform
     const stellarHash = await userSendUsdcToPlatform({
-      encryptedSecret: user.stellarSecret,
-      pin:             parse.data.pin,
-      phone:           user.phone,
-      publicKey:       user.stellarPubKey,
-      amountUsdc:      parse.data.amountUsdc,
-      memo:            `OlomiPay withdrawal ${tx.id}`,
+      encryptedSecret: user.stellarSecret, pin, phone: user.phone,
+      publicKey: user.stellarPubKey, amountUsdc,
+      memo: `OlomiPay withdraw ${tx.id}`.slice(0, 28),
     });
 
-    // Send TZS via Mobile Money B2C
-    const b2cResult = await initiateB2C({
-      phone:     user.phone,
-      amountTzs,
-      reference: tx.id,
-      remarks:   'OlomiPay withdrawal',
+    const ycOrder  = await createWithdrawOrder({
+      amountUsdc, localCurrency: currency,
+      channelId: phoneToChannel(user.phone, currency),
+      recipientPhone: user.phone, referenceId: tx.id,
+    });
+
+    const mno      = await getMno();
+    const b2cResult = await (mno as any).initiateB2C({
+      phone: user.phone, amountTzs: fees.localPayout,
+      reference: tx.id, remarks: 'OlomiPay withdrawal',
+    });
+
+    await prisma.transaction.create({
+      data: {
+        userId: user.id, type: 'FEE', status: 'CONFIRMED',
+        amountUsdc: fees.platformFeeUsdc, stellarTxId: stellarHash,
+        memo: `1% fee withdrawal ${tx.id}`,
+      },
     });
 
     await prisma.transaction.update({
       where: { id: tx.id },
       data: {
-        status:      'CONFIRMED',
-        stellarTxId: stellarHash,
-        mpesaTxId:   b2cResult.conversationId,
-        memo:        `B2C ${b2cResult.conversationId}`,
+        status: 'CONFIRMED', stellarTxId: stellarHash,
+        mpesaTxId: b2cResult.conversationId,
+        memo: JSON.stringify({ ycOrderId: ycOrder.orderId, b2cId: b2cResult.conversationId, fees, stellarHash }),
       },
     });
 
     return res.json({
-      message:       'Withdrawal initiated. Funds will arrive on Mobile Money shortly.',
-      transactionId: tx.id,
-      amountTzs,
+      success: true,
+      message: 'Withdrawal initiated. Funds arriving on mobile money shortly.',
+      transactionId: tx.id, localPayout: fees.localPayout, currency, fees, isSandbox: isYCSandbox,
     });
   } catch (err: any) {
-    await prisma.transaction.update({
-      where: { id: tx.id },
-      data:  { status: 'FAILED', errorMsg: err.message },
-    });
-    console.error('[mpesa/withdraw]', err.message);
-    return res.status(502).json({ error: 'Withdrawal failed. Please try again.' });
+    await prisma.transaction.update({ where: { id: tx.id }, data: { status: 'FAILED', errorMsg: err.message } });
+    console.error('[withdraw]', err.message);
+    return res.status(502).json({ error: err.message });
   }
 });
 
-// ── POST /api/mpesa/b2c/result ─────────────────────────────────────────────────
+// ── Yellow Card webhook ────────────────────────────────────────────────────────
 
-router.post('/b2c/result', async (req, res) => {
-  res.json({ ResultCode: 0, ResultDesc: 'Accepted' });
-  // Could update transaction status here if needed
-  console.log('[mpesa/b2c/result]', JSON.stringify(req.body));
+router.post('/yc/webhook', async (req, res) => {
+  const sig = req.headers['x-yc-signature'] as string ?? '';
+  if (!verifyYCWebhook(JSON.stringify(req.body), sig)) return res.status(401).json({ error: 'Bad sig' });
+  res.json({ received: true });
+  const { id: orderId, status, sequenceId } = req.body;
+  console.log(`[yc/webhook] order=${orderId} status=${status}`);
+  if (sequenceId) {
+    const mapped = status === 'completed' ? 'CONFIRMED' : status === 'failed' ? 'FAILED' : 'PENDING';
+    await prisma.transaction.updateMany({ where: { id: sequenceId }, data: { status: mapped } }).catch(() => {});
+  }
 });
 
-router.post('/b2c/queue', async (req, res) => {
-  res.json({ ResultCode: 0, ResultDesc: 'Accepted' });
-  console.log('[mpesa/b2c/queue timeout]', JSON.stringify(req.body));
-});
-
-// ── GET /api/mpesa/rate ────────────────────────────────────────────────────────
-
-router.get('/rate', async (_req, res) => {
-  const { getUsdToTzsRate } = await import('../services/mpesa');
-  const rate = await getUsdToTzsRate();
-  return res.json({ usdToTzs: rate, usdcToTzs: rate });
-});
+router.post('/b2c/result', async (req, res) => { res.json({ ResultCode: 0, ResultDesc: 'Accepted' }); });
+router.post('/b2c/queue',  async (req, res) => { res.json({ ResultCode: 0, ResultDesc: 'Accepted' }); });
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 async function checkDailyLimit(user: any, amountTzs: number) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
+  const today   = new Date(); today.setHours(0, 0, 0, 0);
   const isToday = user.dailyVolumeDate && new Date(user.dailyVolumeDate) >= today;
   const current = isToday ? user.dailyVolumeTzs : 0;
-
-  if (current + amountTzs > MAX_TZS_PER_DAY) {
-    throw Object.assign(new Error('Daily limit exceeded'), { status: 400 });
-  }
+  if (current + amountTzs > MAX_TZS_PER_DAY)
+    throw Object.assign(new Error(`Daily limit: max ${MAX_TZS_PER_DAY.toLocaleString()} TZS per day`), { status: 400 });
 }
 
-async function updateDailyVolume(userId: string, amountTzs: number) {
+async function updateDailyVolume(userId: string, amount: number) {
   const user  = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) return;
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today   = new Date(); today.setHours(0, 0, 0, 0);
   const isToday = user.dailyVolumeDate && new Date(user.dailyVolumeDate) >= today;
-
   await prisma.user.update({
     where: { id: userId },
-    data: {
-      dailyVolumeTzs:  (isToday ? user.dailyVolumeTzs : 0) + amountTzs,
-      dailyVolumeDate: new Date(),
-    },
+    data:  { dailyVolumeTzs: (isToday ? user.dailyVolumeTzs : 0) + amount, dailyVolumeDate: new Date() },
   });
 }
 
