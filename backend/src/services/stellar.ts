@@ -44,6 +44,36 @@ function getPlatformKeypair(): StellarSdk.Keypair {
   return StellarSdk.Keypair.fromSecret(process.env.STELLAR_SECRET_KEY!);
 }
 
+// ── Fee wallet ─────────────────────────────────────────────────────────────────
+// The fee wallet is the Stellar address that receives all 1% platform fees.
+// Configured via FEE_WALLET_PUBLIC (public key) and FEE_WALLET_SECRET (to sign).
+// Falls back to STELLAR_PUBLIC_KEY / STELLAR_SECRET_KEY if not separately set.
+//
+// On testnet: both can be the same address — fees stay in platform wallet.
+// On mainnet: you should use a SEPARATE keypair so fees are clearly segregated.
+//
+// The fee wallet MUST have a USDC trustline. Call setupFeeWallet() once
+// or use POST /api/admin/fee-wallet/setup to configure it automatically.
+
+export function getFeeWalletPublic(): string {
+  return (
+    process.env.FEE_WALLET_PUBLIC   ??
+    process.env.FEE_ACCOUNT         ??
+    process.env.STELLAR_PUBLIC_KEY  ??
+    getPlatformKeypair().publicKey()
+  );
+}
+
+function getFeeWalletSecret(): string {
+  return (
+    process.env.FEE_WALLET_SECRET  ??
+    process.env.STELLAR_SECRET_KEY ?? ''
+  );
+}
+
+export const PLATFORM_FEE_BPS = 100; // 1% = 100 basis points
+export const PLATFORM_FEE_PCT = PLATFORM_FEE_BPS / 10000; // 0.01
+
 // ── Account / keypair helpers ──────────────────────────────────────────────────
 
 /** Generate a brand-new Stellar keypair for a new user. */
@@ -250,37 +280,122 @@ export async function contractTransfer(params: {
 }
 
 /**
- * Simple USDC transfer NOT through the Soroban contract (used by the anchor
- * when crediting user accounts after Mobile Money deposit confirmation).
+ * Platform sends USDC to a user after a confirmed deposit.
+ *
+ * Accepts the GROSS amount (before fee). Internally:
+ *   - Calculates 1% platform fee
+ *   - Sends NET (99%) to the user
+ *   - Sends FEE (1%) to the FEE_WALLET in the SAME atomic Stellar transaction
+ *
+ * If FEE_WALLET === platform wallet (default on testnet), the fee stays in the
+ * platform wallet — no second operation needed.
+ *
+ * Returns: { hash, netUsdc, feeUsdc, feeWallet }
  */
 export async function platformSendUsdc(
   toPublicKey: string,
-  amountUsdc:  number,
+  grossUsdc:   number,
   memo?:       string,
 ): Promise<string> {
-  const anchor  = getPlatformKeypair();
-  const account = await server.loadAccount(anchor.publicKey());
+  const { hash } = await platformSendUsdcWithFee(toPublicKey, grossUsdc, memo);
+  return hash;
+}
 
-  const txBuilder = new StellarSdk.TransactionBuilder(account, {
+export async function platformSendUsdcWithFee(
+  toPublicKey: string,
+  grossUsdc:   number,
+  memo?:       string,
+): Promise<{ hash: string; netUsdc: number; feeUsdc: number; feeWallet: string }> {
+  const anchor     = getPlatformKeypair();
+  const feeWallet  = getFeeWalletPublic();
+  const feeUsdc    = parseFloat((grossUsdc * PLATFORM_FEE_PCT).toFixed(7));
+  const netUsdc    = parseFloat((grossUsdc - feeUsdc).toFixed(7));
+
+  const account    = await server.loadAccount(anchor.publicKey());
+  const txBuilder  = new StellarSdk.TransactionBuilder(account, {
     fee:               StellarSdk.BASE_FEE,
     networkPassphrase: NETWORK_PASSPHRASE,
-  }).addOperation(
-    StellarSdk.Operation.payment({
-      destination: toPublicKey,
-      asset:       USDC_ASSET,
-      amount:      amountUsdc.toFixed(7),
-    }),
-  );
+  });
 
-  if (memo) {
-    txBuilder.addMemo(StellarSdk.Memo.text(memo.slice(0, 28)));
+  // Operation 1: Net USDC → user
+  txBuilder.addOperation(StellarSdk.Operation.payment({
+    destination: toPublicKey,
+    asset:       USDC_ASSET,
+    amount:      netUsdc.toFixed(7),
+  }));
+
+  // Operation 2: Fee USDC → fee wallet (only if it's a different address AND fee > minimum)
+  const feeWalletIsSelf = feeWallet === anchor.publicKey();
+  if (!feeWalletIsSelf && feeUsdc >= 0.0000001) {
+    txBuilder.addOperation(StellarSdk.Operation.payment({
+      destination: feeWallet,
+      asset:       USDC_ASSET,
+      amount:      feeUsdc.toFixed(7),
+    }));
+  }
+  // If feeWallet === platform wallet, the fee stays there implicitly (no extra op needed)
+
+  if (memo) txBuilder.addMemo(StellarSdk.Memo.text(memo.slice(0, 28)));
+  txBuilder.setTimeout(30);
+
+  const tx = txBuilder.build();
+  tx.sign(anchor);
+  const result = await server.submitTransaction(tx);
+
+  return { hash: result.hash, netUsdc, feeUsdc, feeWallet };
+}
+
+/**
+ * User sends USDC to another address with 1% fee to fee wallet.
+ * Two operations in ONE atomic Stellar transaction:
+ *   Op 1: (grossUsdc * 0.99) → recipient
+ *   Op 2: (grossUsdc * 0.01) → fee wallet
+ */
+export async function userSendUsdcWithFee(params: {
+  encryptedSecret: string;
+  pin:             string;
+  phone:           string;
+  publicKey:       string;
+  toAddress:       string;
+  grossUsdc:       number;
+  memo?:           string;
+}): Promise<{ hash: string; netUsdc: number; feeUsdc: number; feeWallet: string }> {
+  const { encryptedSecret, pin, phone, publicKey, toAddress, grossUsdc, memo } = params;
+  const signer    = getUserKeypair(encryptedSecret, pin, phone);
+  const feeWallet = getFeeWalletPublic();
+  const feeUsdc   = parseFloat((grossUsdc * PLATFORM_FEE_PCT).toFixed(7));
+  const netUsdc   = parseFloat((grossUsdc - feeUsdc).toFixed(7));
+
+  const account    = await server.loadAccount(publicKey);
+  const txBuilder  = new StellarSdk.TransactionBuilder(account, {
+    fee:               StellarSdk.BASE_FEE,
+    networkPassphrase: NETWORK_PASSPHRASE,
+  });
+
+  // Op 1: net USDC to recipient
+  txBuilder.addOperation(StellarSdk.Operation.payment({
+    destination: toAddress,
+    asset:       USDC_ASSET,
+    amount:      netUsdc.toFixed(7),
+  }));
+
+  // Op 2: fee to fee wallet (skip if recipient IS the fee wallet to avoid loops)
+  if (feeWallet !== toAddress && feeUsdc >= 0.0000001) {
+    txBuilder.addOperation(StellarSdk.Operation.payment({
+      destination: feeWallet,
+      asset:       USDC_ASSET,
+      amount:      feeUsdc.toFixed(7),
+    }));
   }
 
-  const tx = txBuilder.setTimeout(30).build();
-  tx.sign(anchor);
+  if (memo) txBuilder.addMemo(StellarSdk.Memo.text(memo.slice(0, 28)));
+  txBuilder.setTimeout(60);
 
+  const tx = txBuilder.build();
+  tx.sign(signer);
   const result = await server.submitTransaction(tx);
-  return result.hash;
+
+  return { hash: result.hash, netUsdc, feeUsdc, feeWallet };
 }
 
 /**
@@ -489,6 +604,79 @@ export async function userSendXlm(params: {
   tx.sign(signer);
   const result = await server.submitTransaction(tx);
   return result.hash;
+}
+
+/**
+ * Set up the fee wallet for the first time.
+ * 1. Fund with testnet XLM via Friendbot (testnet only)
+ * 2. Add USDC trustline so it can receive USDC fees
+ * 3. Returns the fee wallet public key + setup result
+ */
+export async function setupFeeWallet(): Promise<{
+  feeWallet:       string;
+  funded:          boolean;
+  trustlineAdded:  boolean;
+  alreadySetup:    boolean;
+  message:         string;
+}> {
+  const feeWalletPub    = getFeeWalletPublic();
+  const feeWalletSecret = getFeeWalletSecret();
+
+  if (!feeWalletSecret) {
+    throw new Error('FEE_WALLET_SECRET not configured — set FEE_WALLET_SECRET in .env');
+  }
+
+  let funded         = false;
+  let trustlineAdded = false;
+  let alreadySetup   = false;
+
+  // Check if account already exists on Stellar
+  const info = await getAccountInfo(feeWalletPub).catch(() => null);
+
+  // Step 1: Fund with Friendbot (testnet only)
+  if (!info?.funded) {
+    if (!IS_TESTNET) {
+      throw new Error('Fee wallet not funded. On mainnet, send at least 2 XLM to ' + feeWalletPub);
+    }
+    funded = await friendbotFund(feeWalletPub);
+    if (!funded) throw new Error('Friendbot funding failed — try again in a moment');
+    // Wait for account to appear on network
+    await new Promise(r => setTimeout(r, 3000));
+  }
+
+  // Step 2: Check if USDC trustline already exists
+  const refreshed = await getAccountInfo(feeWalletPub).catch(() => null);
+  const hasUsdc   = refreshed?.balances?.some(b => b.asset === 'USDC') ?? false;
+
+  if (hasUsdc) {
+    alreadySetup = true;
+    return { feeWallet: feeWalletPub, funded, trustlineAdded: false, alreadySetup, message: 'Fee wallet already configured' };
+  }
+
+  // Step 3: Add USDC trustline
+  const keypair = StellarSdk.Keypair.fromSecret(feeWalletSecret);
+  const account = await server.loadAccount(feeWalletPub);
+  const tx = new StellarSdk.TransactionBuilder(account, {
+    fee:               StellarSdk.BASE_FEE,
+    networkPassphrase: NETWORK_PASSPHRASE,
+  })
+    .addOperation(StellarSdk.Operation.changeTrust({
+      asset:  USDC_ASSET,
+      limit:  '1000000000', // 1 billion USDC max
+    }))
+    .setTimeout(60)
+    .build();
+  tx.sign(keypair);
+  await server.submitTransaction(tx);
+  trustlineAdded = true;
+
+  return {
+    feeWallet:      feeWalletPub,
+    funded:         funded || !!info?.funded,
+    trustlineAdded,
+    alreadySetup:   false,
+    message:        `Fee wallet ready. Address: ${feeWalletPub}`,
+  };
 }
 
 /**

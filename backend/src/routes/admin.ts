@@ -2,6 +2,12 @@ import { Router }      from 'express';
 import { PrismaClient } from '@prisma/client';
 import PDFDocument      from 'pdfkit';
 import { requireAuth, AuthRequest } from '../middleware/auth';
+import {
+  getFeeWalletPublic,
+  getAccountInfo,
+  setupFeeWallet,
+  PLATFORM_FEE_PCT,
+} from '../services/stellar';
 
 const router = Router();
 const prisma  = new PrismaClient();
@@ -20,21 +26,42 @@ async function requireAdmin(req: AuthRequest, res: any, next: any) {
 
 // ── GET /api/admin/stats ──────────────────────────────────────────────────────
 router.get('/stats', requireAuth, requireAdmin, async (_req, res) => {
-  const [userCount, txData] = await Promise.all([
+  const feeWallet = getFeeWalletPublic();
+
+  const [userCount, txData, feeData, feeWalletInfo] = await Promise.all([
     prisma.user.count(),
+    // Volume from SEND + DEPOSIT only (not FEE records)
     prisma.transaction.aggregate({
       _sum:   { amountUsdc: true, amountTzs: true },
       _count: true,
-      where:  { status: 'CONFIRMED' },
+      where:  { status: 'CONFIRMED', type: { in: ['DEPOSIT', 'SEND', 'RECEIVE'] } },
     }),
+    // Real fee records from FEE type transactions
+    prisma.transaction.aggregate({
+      _sum:   { amountUsdc: true },
+      _count: true,
+      where:  { status: 'CONFIRMED', type: 'FEE' },
+    }),
+    // Live on-chain balance of fee wallet
+    getAccountInfo(feeWallet).catch(() => null),
   ]);
+
   return res.json(ok({
-    totalUsers:         userCount,
-    totalTransactions:  txData._count,
-    totalVolumeUsdc:    txData._sum.amountUsdc ?? 0,
-    totalVolumeTzs:     txData._sum.amountTzs  ?? 0,
-    feesCollectedUsdc:  (txData._sum.amountUsdc ?? 0) * 0.01,
-    adminWallet:        process.env.STELLAR_PUBLIC_KEY ?? 'Not configured',
+    totalUsers:          userCount,
+    totalTransactions:   txData._count,
+    totalVolumeUsdc:     txData._sum.amountUsdc ?? 0,
+    totalVolumeTzs:      txData._sum.amountTzs  ?? 0,
+    // Fees from actual FEE tx records — not an estimate
+    feesCollectedUsdc:   feeData._sum.amountUsdc ?? 0,
+    feeTxCount:          feeData._count,
+    feeWallet,
+    feeWalletBalance: {
+      xlm:  feeWalletInfo?.xlm  ?? '0',
+      usdc: feeWalletInfo?.usdc ?? '0',
+    },
+    platformFeePct: PLATFORM_FEE_PCT * 100, // 1
+    // Legacy alias
+    adminWallet: feeWallet,
   }));
 });
 
@@ -106,32 +133,120 @@ router.get('/transactions', requireAuth, requireAdmin, async (req: AuthRequest, 
 });
 
 // ── GET /api/admin/fees ───────────────────────────────────────────────────────
+// Reads ACTUAL FEE transaction records — not estimates
 router.get('/fees', requireAuth, requireAdmin, async (req: AuthRequest, res) => {
   const from = req.query.from as string | undefined;
   const to   = req.query.to   as string | undefined;
-  const where: any = { status: 'CONFIRMED' };
-  if (from || to) where.createdAt = {};
-  if (from) where.createdAt.gte = new Date(from);
-  if (to)   where.createdAt.lte = new Date(to + 'T23:59:59Z');
 
-  const byType = await prisma.transaction.groupBy({
-    by:    ['type'],
-    where,
-    _sum:  { amountUsdc: true },
-    _count: true,
-  });
-  const totalUsdc = byType.reduce((s, r) => s + (r._sum.amountUsdc ?? 0), 0);
+  const feeWhere: any = { status: 'CONFIRMED', type: 'FEE' };
+  if (from || to) feeWhere.createdAt = {};
+  if (from) feeWhere.createdAt.gte = new Date(from);
+  if (to)   feeWhere.createdAt.lte = new Date(to + 'T23:59:59Z');
+
+  // Volume breakdown by original tx type (SEND, DEPOSIT, etc.)
+  const volWhere: any = { status: 'CONFIRMED', type: { in: ['DEPOSIT', 'SEND', 'RECEIVE'] } };
+  if (from || to) volWhere.createdAt = { ...feeWhere.createdAt };
+
+  const feeWallet = getFeeWalletPublic();
+
+  const [feeAgg, feeByDay, volByType, walletInfo] = await Promise.all([
+    prisma.transaction.aggregate({ where: feeWhere, _sum: { amountUsdc: true }, _count: true }),
+    // Fee collected per day
+    prisma.$queryRaw`
+      SELECT DATE("createdAt") as day, SUM("amountUsdc") as daily_fee, COUNT(*) as count
+      FROM "Transaction"
+      WHERE status = 'CONFIRMED' AND type = 'FEE'
+      ${from ? prisma.$raw`AND "createdAt" >= ${new Date(from)}` : prisma.$raw``}
+      ${to   ? prisma.$raw`AND "createdAt" <= ${new Date(to + 'T23:59:59Z')}` : prisma.$raw``}
+      GROUP BY DATE("createdAt")
+      ORDER BY day DESC
+      LIMIT 30
+    `.catch(() => []),
+    prisma.transaction.groupBy({
+      by:    ['type'],
+      where: volWhere,
+      _sum:  { amountUsdc: true },
+      _count: true,
+    }),
+    getAccountInfo(feeWallet).catch(() => null),
+  ]);
+
   return res.json(ok({
-    feesEarnedUsdc:  totalUsdc * 0.01,
-    totalVolumeUsdc: totalUsdc,
-    adminWallet:     process.env.STELLAR_PUBLIC_KEY ?? '',
-    breakdown: byType.map(r => ({
-      type:       r.type,
-      count:      r._count,
-      volumeUsdc: r._sum.amountUsdc ?? 0,
-      feeUsdc:    (r._sum.amountUsdc ?? 0) * 0.01,
+    feeWallet,
+    feeWalletBalance: {
+      xlm:  walletInfo?.xlm  ?? '0',
+      usdc: walletInfo?.usdc ?? '0',
+    },
+    feesCollectedUsdc: feeAgg._sum.amountUsdc ?? 0,
+    feeTxCount:        feeAgg._count,
+    platformFeePct:    PLATFORM_FEE_PCT * 100,
+    recentDailyFees:   feeByDay,
+    volumeBreakdown: volByType.map(r => ({
+      type:            r.type,
+      txCount:         r._count,
+      volumeUsdc:      r._sum.amountUsdc ?? 0,
+      estimatedFeeUsdc: (r._sum.amountUsdc ?? 0) * PLATFORM_FEE_PCT,
     })),
   }));
+});
+
+// ── GET /api/admin/fee-wallet ──────────────────────────────────────────────────
+// Returns fee wallet address, live balance, and setup status
+router.get('/fee-wallet', requireAuth, requireAdmin, async (_req, res) => {
+  const feeWallet    = getFeeWalletPublic();
+  const platformPub  = process.env.STELLAR_PUBLIC_KEY ?? '';
+  const isShared     = feeWallet === platformPub;
+  const isTestnet    = (process.env.STELLAR_NETWORK ?? 'testnet') !== 'mainnet';
+
+  const [walletInfo, totalFees] = await Promise.all([
+    getAccountInfo(feeWallet).catch(() => null),
+    prisma.transaction.aggregate({
+      where: { status: 'CONFIRMED', type: 'FEE' },
+      _sum:  { amountUsdc: true },
+      _count: true,
+    }),
+  ]);
+
+  const hasUsdcTrustline = walletInfo?.balances?.some(b => b.asset === 'USDC') ?? false;
+
+  return res.json(ok({
+    feeWallet,
+    platformWallet:   platformPub,
+    isSameAsPlatform: isShared,
+    isTestnet,
+    network:          isTestnet ? 'TESTNET' : 'MAINNET',
+    funded:           walletInfo?.funded ?? false,
+    hasUsdcTrustline,
+    ready:            walletInfo?.funded && hasUsdcTrustline,
+    balances: {
+      xlm:  walletInfo?.xlm  ?? '0',
+      usdc: walletInfo?.usdc ?? '0',
+    },
+    allBalances:      walletInfo?.balances ?? [],
+    totalFeesCollected: {
+      usdc:   totalFees._sum.amountUsdc ?? 0,
+      txCount: totalFees._count,
+    },
+    explorerUrl: isTestnet
+      ? `https://stellar.expert/explorer/testnet/account/${feeWallet}`
+      : `https://stellar.expert/explorer/public/account/${feeWallet}`,
+    configuredVia: process.env.FEE_WALLET_PUBLIC
+      ? 'FEE_WALLET_PUBLIC'
+      : process.env.FEE_ACCOUNT
+      ? 'FEE_ACCOUNT'
+      : 'STELLAR_PUBLIC_KEY (default)',
+  }));
+});
+
+// ── POST /api/admin/fee-wallet/setup ──────────────────────────────────────────
+// Fund fee wallet + add USDC trustline (testnet: free via Friendbot)
+router.post('/fee-wallet/setup', requireAuth, requireAdmin, async (_req, res) => {
+  try {
+    const result = await setupFeeWallet();
+    return res.json(ok(result));
+  } catch (e: any) {
+    return res.status(500).json(fail(e.message));
+  }
 });
 
 // ── GET /api/admin/report/csv ─────────────────────────────────────────────────

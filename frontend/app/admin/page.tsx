@@ -23,11 +23,13 @@ async function adminApi(path: string, params: Record<string, string> = {}) {
 
 export default function AdminPage() {
   const router = useRouter();
-  const [stats,    setStats]    = useState<any>(null);
-  const [users,    setUsers]    = useState<any[]>([]);
-  const [txs,      setTxs]      = useState<any[]>([]);
-  const [wallet,   setWallet]   = useState<any>(null);
-  const [tab,      setTab]      = useState('overview');
+  const [stats,     setStats]     = useState<any>(null);
+  const [users,     setUsers]     = useState<any[]>([]);
+  const [txs,       setTxs]       = useState<any[]>([]);
+  const [wallet,    setWallet]    = useState<any>(null);
+  const [feeWallet, setFeeWallet] = useState<any>(null);
+  const [setupBusy, setSetupBusy] = useState(false);
+  const [tab,       setTab]       = useState('overview');
   const [loading,  setLoading]  = useState(true);
   const [search,   setSearch]   = useState('');
   const [fromDate, setFromDate] = useState('');
@@ -46,19 +48,38 @@ export default function AdminPage() {
   async function loadAll() {
     setLoading(true);
     try {
-      const [sR, uR, tR, wR] = await Promise.all([
+      const [sR, uR, tR, wR, fwR] = await Promise.all([
         adminApi('/stats'),
         adminApi('/users'),
         adminApi('/transactions'),
         adminApi('/wallet'),
+        adminApi('/fee-wallet'),
       ]);
       if (!sR.success) { toast.error('Admin access denied'); router.push('/dashboard'); return; }
       setStats(sR.data);
       setUsers(uR.data?.users ?? []);
       setTxs(tR.data?.transactions ?? []);
-      if (wR.success) setWallet(wR.data);
+      if (wR.success)  setWallet(wR.data);
+      if (fwR.success) setFeeWallet(fwR.data);
     } catch { toast.error('Failed to load'); }
     finally { setLoading(false); }
+  }
+
+  async function handleFeeWalletSetup() {
+    setSetupBusy(true);
+    try {
+      const r = await fetch(`${API}/api/admin/fee-wallet/setup`, {
+        method: 'POST', headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      const d = await r.json();
+      if (!d.success) throw new Error(d.error);
+      toast.success(d.data.message ?? 'Fee wallet configured!');
+      // Reload fee wallet status
+      const fwR = await adminApi('/fee-wallet');
+      if (fwR.success) setFeeWallet(fwR.data);
+    } catch (e: any) {
+      toast.error(e.message ?? 'Setup failed');
+    } finally { setSetupBusy(false); }
   }
 
   async function loadTxs() {
@@ -197,12 +218,22 @@ export default function AdminPage() {
 
       {/* Tabs */}
       <div className="flex bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 overflow-x-auto">
-        {['overview', 'users', 'transactions', 'fees', 'send'].map(t => (
-          <button key={t} onClick={() => setTab(t)}
-            className={`px-4 py-3 text-sm font-semibold whitespace-nowrap border-b-2 transition-colors capitalize ${
-              tab === t ? 'border-primary text-primary' : 'border-transparent text-slate-400'
+        {[
+          { id: 'overview',     label: 'Overview'    },
+          { id: 'users',        label: 'Users'       },
+          { id: 'transactions', label: 'Transactions'},
+          { id: 'fees',         label: '💰 Fees'     },
+          { id: 'fee-wallet',   label: '🏦 Fee Wallet'},
+          { id: 'send',         label: '📤 Send'     },
+        ].map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)}
+            className={`px-4 py-3 text-sm font-semibold whitespace-nowrap border-b-2 transition-colors ${
+              tab === t.id ? 'border-primary text-primary' : 'border-transparent text-slate-400'
             }`}>
-            {t === 'send' ? '📤 Send' : t}
+            {t.label}
+            {t.id === 'fee-wallet' && feeWallet && !feeWallet.ready && (
+              <span className="ml-1 w-2 h-2 bg-amber-400 rounded-full inline-block" />
+            )}
           </button>
         ))}
       </div>
@@ -325,31 +356,173 @@ export default function AdminPage() {
         {tab === 'fees' && stats && (
           <>
             <div className="bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl p-5 text-white">
-              <p className="text-sm text-white/80 mb-1">Total Fees Earned (1% per tx)</p>
-              <p className="text-4xl font-bold">${parseFloat(stats.feesCollectedUsdc).toFixed(4)}</p>
-              <p className="text-sm text-white/70 mt-1">From ${parseFloat(stats.totalVolumeUsdc).toFixed(2)} total volume</p>
+              <p className="text-sm text-white/80 mb-1">Total Fees Collected (1% per tx — actual records)</p>
+              <p className="text-4xl font-bold">${parseFloat(stats.feesCollectedUsdc ?? 0).toFixed(4)} USDC</p>
+              <p className="text-sm text-white/70 mt-1">
+                {stats.feeTxCount} fee transactions · from ${parseFloat(stats.totalVolumeUsdc ?? 0).toFixed(2)} volume
+              </p>
             </div>
-            <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 space-y-3">
-              <p className="font-semibold text-sm">Your Fee Collection Wallet</p>
-              <div className="bg-slate-50 dark:bg-slate-700 rounded-xl p-3">
-                <p className="font-mono text-xs break-all text-slate-600 dark:text-slate-300">{stats.adminWallet}</p>
+            {/* Fee wallet live balance */}
+            {feeWallet && (
+              <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="font-semibold text-sm">Fee Wallet Live Balance</p>
+                  <span className={`text-xs px-2 py-1 rounded-full font-bold ${feeWallet.ready ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                    {feeWallet.ready ? '✓ Ready' : '⚠ Setup needed'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-primary/5 rounded-xl p-3 text-center">
+                    <p className="text-xs text-slate-400">USDC Balance</p>
+                    <p className="font-bold text-primary text-lg">${parseFloat(feeWallet.balances?.usdc ?? 0).toFixed(4)}</p>
+                  </div>
+                  <div className="bg-slate-50 dark:bg-slate-700 rounded-xl p-3 text-center">
+                    <p className="text-xs text-slate-400">XLM Balance</p>
+                    <p className="font-bold text-slate-700 dark:text-slate-200 text-lg">{parseFloat(feeWallet.balances?.xlm ?? 0).toFixed(4)}</p>
+                  </div>
+                </div>
+                <div className="bg-slate-50 dark:bg-slate-700 rounded-xl p-3">
+                  <p className="text-xs text-slate-400 mb-1">Fee Wallet Address</p>
+                  <p className="font-mono text-xs break-all text-slate-600 dark:text-slate-300">{feeWallet.feeWallet}</p>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <button onClick={() => { navigator.clipboard.writeText(feeWallet.feeWallet); toast.success('Copied!'); }}
+                    className="bg-primary/10 text-primary font-semibold text-sm py-2 rounded-xl">Copy</button>
+                  <button onClick={downloadCsv} disabled={busy === 'csv'}
+                    className="bg-green-500 text-white text-sm font-bold py-2 rounded-xl disabled:opacity-60">
+                    {busy === 'csv' ? '…' : 'CSV'}
+                  </button>
+                  <button onClick={downloadPdf} disabled={busy === 'pdf'}
+                    className="bg-primary text-white text-sm font-bold py-2 rounded-xl disabled:opacity-60">
+                    {busy === 'pdf' ? '…' : 'PDF'}
+                  </button>
+                </div>
               </div>
-              <div className="grid grid-cols-3 gap-2">
-                <button onClick={() => { navigator.clipboard.writeText(stats.adminWallet); toast.success('Copied!'); }}
-                  className="bg-primary/10 text-primary font-semibold text-sm py-2 rounded-xl">Copy</button>
-                <button onClick={downloadCsv} disabled={busy === 'csv'}
-                  className="bg-green-500 text-white text-sm font-bold py-2 rounded-xl disabled:opacity-60">
-                  {busy === 'csv' ? '…' : 'CSV'}
-                </button>
-                <button onClick={downloadPdf} disabled={busy === 'pdf'}
-                  className="bg-primary text-white text-sm font-bold py-2 rounded-xl disabled:opacity-60">
-                  {busy === 'pdf' ? '…' : 'PDF'}
-                </button>
-              </div>
-              <p className="text-xs text-slate-400 text-center">Download by date range using the filter above</p>
-            </div>
+            )}
             <DateFilter />
           </>
+        )}
+
+        {/* ── Fee Wallet ────────────────────────────────────────────────────── */}
+        {tab === 'fee-wallet' && (
+          <div className="space-y-4">
+            {feeWallet ? (
+              <>
+                {/* Status card */}
+                <div className={`rounded-2xl p-5 ${feeWallet.ready
+                  ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white'
+                  : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white'}`}>
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="font-bold text-lg">{feeWallet.ready ? '✓ Fee Wallet Ready' : '⚠ Fee Wallet Needs Setup'}</p>
+                    <span className="text-xs bg-white/20 px-2 py-1 rounded-full">{feeWallet.network}</span>
+                  </div>
+                  <p className="text-sm opacity-80 mb-1">Total Fees Collected</p>
+                  <p className="text-3xl font-bold">${parseFloat(feeWallet.totalFeesCollected?.usdc ?? 0).toFixed(4)} USDC</p>
+                  <p className="text-xs opacity-70 mt-1">{feeWallet.totalFeesCollected?.txCount ?? 0} fee transactions recorded</p>
+                </div>
+
+                {/* Address */}
+                <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 space-y-3">
+                  <p className="font-semibold text-sm">Fee Wallet Address</p>
+                  <div className="bg-slate-50 dark:bg-slate-700 rounded-xl p-3">
+                    <p className="font-mono text-xs break-all">{feeWallet.feeWallet}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => { navigator.clipboard.writeText(feeWallet.feeWallet); toast.success('Copied!'); }}
+                      className="flex-1 bg-primary/10 text-primary text-sm font-semibold py-2.5 rounded-xl">Copy</button>
+                    <a href={feeWallet.explorerUrl} target="_blank" rel="noopener noreferrer"
+                      className="flex-1 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-sm font-semibold py-2.5 rounded-xl text-center">
+                      Explorer ↗
+                    </a>
+                  </div>
+                </div>
+
+                {/* Live balances */}
+                <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="font-semibold text-sm">Live On-Chain Balances</p>
+                    <button onClick={loadAll} className="text-xs text-primary">Refresh</button>
+                  </div>
+                  <div className="space-y-2">
+                    {(feeWallet.allBalances ?? []).length > 0 ? (
+                      (feeWallet.allBalances ?? []).map((b: any, i: number) => (
+                        <div key={i} className="flex items-center justify-between bg-slate-50 dark:bg-slate-700 rounded-xl px-4 py-3">
+                          <div>
+                            <p className="font-semibold text-sm">{b.asset}</p>
+                            {b.issuer && <p className="text-xs text-slate-400 font-mono">{b.issuer.slice(0,8)}…</p>}
+                          </div>
+                          <p className="font-bold text-primary">{parseFloat(b.balance).toFixed(4)}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-slate-400 text-center py-4">
+                        {feeWallet.funded ? 'No balances found' : 'Wallet not yet funded'}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Setup status */}
+                <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 space-y-3">
+                  <p className="font-semibold text-sm">Configuration</p>
+                  {[
+                    { label: 'Wallet funded',       ok: feeWallet.funded        },
+                    { label: 'USDC trustline active', ok: feeWallet.hasUsdcTrustline },
+                    { label: 'Same as platform wallet', ok: feeWallet.isSameAsPlatform, neutral: true },
+                  ].map((item, i) => (
+                    <div key={i} className="flex items-center justify-between">
+                      <span className="text-sm text-slate-600 dark:text-slate-300">{item.label}</span>
+                      <span className={`text-xs font-bold px-2 py-1 rounded-full ${
+                        item.neutral ? 'bg-blue-100 text-blue-700' :
+                        item.ok ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                      }`}>
+                        {item.neutral ? (item.ok ? 'Yes' : 'No') : (item.ok ? '✓ Yes' : '✗ No')}
+                      </span>
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-slate-600 dark:text-slate-300">Configured via</span>
+                    <span className="text-xs font-mono bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded-lg">{feeWallet.configuredVia}</span>
+                  </div>
+                </div>
+
+                {/* Setup button */}
+                {!feeWallet.ready && (
+                  <button onClick={handleFeeWalletSetup} disabled={setupBusy}
+                    className="w-full bg-primary text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 disabled:opacity-60">
+                    {setupBusy
+                      ? <><RefreshCw size={16} className="animate-spin" /> Setting up…</>
+                      : '⚡ Setup Fee Wallet (Fund + Add USDC Trustline)'}
+                  </button>
+                )}
+                {feeWallet.ready && (
+                  <div className="bg-green-50 dark:bg-green-900/20 rounded-2xl p-4 text-center">
+                    <p className="text-sm font-semibold text-green-700 dark:text-green-400">
+                      ✅ Fee wallet is fully configured and receiving fees
+                    </p>
+                    <p className="text-xs text-green-600 dark:text-green-500 mt-1">
+                      All 1% platform fees flow here automatically on every transaction
+                    </p>
+                  </div>
+                )}
+
+                {/* Production note */}
+                {feeWallet.isSameAsPlatform && (
+                  <div className="bg-blue-50 dark:bg-blue-900/20 rounded-2xl p-4 space-y-1">
+                    <p className="text-sm font-semibold text-blue-700 dark:text-blue-400">ℹ️ Testnet: shared wallet</p>
+                    <p className="text-xs text-blue-600 dark:text-blue-300">
+                      Fee wallet and platform wallet are the same address. For mainnet, set{' '}
+                      <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">FEE_WALLET_PUBLIC</code> and{' '}
+                      <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">FEE_WALLET_SECRET</code> to a
+                      separate keypair for clean accounting.
+                    </p>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="flex justify-center py-16"><RefreshCw size={24} className="animate-spin text-primary" /></div>
+            )}
+          </div>
         )}
 
         {/* ── Send Stellar ──────────────────────────────────────────────────── */}

@@ -36,7 +36,13 @@ import {
   isYCSandbox,
   verifyYCWebhook,
 } from '../services/yellowcard';
-import { platformSendUsdc, userSendUsdcToPlatform, getAccountInfo } from '../services/stellar';
+import {
+  platformSendUsdcWithFee,
+  platformSendUsdc,
+  userSendUsdcToPlatform,
+  getAccountInfo,
+  getFeeWalletPublic,
+} from '../services/stellar';
 import { verifyPin } from '../services/crypto';
 
 const router = Router();
@@ -216,63 +222,72 @@ router.post('/callback', async (req, res) => {
       channelId, senderPhone: dbTx.user.phone,
       stellarAddress: dbTx.user.stellarPubKey, referenceId: dbTx.id,
     });
-    console.log(`[callback] YC order: ${ycOrder.orderId} -> ${ycOrder.usdcAmount} USDC`);
+    const grossUsdc   = ycOrder.fees.grossUsdc;   // full USDC before platform fee
+    const feeWallet   = getFeeWalletPublic();
+    console.log(`[callback] YC order: ${ycOrder.orderId} -> ${grossUsdc} USDC gross | fee wallet: ${feeWallet.slice(0,8)}...`);
 
-    const usdcToSend  = ycOrder.fees.netUsdc;
-    const feeAccount  = process.env.STELLAR_PUBLIC_KEY ?? process.env.FEE_ACCOUNT ?? '';
-
-    // Step 2: Check platform USDC float (production guard)
+    // Step 2: Safety check — platform wallet has enough gross USDC
     if (!isYCSandbox) {
-      const platformAcc = await getAccountInfo(feeAccount).catch(() => null);
+      const platformPub = process.env.STELLAR_PUBLIC_KEY ?? feeWallet;
+      const platformAcc = await getAccountInfo(platformPub).catch(() => null);
       const platformBal = parseFloat(platformAcc?.usdc ?? '0');
-      if (platformAcc && platformBal < usdcToSend) {
-        console.error(`[callback] FLOAT LOW: ${platformBal} USDC available, ${usdcToSend} needed`);
+      if (platformAcc && platformBal < grossUsdc) {
+        console.error(`[callback] FLOAT LOW: ${platformBal} USDC, need ${grossUsdc}`);
         await prisma.transaction.update({
           where: { id: dbTx.id },
-          data:  { status: 'FAILED', errorMsg: `Platform USDC float too low (${platformBal.toFixed(2)})` },
+          data:  { status: 'FAILED', errorMsg: `Float too low: ${platformBal.toFixed(4)} USDC available, ${grossUsdc.toFixed(4)} needed` },
         });
         return;
       }
     }
 
-    // Step 3: Send USDC to user wallet from platform wallet
-    const memo        = `OlomiPay ${(payload.mpesaReceiptNumber ?? ycOrder.orderId).slice(0, 20)}`;
-    const stellarHash = await platformSendUsdc(dbTx.user.stellarPubKey, usdcToSend, memo);
-    console.log(`[callback] Stellar tx: ${stellarHash}`);
+    // Step 3: ATOMIC — send net USDC (99%) to user + fee (1%) to fee wallet in ONE tx
+    const memo = `OlomiPay ${(payload.mpesaReceiptNumber ?? ycOrder.orderId).slice(0, 20)}`;
+    const { hash: stellarHash, netUsdc, feeUsdc } = await platformSendUsdcWithFee(
+      dbTx.user.stellarPubKey,
+      grossUsdc,
+      memo,
+    );
+    console.log(`[callback] ✓ Stellar: ${stellarHash} | user=${netUsdc} USDC fee=${feeUsdc} USDC -> ${feeWallet.slice(0,8)}...`);
 
-    // Step 4: Record platform fee (1% stayed in platform wallet)
+    // Step 4: Record fee transaction
     await prisma.transaction.create({
       data: {
         userId:      dbTx.userId,
         type:        'FEE',
         status:      'CONFIRMED',
-        amountUsdc:  ycOrder.fees.platformFeeUsdc,
+        amountUsdc:  feeUsdc,
         stellarTxId: stellarHash,
-        memo:        `1% fee deposit ${dbTx.id}`,
+        toAddress:   feeWallet,
+        memo:        `1% fee on deposit ${dbTx.id}`,
       },
     });
 
-    // Step 5: Update tx record
+    // Step 5: Update original transaction
     await prisma.transaction.update({
       where: { id: dbTx.id },
       data: {
         status:      'CONFIRMED',
-        amountUsdc:  usdcToSend,
+        amountUsdc:  netUsdc,
         amountTzs:   actualAmount,
         stellarTxId: stellarHash,
         mpesaTxId:   payload.mpesaReceiptNumber ?? dbTx.mpesaTxId,
         memo: JSON.stringify({
           ycOrderId:    ycOrder.orderId,
           mpesaReceipt: payload.mpesaReceiptNumber,
-          fees:         ycOrder.fees,
+          grossUsdc,
+          netUsdc,
+          feeUsdc,
+          feeWallet,
+          fees:     ycOrder.fees,
           stellarHash,
-          provider:     isYCSandbox ? 'yellowcard_sandbox' : 'yellowcard',
+          provider: isYCSandbox ? 'yellowcard_sandbox' : 'yellowcard',
         }),
       },
     });
 
     await updateDailyVolume(dbTx.userId, actualAmount);
-    console.log(`[callback] DONE: ${actualAmount} ${currency} -> ${usdcToSend} USDC -> ${dbTx.user.phone}`);
+    console.log(`[callback] DONE: ${actualAmount} ${currency} -> ${netUsdc} USDC (fee ${feeUsdc}) -> ${dbTx.user.phone}`);
 
   } catch (err: any) {
     console.error('[callback] ERROR:', err.message);

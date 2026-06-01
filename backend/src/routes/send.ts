@@ -3,7 +3,7 @@ import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { PrismaClient } from '@prisma/client';
 import { requireAuth, AuthRequest } from '../middleware/auth';
-import { contractTransfer, userSendXlm } from '../services/stellar';
+import { contractTransfer, userSendXlm, userSendUsdcWithFee, getFeeWalletPublic, PLATFORM_FEE_PCT } from '../services/stellar';
 import { verifyPin } from '../services/crypto';
 
 const router = Router();
@@ -59,45 +59,70 @@ router.post('/stellar', requireAuth, sendLimiter, async (req: AuthRequest, res) 
   });
 
   try {
-    const memoText = memo || `OlomiPay send to ${toAddress.slice(0, 8)}...`;
-    const hash = await contractTransfer({
-      fromEncryptedSecret: user.stellarSecret,
-      fromPin:             pin,
-      fromPhone:           user.phone,
-      fromPublicKey:       user.stellarPubKey,
-      toPublicKey:         toAddress,
-      amountUsdc:          amount,
-      memo:                memoText,
+    const memoText   = memo || `OlomiPay ${toAddress.slice(0, 8)}`;
+    const feeUsdc    = parseFloat((amount * PLATFORM_FEE_PCT).toFixed(7));
+    const netUsdc    = parseFloat((amount - feeUsdc).toFixed(7));
+
+    // Use direct Horizon payment with fee split (faster than Soroban for simple transfers)
+    const { hash, feeWallet } = await userSendUsdcWithFee({
+      encryptedSecret: user.stellarSecret,
+      pin, phone: user.phone,
+      publicKey: user.stellarPubKey,
+      toAddress,
+      grossUsdc: amount,
+      memo:      memoText,
     });
 
     await prisma.transaction.update({
       where: { id: dbTx.id },
-      data:  { status: 'CONFIRMED', stellarTxId: hash },
+      data:  { status: 'CONFIRMED', stellarTxId: hash, amountUsdc: amount },
     });
 
-    // Record receive for the recipient if they're also an OlomiPay user
+    // Fee record
+    await prisma.transaction.create({
+      data: {
+        userId:      user.id,
+        type:        'FEE',
+        status:      'CONFIRMED',
+        amountUsdc:  feeUsdc,
+        stellarTxId: hash,
+        toAddress:   feeWallet,
+        memo:        `1% fee on send ${dbTx.id}`,
+      },
+    });
+
+    // Record receive for the recipient if they're an OlomiPay user
     const recipient = await prisma.user.findUnique({ where: { stellarPubKey: toAddress } });
     if (recipient) {
       await prisma.transaction.create({
         data: {
-          userId:     recipient.id,
-          type:       'RECEIVE',
-          status:     'CONFIRMED',
-          amountUsdc: asset === 'USDC' ? amount : undefined,
+          userId:      recipient.id,
+          type:        'RECEIVE',
+          status:      'CONFIRMED',
+          amountUsdc:  netUsdc,
           stellarTxId: hash,
           memo:        memoText,
         },
       });
     }
 
-    return res.json({ message: 'Transfer complete', transactionId: dbTx.id, hash });
+    return res.json({
+      success: true,
+      transactionId: dbTx.id,
+      hash,
+      grossUsdc:   amount,
+      netUsdc,
+      feeUsdc,
+      feeWallet,
+      message: 'Transfer complete',
+    });
   } catch (err: any) {
     await prisma.transaction.update({
       where: { id: dbTx.id },
       data:  { status: 'FAILED', errorMsg: err.message },
     });
     console.error('[send/stellar]', err.message);
-    return res.status(502).json({ error: 'Transfer failed. Please try again.' });
+    return res.status(502).json({ error: 'Transfer failed: ' + err.message });
   }
 });
 
