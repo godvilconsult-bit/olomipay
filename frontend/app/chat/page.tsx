@@ -109,7 +109,7 @@ export default function ChatPage() {
   }, [query]);
 
   useEffect(() => {
-    return on('new_message', (msg: any) => {
+    const u1 = on('new_message', (msg: any) => {
       setConversations(prev => {
         const idx = prev.findIndex(c => c.id === msg.conversationId);
         if (idx === -1) return prev;
@@ -119,6 +119,27 @@ export default function ChatPage() {
         return [item, ...updated];
       });
     });
+
+    // Global money events — show toasts even outside a chat window
+    const u2 = on('money_received', ({ amount, from, asset }: any) => {
+      toast.success(
+        `💚 Umepokea ${asset === 'XLM' ? `${Number(amount).toFixed(4)} XLM` : `$${Number(amount).toFixed(2)} USDC`} kutoka ${from}`,
+        { duration: 6000 }
+      );
+    });
+
+    const u3 = on('deposit_confirmed', ({ amountUsdc, currency, amountLocal }: any) => {
+      toast.success(`💚 Amana imefanikiwa! $${Number(amountUsdc).toFixed(2)} USDC`, { duration: 6000 });
+    });
+
+    const u4 = on('money_sent', ({ amount, asset }: any) => {
+      toast.success(
+        `✅ Umetuma ${asset === 'XLM' ? `${Number(amount).toFixed(4)} XLM` : `$${Number(amount).toFixed(2)} USDC`}`,
+        { duration: 4000 }
+      );
+    });
+
+    return () => { u1(); u2(); u3(); u4(); };
   }, [on]);
 
   async function startChat(userId: string) {

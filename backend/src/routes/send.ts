@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { PrismaClient } from '@prisma/client';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 import { contractTransfer, userSendXlm, userSendUsdcWithFee, getFeeWalletPublic, PLATFORM_FEE_PCT } from '../services/stellar';
+import { notify } from '../services/notifications';
+import { emitToUser } from '../socket';
 import { verifyPin } from '../services/crypto';
 
 const router = Router();
@@ -104,6 +106,20 @@ router.post('/stellar', requireAuth, sendLimiter, async (req: AuthRequest, res) 
           memo:        memoText,
         },
       });
+    }
+
+    // ── Notifications + real-time events ───────────────────────────────────
+    const amtStr  = `$${netUsdc.toFixed(2)} USDC`;
+    const toShort = recipient?.kycName ?? toAddress.slice(0, 8) + '…';
+
+    // Sender: confirm sent
+    notify.moneySent(user.id, amtStr, toShort).catch(() => {});
+    emitToUser(user.id, 'money_sent', { hash, amount: netUsdc, feeUsdc, toAddress, asset: 'USDC' });
+
+    // Receiver: notify if OlomiPay user
+    if (recipient) {
+      notify.moneyReceived(recipient.id, amtStr, user.kycName ?? user.phone.slice(-4)).catch(() => {});
+      emitToUser(recipient.id, 'money_received', { hash, amount: netUsdc, from: user.kycName ?? user.phone, asset: 'USDC' });
     }
 
     return res.json({
@@ -223,7 +239,15 @@ router.post('/xlm', requireAuth, sendLimiter, async (req: AuthRequest, res) => {
       }});
     }
 
-    return res.json({ success: true, hash, netAmount: amount * 0.99, fee: amount * 0.01 });
+    const xlmNet = amount * 0.99;
+    const amtStr = `${xlmNet.toFixed(4)} XLM`;
+    notify.moneySent(user.id, amtStr, toAddress.slice(0, 8) + '…').catch(() => {});
+    emitToUser(user.id, 'money_sent', { hash, amount: xlmNet, fee: amount * 0.01, toAddress, asset: 'XLM' });
+    if (recipient) {
+      notify.moneyReceived(recipient.id, amtStr, user.kycName ?? user.phone.slice(-4)).catch(() => {});
+      emitToUser(recipient.id, 'money_received', { hash, amount: xlmNet, from: user.kycName ?? user.phone, asset: 'XLM' });
+    }
+    return res.json({ success: true, hash, netAmount: xlmNet, fee: amount * 0.01 });
   } catch (err: any) {
     await prisma.transaction.update({ where: { id: dbTx.id }, data: { status: 'FAILED', errorMsg: err.message } });
     return res.status(502).json({ error: err.message });

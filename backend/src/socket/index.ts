@@ -9,10 +9,16 @@ import { Server } from 'socket.io';
 import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import { handleSendMessage }     from './handlers/message';
-import { handleSendPayment, handlePaymentRequest, handlePayRequest } from './handlers/payment';
+import { handleSendPayment, handlePaymentRequest, handlePayRequest, handleRejectRequest } from './handlers/payment';
 import { handleMarkRead, handleDeleteMessage } from './handlers/room';
 
 const prisma = new PrismaClient();
+n// ── Global io — lets REST routes emit real-time events
+let _io: Server | null = null;
+export function getIo(): Server | null { return _io; }
+export function emitToUser(userId: string, event: string, data: any): void {
+  _io?.to(`user:${userId}`).emit(event, data);
+}
 
 // Rate limiting per socket
 const messageRates  = new Map<string, { count: number; resetAt: number }>();
@@ -43,6 +49,8 @@ export function initSocket(httpServer: HttpServer): Server {
     pingTimeout:   60_000,
     pingInterval:  25_000,
   });
+
+  _io = io; // expose globally so REST routes can emit to users
 
   // Optional Redis adapter (gracefully skip if no REDIS_URL)
   if (process.env.REDIS_URL) {
@@ -87,6 +95,9 @@ export function initSocket(httpServer: HttpServer): Server {
       data:  { isOnline: true, lastSeenAt: new Date() },
     }).catch(() => {});
 
+    // Join personal room (for direct notifications from REST routes)
+    socket.join(`user:${userId}`);
+
     // Join all conversation rooms
     try {
       const memberships = await prisma.conversationMember.findMany({
@@ -117,6 +128,7 @@ export function initSocket(httpServer: HttpServer): Server {
 
     socket.on('payment_request',  (data) => handlePaymentRequest(io, socket, data));
     socket.on('pay_request',      (data) => handlePayRequest(io, socket, data));
+    socket.on('reject_request',   (data) => handleRejectRequest(io, socket, data));
     socket.on('mark_read',        (data) => handleMarkRead(io, socket, data));
     socket.on('delete_message',   (data) => handleDeleteMessage(io, socket, data));
 

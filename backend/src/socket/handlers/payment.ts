@@ -1,12 +1,13 @@
 import { Server, Socket } from 'socket.io';
-import { PrismaClient } from '@prisma/client';
-import { getBalance, platformSendUsdc } from '../../services/stellar';
-import { verifyPin } from '../../services/crypto';
+import { PrismaClient }   from '@prisma/client';
+import { userSendUsdcWithFee, getBalance } from '../../services/stellar';
+import { verifyPin }      from '../../services/crypto';
 import { sendPushToUser } from '../../services/notifications';
 
-const prisma = new PrismaClient();
+const prisma   = new PrismaClient();
+const TZS_RATE = 2600;
 
-const TZS_RATE = 2600; // fallback rate
+// ── Send payment in chat ───────────────────────────────────────────────────────
 
 export async function handleSendPayment(io: Server, socket: Socket, data: any) {
   const { conversationId, amountUsdc, encryptedNote, recipientId, pin } = data;
@@ -16,24 +17,25 @@ export async function handleSendPayment(io: Server, socket: Socket, data: any) {
     const sender = await prisma.user.findUnique({ where: { id: senderId } });
     if (!sender) { socket.emit('payment_error', { error: 'Mtumiaji hakupatikana.' }); return; }
 
-    // Verify PIN
     if (!await verifyPin(pin, sender.pinHash)) {
-      socket.emit('payment_error', { error: 'Nambari ya siri si sahihi.' });
+      socket.emit('payment_error', { error: 'Nambari ya siri si sahihi / Incorrect PIN' });
       return;
     }
 
-    // Check balance
+    // Balance check: need grossUsdc (before 1% fee)
     const balance = await getBalance(sender.stellarPubKey);
-    const fee = amountUsdc * 0.01;
-    if (parseFloat(balance.usdc) < amountUsdc + fee) {
-      socket.emit('payment_error', { error: `Salio halikutosha. Una $${balance.usdc} USDC.` });
+    const totalNeeded = amountUsdc; // gross; fee comes from the amount
+    if (parseFloat(balance.usdc) < totalNeeded) {
+      socket.emit('payment_error', {
+        error: `Salio halikutosha. Una $${parseFloat(balance.usdc).toFixed(2)} USDC / Insufficient balance.`,
+      });
       return;
     }
 
     const recipient = await prisma.user.findUnique({ where: { id: recipientId } });
     if (!recipient) { socket.emit('payment_error', { error: 'Mpokeaji hakupatikana.' }); return; }
 
-    // Create PENDING message immediately
+    // Create PENDING message
     const message = await prisma.message.create({
       data: {
         conversationId,
@@ -47,62 +49,104 @@ export async function handleSendPayment(io: Server, socket: Socket, data: any) {
       },
     });
 
-    // Emit pending immediately (optimistic UI)
+    // Optimistic update — show pending immediately
     io.to(conversationId).emit('new_message', message);
 
-    // Submit Stellar transfer
-    const hash = await platformSendUsdc(
-      recipient.stellarPubKey,
-      amountUsdc,
-      `Chat:${message.id.slice(0, 20)}`,
-    );
+    // Execute Stellar transfer with 1% fee split
+    const { hash, netUsdc, feeUsdc, feeWallet } = await userSendUsdcWithFee({
+      encryptedSecret: sender.stellarSecret,
+      pin,
+      phone:           sender.phone,
+      publicKey:       sender.stellarPubKey,
+      toAddress:       recipient.stellarPubKey,
+      grossUsdc:       amountUsdc,
+      memo:            `Chat:${message.id.slice(0, 16)}`,
+    });
 
     // Update message confirmed
     const confirmed = await prisma.message.update({
       where: { id: message.id },
-      data:  { stellarTxId: hash, paymentStatus: 'CONFIRMED' },
+      data:  { stellarTxId: hash, paymentStatus: 'CONFIRMED', amountUsdc: netUsdc },
     });
 
-    // Log as transaction
-    await prisma.transaction.create({
-      data: {
-        userId:     senderId,
-        type:       'SEND',
-        status:     'CONFIRMED',
-        amountUsdc,
-        stellarTxId: hash,
-        toAddress:  recipient.stellarPubKey,
-        memo:       `Chat payment`,
-      },
-    }).catch(() => {});
+    // DB transaction records
+    await Promise.all([
+      prisma.transaction.create({
+        data: {
+          userId:      senderId,
+          type:        'SEND',
+          status:      'CONFIRMED',
+          amountUsdc:  netUsdc,
+          stellarTxId: hash,
+          toAddress:   recipient.stellarPubKey,
+          memo:        `Chat payment`,
+        },
+      }),
+      prisma.transaction.create({
+        data: {
+          userId:      recipientId,
+          type:        'RECEIVE',
+          status:      'CONFIRMED',
+          amountUsdc:  netUsdc,
+          stellarTxId: hash,
+          memo:        `Chat payment from ${sender.phone}`,
+        },
+      }),
+      prisma.transaction.create({
+        data: {
+          userId:      senderId,
+          type:        'FEE',
+          status:      'CONFIRMED',
+          amountUsdc:  feeUsdc,
+          stellarTxId: hash,
+          toAddress:   feeWallet,
+          memo:        `1% fee chat payment`,
+        },
+      }),
+    ]).catch(() => {});
 
     // Emit confirmed to room
     io.to(conversationId).emit('payment_confirmed', {
-      messageId: message.id,
-      stellarTxId: hash,
+      messageId:     message.id,
+      stellarTxId:   hash,
       paymentStatus: 'CONFIRMED',
+      netUsdc,
     });
 
-    // Push to recipient
-    await sendPushToUser(recipientId, {
-      title: 'Pesa imefika! 💚',
-      body:  `Umepokea $${amountUsdc.toFixed(2)} USDC`,
-      type:  'payment_received',
-      data:  { conversationId, type: 'payment' },
+    // ── Push notifications ──────────────────────────────────────────────────
+    const senderName = sender.kycName ?? sender.phone.slice(-4);
+    const amount     = `$${netUsdc.toFixed(2)} USDC`;
+
+    // Receiver: money arrived
+    sendPushToUser(recipientId, {
+      title: '💚 Umepokea pesa!',
+      body:  `${senderName} amekutumia ${amount} / sent you ${amount}`,
+      type:  'money_in',
+      data:  { conversationId, type: 'payment', amount: netUsdc, from: senderName, stellarTxId: hash },
+    }).catch(() => {});
+
+    // Sender: confirm sent
+    sendPushToUser(senderId, {
+      title: '✅ Pesa imetumwa',
+      body:  `Umetuma ${amount} kwa ${recipient.kycName ?? recipient.phone.slice(-4)}`,
+      type:  'money_out',
+      data:  { conversationId, type: 'payment_sent', amount: netUsdc, stellarTxId: hash },
     }).catch(() => {});
 
   } catch (e: any) {
     console.error('[socket:payment]', e.message);
-    // Mark failed in DB
-    socket.emit('payment_error', { error: 'Malipo hayakufanikiwa. Jaribu tena.' });
+    socket.emit('payment_error', { error: 'Malipo hayakufanikiwa. Jaribu tena. / Transfer failed.' });
   }
 }
+
+// ── Send payment request ───────────────────────────────────────────────────────
 
 export async function handlePaymentRequest(io: Server, socket: Socket, data: any) {
   const { conversationId, amountUsdc, encryptedNote, expiresInHours = 24 } = data;
   const senderId = socket.data.userId;
 
   try {
+    const sender    = await prisma.user.findUnique({ where: { id: senderId }, select: { kycName: true, phone: true } });
     const expiresAt = new Date(Date.now() + expiresInHours * 3_600_000);
 
     const message = await prisma.message.create({
@@ -115,17 +159,33 @@ export async function handlePaymentRequest(io: Server, socket: Socket, data: any
         paymentStatus: 'PENDING',
         paymentNote:   encryptedNote ?? null,
         deliveredAt:   new Date(),
-        // Store expiry in deletedAt field temporarily
-        deletedAt:     expiresAt,
+        deletedAt:     expiresAt, // repurpose field for expiry
       },
       include: { sender: { select: { id: true, kycName: true, chatPublicKey: true } } },
     });
 
     io.to(conversationId).emit('new_message', message);
+
+    // Notify all other members of the request
+    const members = await prisma.conversationMember.findMany({
+      where:   { conversationId, userId: { not: senderId } },
+      select:  { userId: true },
+    });
+    const requesterName = sender?.kycName ?? sender?.phone?.slice(-4) ?? 'Someone';
+    for (const m of members) {
+      sendPushToUser(m.userId, {
+        title: '💛 Ombi la malipo / Payment Request',
+        body:  `${requesterName} anaomba $${amountUsdc.toFixed(2)} USDC`,
+        type:  'payment_request',
+        data:  { conversationId, messageId: message.id, amount: amountUsdc, type: 'payment_request' },
+      }).catch(() => {});
+    }
   } catch (e: any) {
     socket.emit('error', { message: 'Ombi la malipo halikufanikiwa.' });
   }
 }
+
+// ── Accept (pay) a payment request ────────────────────────────────────────────
 
 export async function handlePayRequest(io: Server, socket: Socket, data: any) {
   const { messageId, pin } = data;
@@ -134,7 +194,10 @@ export async function handlePayRequest(io: Server, socket: Socket, data: any) {
   try {
     const requestMsg = await prisma.message.findUnique({
       where:   { id: messageId },
-      include: { sender: true, conversation: { include: { participants: { include: { user: true } } } } },
+      include: {
+        sender: true,
+        conversation: { include: { participants: { include: { user: { select: { id: true, phone: true, kycName: true } } } } } },
+      },
     });
 
     if (!requestMsg || requestMsg.type !== 'PAYMENT_REQUEST') {
@@ -142,7 +205,12 @@ export async function handlePayRequest(io: Server, socket: Socket, data: any) {
       return;
     }
     if (requestMsg.paymentStatus !== 'PENDING') {
-      socket.emit('payment_error', { error: 'Ombi hili tayari limeshughulikiwa.' });
+      socket.emit('payment_error', { error: 'Ombi hili tayari limeshughulikiwa / Request already processed.' });
+      return;
+    }
+    // Can't pay your own request
+    if (requestMsg.senderId === payerId) {
+      socket.emit('payment_error', { error: 'Huwezi kulipa ombi lako mwenyewe / Cannot pay your own request.' });
       return;
     }
 
@@ -150,34 +218,118 @@ export async function handlePayRequest(io: Server, socket: Socket, data: any) {
     if (!payer) return;
 
     if (!await verifyPin(pin, payer.pinHash)) {
-      socket.emit('payment_error', { error: 'Nambari ya siri si sahihi.' });
+      socket.emit('payment_error', { error: 'Nambari ya siri si sahihi / Incorrect PIN' });
       return;
     }
 
-    const amountUsdc = requestMsg.amountUsdc!;
-    const hash = await platformSendUsdc(
-      requestMsg.sender.stellarPubKey,
-      amountUsdc,
-      `PayReq:${messageId.slice(0, 16)}`,
-    );
+    const grossUsdc = requestMsg.amountUsdc!;
 
+    // Balance check
+    const balance = await getBalance(payer.stellarPubKey);
+    if (parseFloat(balance.usdc) < grossUsdc) {
+      socket.emit('payment_error', {
+        error: `Salio halikutosha. Una $${parseFloat(balance.usdc).toFixed(2)} / Insufficient balance.`,
+      });
+      return;
+    }
+
+    // Execute with fee split
+    const { hash, netUsdc, feeUsdc, feeWallet } = await userSendUsdcWithFee({
+      encryptedSecret: payer.stellarSecret,
+      pin,
+      phone:           payer.phone,
+      publicKey:       payer.stellarPubKey,
+      toAddress:       requestMsg.sender.stellarPubKey,
+      grossUsdc,
+      memo:            `PayReq:${messageId.slice(0, 14)}`,
+    });
+
+    // Update request message
     await prisma.message.update({
       where: { id: messageId },
-      data:  { stellarTxId: hash, paymentStatus: 'CONFIRMED' },
+      data:  { stellarTxId: hash, paymentStatus: 'CONFIRMED', amountUsdc: netUsdc },
     });
+
+    // DB records
+    await Promise.all([
+      prisma.transaction.create({
+        data: { userId: payerId, type: 'SEND', status: 'CONFIRMED', amountUsdc: netUsdc, stellarTxId: hash, toAddress: requestMsg.sender.stellarPubKey, memo: `Pay request` },
+      }),
+      prisma.transaction.create({
+        data: { userId: requestMsg.senderId, type: 'RECEIVE', status: 'CONFIRMED', amountUsdc: netUsdc, stellarTxId: hash, memo: `Request paid by ${payer.phone}` },
+      }),
+      prisma.transaction.create({
+        data: { userId: payerId, type: 'FEE', status: 'CONFIRMED', amountUsdc: feeUsdc, stellarTxId: hash, toAddress: feeWallet, memo: `1% fee pay request` },
+      }),
+    ]).catch(() => {});
 
     io.to(requestMsg.conversationId).emit('payment_confirmed', {
-      messageId, stellarTxId: hash, paymentStatus: 'CONFIRMED',
+      messageId, stellarTxId: hash, paymentStatus: 'CONFIRMED', netUsdc,
     });
 
-    await sendPushToUser(requestMsg.senderId, {
-      title: 'Ombi lako limelipwa! ✅',
-      body:  `Umepokea $${amountUsdc.toFixed(2)} USDC`,
-      type:  'payment_received',
-      data:  { conversationId: requestMsg.conversationId },
+    // ── Push notifications ────────────────────────────────────────────────
+    const payerName   = payer.kycName   ?? payer.phone.slice(-4);
+    const amount      = `$${netUsdc.toFixed(2)} USDC`;
+
+    // Requester: money received
+    sendPushToUser(requestMsg.senderId, {
+      title: '💚 Ombi lako limelipwa! / Request paid!',
+      body:  `${payerName} akulipa ${amount}`,
+      type:  'money_in',
+      data:  { conversationId: requestMsg.conversationId, amount: netUsdc, from: payerName, stellarTxId: hash },
+    }).catch(() => {});
+
+    // Payer: confirm
+    sendPushToUser(payerId, {
+      title: '✅ Malipo yamefanikiwa',
+      body:  `Umelipa ${amount} kwa ${requestMsg.sender.kycName ?? requestMsg.sender.phone.slice(-4)}`,
+      type:  'money_out',
+      data:  { conversationId: requestMsg.conversationId, amount: netUsdc, stellarTxId: hash },
     }).catch(() => {});
 
   } catch (e: any) {
-    socket.emit('payment_error', { error: 'Malipo hayakufanikiwa. Jaribu tena.' });
+    console.error('[socket:pay_request]', e.message);
+    socket.emit('payment_error', { error: 'Malipo hayakufanikiwa. Jaribu tena. / Transfer failed.' });
+  }
+}
+
+// ── Reject a payment request ───────────────────────────────────────────────────
+
+export async function handleRejectRequest(io: Server, socket: Socket, data: any) {
+  const { messageId } = data;
+  const rejecterId    = socket.data.userId;
+
+  try {
+    const requestMsg = await prisma.message.findUnique({
+      where:   { id: messageId },
+      include: { sender: { select: { id: true, kycName: true, phone: true } } },
+    });
+
+    if (!requestMsg || requestMsg.type !== 'PAYMENT_REQUEST') return;
+    if (requestMsg.paymentStatus !== 'PENDING') return;
+    if (requestMsg.senderId === rejecterId) return; // can't reject own request
+
+    await prisma.message.update({
+      where: { id: messageId },
+      data:  { paymentStatus: 'FAILED' },
+    });
+
+    io.to(requestMsg.conversationId).emit('request_rejected', {
+      messageId,
+      paymentStatus: 'FAILED',
+      rejectedBy:    rejecterId,
+    });
+
+    // Notify requester
+    const rejecter = await prisma.user.findUnique({ where: { id: rejecterId }, select: { kycName: true, phone: true } });
+    sendPushToUser(requestMsg.senderId, {
+      title: '❌ Ombi limekataliwa / Request declined',
+      body:  `${rejecter?.kycName ?? 'Mtu'} alikataa ombi lako la $${(requestMsg.amountUsdc ?? 0).toFixed(2)}`,
+      type:  'payment_request_rejected',
+      data:  { conversationId: requestMsg.conversationId, messageId },
+    }).catch(() => {});
+
+  } catch (e: any) {
+    console.error('[socket:reject_request]', e.message);
   }
 }

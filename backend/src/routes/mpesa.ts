@@ -43,7 +43,9 @@ import {
   getAccountInfo,
   getFeeWalletPublic,
 } from '../services/stellar';
-import { verifyPin } from '../services/crypto';
+import { verifyPin }   from '../services/crypto';
+import { notify }      from '../services/notifications';
+import { emitToUser }  from '../socket';
 
 const router = Router();
 const prisma  = new PrismaClient();
@@ -288,6 +290,17 @@ router.post('/callback', async (req, res) => {
 
     await updateDailyVolume(dbTx.userId, actualAmount);
     console.log(`[callback] DONE: ${actualAmount} ${currency} -> ${netUsdc} USDC (fee ${feeUsdc}) -> ${dbTx.user.phone}`);
+
+    // ── Push notification + real-time socket event ─────────────────────────
+    notify.depositConfirmed(dbTx.userId, actualAmount.toLocaleString(), `$${netUsdc.toFixed(2)} USDC`).catch(() => {});
+    emitToUser(dbTx.userId, 'deposit_confirmed', {
+      amountLocal: actualAmount,
+      currency,
+      amountUsdc:  netUsdc,
+      feeUsdc,
+      stellarTxId: stellarHash,
+      mpesaReceipt: payload.mpesaReceiptNumber,
+    });
 
   } catch (err: any) {
     console.error('[callback] ERROR:', err.message);
