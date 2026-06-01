@@ -1,12 +1,13 @@
 #!/bin/sh
 set -e
 
-echo "=== OlomiPay Startup ==="
-echo "DATABASE_URL prefix: ${DATABASE_URL:0:30}..."
+echo "=== Tuma API Startup ==="
+echo "Node: $(node --version)"
+echo "DATABASE_URL set: $([ -n "$DATABASE_URL" ] && echo YES || echo NO)"
 
 echo "--- Running prisma db push ---"
-npx prisma db push --accept-data-loss
-echo "--- Database schema synced ---"
+npx prisma db push --accept-data-loss --skip-generate
+echo "--- Database ready ---"
 
 echo "--- Starting API ---"
 node dist/index.js

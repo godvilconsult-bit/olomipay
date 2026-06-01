@@ -1,7 +1,7 @@
 FROM node:20-alpine
 
-# Cache bust — increment this to force full rebuild
-ARG CACHE_BUST=5
+# Cache bust — increment to force full rebuild
+ARG CACHE_BUST=10
 
 # Install OpenSSL for Prisma
 RUN apk add --no-cache openssl openssl-dev
@@ -23,7 +23,10 @@ COPY . .
 RUN npx prisma generate
 RUN npm run build
 
+# Make startup script executable
+RUN chmod +x start.sh
+
 EXPOSE 3001
 
-# Auto-create tables then start
-CMD ["node", "dist/index.js"]
+# Run prisma db push then start — creates all tables + enums correctly
+CMD ["sh", "start.sh"]
