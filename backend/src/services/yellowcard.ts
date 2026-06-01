@@ -274,6 +274,7 @@ export interface YCRate {
   currency:    string;
   usdBuyRate:  number;  // local per $1 — we RECEIVE local, give USDC (deposit)
   usdSellRate: number;  // local per $1 — we GIVE local, take USDC (withdrawal)
+  midRate:     number;  // mid-market rate (average of buy/sell)
   ycSpreadPct: number;  // Yellow Card spread %
   source:      string;  // 'yellowcard_api' | 'exchangerate_api' | 'fallback'
 }
@@ -330,6 +331,7 @@ export async function getRate(currency: string): Promise<YCRate> {
 
   const rate: YCRate = {
     currency: key, usdBuyRate, usdSellRate,
+    midRate,
     ycSpreadPct: YC_SPREAD_BPS / 100, source,
   };
   rateCache.set(key, { rate, expiry: Date.now() + 5 * 60_000 });
@@ -669,17 +671,22 @@ function currencyToCountry(currency: string): string {
 
 /** Hardcoded channel list for no-key sandbox mode (mirrors YC coverage map) */
 function getFallbackChannels(): YCChannel[] {
+  const ch = (id: string, name: string, country: string, currency: string, type: string, min: number, max: number): YCChannel => ({
+    id, name, country, currency, type,
+    status: 'active' as const, widgetStatus: 'active' as const,
+    minAmount: min, maxAmount: max, fixedFee: 0, percentFee: 0.8, networks: [],
+  });
   return [
-    { id: 'sandbox-tz-mpesa',   name: 'M-Pesa Tanzania',  country: 'TZ', currency: 'TZS', type: 'momo', status: 'active', widgetStatus: 'active', minAmount: 500,    maxAmount: 5_000_000, fixedFee: 0, percentFee: 0.8 },
-    { id: 'sandbox-tz-tigo',    name: 'Tigo Pesa',        country: 'TZ', currency: 'TZS', type: 'momo', status: 'active', widgetStatus: 'active', minAmount: 500,    maxAmount: 5_000_000, fixedFee: 0, percentFee: 0.8 },
-    { id: 'sandbox-tz-airtel',  name: 'Airtel Tanzania',  country: 'TZ', currency: 'TZS', type: 'momo', status: 'active', widgetStatus: 'active', minAmount: 500,    maxAmount: 5_000_000, fixedFee: 0, percentFee: 0.8 },
-    { id: 'sandbox-ke-mpesa',   name: 'M-Pesa Kenya',     country: 'KE', currency: 'KES', type: 'momo', status: 'active', widgetStatus: 'active', minAmount: 10,     maxAmount: 150_000,  fixedFee: 0, percentFee: 0.8 },
-    { id: 'sandbox-ug-mtn',     name: 'MTN Uganda',       country: 'UG', currency: 'UGX', type: 'momo', status: 'active', widgetStatus: 'active', minAmount: 1_000,  maxAmount: 7_000_000, fixedFee: 0, percentFee: 0.8 },
-    { id: 'sandbox-ug-airtel',  name: 'Airtel Uganda',    country: 'UG', currency: 'UGX', type: 'momo', status: 'active', widgetStatus: 'active', minAmount: 1_000,  maxAmount: 7_000_000, fixedFee: 0, percentFee: 0.8 },
-    { id: 'sandbox-gh-mtn',     name: 'MTN Ghana',        country: 'GH', currency: 'GHS', type: 'momo', status: 'active', widgetStatus: 'active', minAmount: 1,      maxAmount: 10_000,   fixedFee: 0, percentFee: 0.8 },
-    { id: 'sandbox-zm-mtn',     name: 'MTN Zambia',       country: 'ZM', currency: 'ZMW', type: 'momo', status: 'active', widgetStatus: 'active', minAmount: 5,      maxAmount: 50_000,   fixedFee: 0, percentFee: 0.8 },
-    { id: 'sandbox-ng-bank',    name: 'Nigeria Bank',     country: 'NG', currency: 'NGN', type: 'bank', status: 'active', widgetStatus: 'active', minAmount: 500,    maxAmount: 5_000_000, fixedFee: 0, percentFee: 0.8 },
-    { id: 'sandbox-rw-mtn',     name: 'MTN Rwanda',       country: 'RW', currency: 'RWF', type: 'momo', status: 'active', widgetStatus: 'active', minAmount: 500,    maxAmount: 2_000_000, fixedFee: 0, percentFee: 0.8 },
+    ch('sandbox-tz-mpesa',  'M-Pesa Tanzania',  'TZ', 'TZS', 'momo', 500,   5_000_000),
+    ch('sandbox-tz-tigo',   'Tigo Pesa',        'TZ', 'TZS', 'momo', 500,   5_000_000),
+    ch('sandbox-tz-airtel', 'Airtel Tanzania',  'TZ', 'TZS', 'momo', 500,   5_000_000),
+    ch('sandbox-ke-mpesa',  'M-Pesa Kenya',     'KE', 'KES', 'momo', 10,    150_000  ),
+    ch('sandbox-ug-mtn',    'MTN Uganda',       'UG', 'UGX', 'momo', 1_000, 7_000_000),
+    ch('sandbox-ug-airtel', 'Airtel Uganda',    'UG', 'UGX', 'momo', 1_000, 7_000_000),
+    ch('sandbox-gh-mtn',    'MTN Ghana',        'GH', 'GHS', 'momo', 1,     10_000   ),
+    ch('sandbox-zm-mtn',    'MTN Zambia',       'ZM', 'ZMW', 'momo', 5,     50_000   ),
+    ch('sandbox-ng-bank',   'Nigeria Bank',     'NG', 'NGN', 'bank', 500,   5_000_000),
+    ch('sandbox-rw-mtn',    'MTN Rwanda',       'RW', 'RWF', 'momo', 500,   2_000_000),
   ].map(c => ({ ...c, networks: [] }));
 }
 

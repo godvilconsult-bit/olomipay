@@ -75,8 +75,9 @@ router.post('/bank-accounts', requireAuth, async (req: AuthRequest, res) => {
   }).safeParse(req.body);
   if (!parse.success) return res.status(400).json(fail(parse.error.errors[0].message));
 
+  const { bankName, accountNumber, swiftCode, accountName } = parse.data as any;
   const account = await prisma.bankAccount.create({
-    data: { userId: req.userId!, ...parse.data },
+    data: { userId: req.userId!, bankName, accountNumber, swiftCode, accountName },
   });
   return res.status(201).json(ok({ account }));
 });

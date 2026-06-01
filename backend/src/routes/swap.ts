@@ -170,8 +170,8 @@ router.get('/wallet', requireAuth, async (req: AuthRequest, res) => {
   let balance = { usdc: '0.0000000', xlm: '0.0000000' };
   let funded  = false;
   try {
-    const { getStellarBalance } = await import('../services/stellar');
-    const b  = await getStellarBalance(user.stellarPubKey);
+    const { getBalance } = await import('../services/stellar');
+    const b  = await getBalance(user.stellarPubKey);
     balance  = b;
     funded   = true;
   } catch {}

@@ -226,7 +226,7 @@ router.post('/callback', async (req, res) => {
     });
     const grossUsdc   = ycOrder.fees.grossUsdc;   // full USDC before platform fee
     const feeWallet   = getFeeWalletPublic();
-    console.log(`[callback] YC order: ${ycOrder.orderId} -> ${grossUsdc} USDC gross | fee wallet: ${feeWallet.slice(0,8)}...`);
+    console.log(`[callback] YC order: ${ycOrder.id} -> ${grossUsdc} USDC gross | fee wallet: ${feeWallet.slice(0,8)}...`);
 
     // Step 2: Safety check — platform wallet has enough gross USDC
     if (!isYCSandbox) {
@@ -244,7 +244,7 @@ router.post('/callback', async (req, res) => {
     }
 
     // Step 3: ATOMIC — send net USDC (99%) to user + fee (1%) to fee wallet in ONE tx
-    const memo = `OlomiPay ${(payload.mpesaReceiptNumber ?? ycOrder.orderId).slice(0, 20)}`;
+    const memo = `OlomiPay ${(payload.mpesaReceiptNumber ?? ycOrder.id).slice(0, 20)}`;
     const { hash: stellarHash, netUsdc, feeUsdc } = await platformSendUsdcWithFee(
       dbTx.user.stellarPubKey,
       grossUsdc,
@@ -275,7 +275,7 @@ router.post('/callback', async (req, res) => {
         stellarTxId: stellarHash,
         mpesaTxId:   payload.mpesaReceiptNumber ?? dbTx.mpesaTxId,
         memo: JSON.stringify({
-          ycOrderId:    ycOrder.orderId,
+          ycOrderId:    ycOrder.id,
           mpesaReceipt: payload.mpesaReceiptNumber,
           grossUsdc,
           netUsdc,
@@ -369,7 +369,7 @@ router.post('/withdraw', requireAuth, depositLimiter, async (req: AuthRequest, r
       data: {
         status: 'CONFIRMED', stellarTxId: stellarHash,
         mpesaTxId: b2cResult.conversationId,
-        memo: JSON.stringify({ ycOrderId: ycOrder.orderId, b2cId: b2cResult.conversationId, fees, stellarHash }),
+        memo: JSON.stringify({ ycOrderId: ycOrder.id, b2cId: b2cResult.conversationId, fees, stellarHash }),
       },
     });
 

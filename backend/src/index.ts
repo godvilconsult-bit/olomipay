@@ -94,7 +94,7 @@ app.get('/debug/wallet/:address', async (req, res) => {
     const address = req.params.address;
     const r = await fetch(`https://horizon-testnet.stellar.org/accounts/${address}`);
     if (r.status === 404) return res.json({ funded: false, address, balances: [] });
-    const data = await r.json();
+    const data: any = await r.json();
     const balances = data.balances?.map((b: any) => ({
       asset: b.asset_type === 'native' ? 'XLM' : b.asset_code,
       balance: b.balance,

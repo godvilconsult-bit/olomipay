@@ -13,7 +13,8 @@ import { handleSendPayment, handlePaymentRequest, handlePayRequest, handleReject
 import { handleMarkRead, handleDeleteMessage } from './handlers/room';
 
 const prisma = new PrismaClient();
-n// ── Global io — lets REST routes emit real-time events
+
+// ── Global io — lets REST routes emit real-time events
 let _io: Server | null = null;
 export function getIo(): Server | null { return _io; }
 export function emitToUser(userId: string, event: string, data: any): void {
