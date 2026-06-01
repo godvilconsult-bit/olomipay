@@ -65,6 +65,7 @@ export async function setupDatabase(): Promise<void> {
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "isOnline" BOOLEAN NOT NULL DEFAULT false`,
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "lastSeenAt" TIMESTAMP`,
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "country" TEXT NOT NULL DEFAULT 'TZ'`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "profilePicUrl" TEXT`,
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "dailyVolumeTzs" DOUBLE PRECISION NOT NULL DEFAULT 0`,
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "dailyVolumeDate" TIMESTAMP`,
     ];

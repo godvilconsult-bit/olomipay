@@ -159,4 +159,32 @@ router.post('/execute', requireAuth, limiter, async (req: AuthRequest, res) => {
   }
 });
 
+// ── GET /api/swap/wallet — user's Stellar wallet info ─────────────────────────
+router.get('/wallet', requireAuth, async (req: AuthRequest, res) => {
+  const user = await prisma.user.findUnique({
+    where:  { id: req.userId! },
+    select: { stellarPubKey: true, phone: true, kycName: true },
+  });
+  if (!user) return res.status(404).json(fail('User not found'));
+
+  let balance = { usdc: '0.0000000', xlm: '0.0000000' };
+  let funded  = false;
+  try {
+    const { getStellarBalance } = await import('../services/stellar');
+    const b  = await getStellarBalance(user.stellarPubKey);
+    balance  = b;
+    funded   = true;
+  } catch {}
+
+  return res.json(ok({
+    address:  user.stellarPubKey,
+    phone:    user.phone,
+    name:     user.kycName,
+    funded,
+    balance,
+    network:  process.env.STELLAR_NETWORK ?? 'testnet',
+    explorerUrl: `https://stellar.expert/explorer/${process.env.STELLAR_NETWORK ?? 'testnet'}/account/${user.stellarPubKey}`,
+  }));
+});
+
 export { router as swapRouter };

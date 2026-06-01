@@ -1,185 +1,272 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Copy, LogOut, Shield, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Copy, LogOut, Shield, Camera, Wallet, ExternalLink, RefreshCw, Edit2, Check } from 'lucide-react';
 import BottomNav from '../../components/BottomNav';
-import StatusBadge from '../../components/StatusBadge';
-import { auth, kyc, clearTokens } from '../../lib/api';
-import { formatPhone, truncateAddress } from '../../lib/utils';
+import { auth, clearTokens } from '../../lib/api';
+
+const API = process.env.NEXT_PUBLIC_API_URL;
+
+function getToken() {
+  return sessionStorage.getItem('olomipay_at') || sessionStorage.getItem('olomipay_rt') || '';
+}
 
 export default function ProfilePage() {
-  const router  = useRouter();
-  const [user,    setUser]    = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [kycData, setKycData] = useState({ idType: '', idNumber: '', name: '' });
-  const [submitting, setSubmitting] = useState(false);
-  const [showKyc, setShowKyc] = useState(false);
+  const router   = useRouter();
+  const fileRef  = useRef<HTMLInputElement>(null);
+
+  const [user,        setUser]        = useState<any>(null);
+  const [wallet,      setWallet]      = useState<any>(null);
+  const [loading,     setLoading]     = useState(true);
+  const [uploading,   setUploading]   = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [newName,     setNewName]     = useState('');
 
   useEffect(() => {
-    (async () => {
-      try {
-        const res = await auth.me();
-        setUser(res.user);
-      } catch {
-        router.replace('/auth/login');
-      } finally {
-        setLoading(false);
-      }
-    })();
+    Promise.all([
+      fetch(`${API}/api/profile/me`, { headers: { Authorization: `Bearer ${getToken()}` } }).then(r => r.json()),
+      fetch(`${API}/api/swap/wallet`, { headers: { Authorization: `Bearer ${getToken()}` } }).then(r => r.json()),
+    ]).then(([profileRes, walletRes]) => {
+      if (profileRes.success) { setUser(profileRes.data.user); setNewName(profileRes.data.user.kycName ?? ''); }
+      else router.replace('/auth/login');
+      if (walletRes.success) setWallet(walletRes.data);
+      setLoading(false);
+    }).catch(() => { router.replace('/auth/login'); });
   }, []);
 
+  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { toast.error('Image must be under 10MB'); return; }
+
+    setUploading(true);
+    const form = new FormData();
+    form.append('file', file);
+    try {
+      const res = await fetch(`${API}/api/profile/avatar`, {
+        method:  'POST',
+        headers: { Authorization: `Bearer ${getToken()}` },
+        body:    form,
+      });
+      const data = await res.json();
+      if (data.success) {
+        setUser((u: any) => ({ ...u, profilePicUrl: data.data.avatarUrl }));
+        toast.success('Profile photo updated!');
+      } else {
+        toast.error(data.error ?? 'Upload failed');
+      }
+    } catch {
+      toast.error('Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function saveName() {
+    if (newName.trim().length < 2) { toast.error('Name must be at least 2 characters'); return; }
+    const res = await fetch(`${API}/api/profile/name`, {
+      method:  'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+      body:    JSON.stringify({ name: newName.trim() }),
+    }).then(r => r.json());
+    if (res.success) { setUser((u: any) => ({ ...u, kycName: newName.trim() })); setEditingName(false); toast.success('Name updated!'); }
+    else toast.error(res.error ?? 'Failed');
+  }
+
+  async function fundWallet() {
+    if (!wallet?.address) return;
+    toast.loading('Funding wallet from testnet...', { id: 'fund' });
+    try {
+      await fetch(`https://friendbot.stellar.org?addr=${wallet.address}`);
+      toast.success('Wallet funded with testnet XLM!', { id: 'fund' });
+      // Refresh wallet
+      const r = await fetch(`${API}/api/swap/wallet`, { headers: { Authorization: `Bearer ${getToken()}` } }).then(r => r.json());
+      if (r.success) setWallet(r.data);
+    } catch {
+      toast.error('Funding failed', { id: 'fund' });
+    }
+  }
+
   function copyAddress() {
-    navigator.clipboard.writeText(user.stellarPubKey);
-    toast.success('Address copied!');
+    if (!wallet?.address) return;
+    navigator.clipboard.writeText(wallet.address);
+    toast.success('Stellar address copied!');
   }
 
   async function handleLogout() {
     await auth.logout().catch(() => {});
     clearTokens();
-    router.push('/');
+    router.replace('/');
   }
 
-  async function handleKycSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setSubmitting(true);
-    try {
-      const res = await kyc.submit(kycData as any);
-      toast.success('KYC submitted!');
-      setUser((u: any) => ({ ...u, kycStatus: res.kycStatus }));
-      setShowKyc(false);
-    } catch (err: any) {
-      toast.error(err.message ?? 'KYC submission failed');
-    } finally {
-      setSubmitting(false);
-    }
-  }
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pb-24">
-        <div className="px-5 max-w-md mx-auto mt-8 space-y-4">
-          <div className="skeleton h-24 rounded-3xl" />
-          <div className="skeleton h-40 rounded-3xl" />
-        </div>
-        <BottomNav />
-      </div>
-    );
-  }
+  const initials = (user?.kycName ?? user?.phone ?? '?').slice(0, 2).toUpperCase();
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pb-24">
-      <div className="sticky top-0 z-40 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-5 py-4 flex items-center gap-3">
-        <button onClick={() => router.back()} className="p-2 -ml-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 min-h-[44px] min-w-[44px] flex items-center justify-center">
+      {/* Header */}
+      <div className="bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-5 py-4 flex items-center gap-3">
+        <button onClick={() => router.back()} className="p-2 -ml-2 rounded-full hover:bg-slate-100">
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-lg font-semibold">Profile</h1>
+        <h1 className="font-semibold text-lg">Profile</h1>
       </div>
 
-      <div className="px-5 max-w-md mx-auto mt-4 space-y-4">
-        {/* User info */}
-        <div className="card text-center py-6">
-          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
-            <span className="text-2xl font-bold text-primary">
-              {user?.phone?.[4] ?? '?'}
+      <div className="max-w-md mx-auto px-4 pt-6 space-y-4">
+
+        {/* ── Avatar + name ── */}
+        <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 flex flex-col items-center gap-4">
+          {/* Avatar */}
+          <div className="relative">
+            {user?.profilePicUrl ? (
+              <img src={user.profilePicUrl} alt="Avatar"
+                className="w-24 h-24 rounded-full object-cover border-4 border-primary/20" />
+            ) : (
+              <div className="w-24 h-24 rounded-full bg-primary flex items-center justify-center text-white text-3xl font-bold border-4 border-primary/20">
+                {initials}
+              </div>
+            )}
+            <button onClick={() => fileRef.current?.click()} disabled={uploading}
+              className="absolute bottom-0 right-0 w-8 h-8 bg-primary rounded-full flex items-center justify-center shadow-md border-2 border-white">
+              {uploading
+                ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                : <Camera size={14} className="text-white" />}
+            </button>
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
+          </div>
+
+          {/* Name */}
+          {editingName ? (
+            <div className="flex items-center gap-2 w-full">
+              <input type="text" value={newName} onChange={e => setNewName(e.target.value)}
+                className="flex-1 bg-slate-50 dark:bg-slate-700 rounded-xl px-3 py-2 text-sm outline-none border-2 border-primary"
+                autoFocus onKeyDown={e => e.key === 'Enter' && saveName()} />
+              <button onClick={saveName} className="p-2 bg-primary rounded-xl text-white">
+                <Check size={16} />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <p className="font-bold text-lg">{user?.kycName ?? 'No name set'}</p>
+              <button onClick={() => setEditingName(true)} className="p-1 text-slate-400 hover:text-primary">
+                <Edit2 size={14} />
+              </button>
+            </div>
+          )}
+
+          <p className="text-sm text-slate-400">{user?.phone}</p>
+
+          <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
+            user?.kycStatus === 'APPROVED' ? 'bg-green-100 text-green-700' :
+            user?.kycStatus === 'SUBMITTED' ? 'bg-amber-100 text-amber-700' :
+            'bg-slate-100 text-slate-500'
+          }`}>
+            {user?.kycStatus === 'APPROVED' ? '✓ Verified' :
+             user?.kycStatus === 'SUBMITTED' ? 'Pending verification' : 'Not verified'}
+          </div>
+        </div>
+
+        {/* ── Stellar Wallet ── */}
+        <div className="bg-white dark:bg-slate-800 rounded-3xl p-5 space-y-4">
+          <div className="flex items-center gap-2 mb-1">
+            <Wallet size={18} className="text-primary" />
+            <h3 className="font-semibold">Stellar Wallet</h3>
+            <span className={`ml-auto text-xs px-2 py-0.5 rounded-full font-medium ${
+              wallet?.network === 'mainnet' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+            }`}>
+              {wallet?.network === 'mainnet' ? 'Mainnet' : 'Testnet'}
             </span>
           </div>
-          <p className="font-semibold text-lg">{formatPhone(user?.phone ?? '')}</p>
-          <div className="mt-1 flex items-center justify-center">
-            <StatusBadge status={user?.kycStatus} />
-          </div>
-        </div>
 
-        {/* Stellar address */}
-        <div className="card">
-          <p className="text-xs font-medium text-slate-500 mb-2">Stellar Address</p>
-          <div className="flex items-center gap-2">
-            <p className="text-sm font-mono text-slate-700 dark:text-slate-300 flex-1 truncate">
-              {user?.stellarPubKey}
+          {/* Balances */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-slate-50 dark:bg-slate-700 rounded-2xl p-3 text-center">
+              <p className="text-xs text-slate-400 mb-1">USDC Balance</p>
+              <p className="font-bold text-lg">${parseFloat(wallet?.balance?.usdc ?? '0').toFixed(2)}</p>
+            </div>
+            <div className="bg-slate-50 dark:bg-slate-700 rounded-2xl p-3 text-center">
+              <p className="text-xs text-slate-400 mb-1">XLM Balance</p>
+              <p className="font-bold text-lg">{parseFloat(wallet?.balance?.xlm ?? '0').toFixed(2)}</p>
+            </div>
+          </div>
+
+          {/* Wallet address */}
+          <div className="bg-slate-50 dark:bg-slate-700 rounded-2xl p-3">
+            <p className="text-xs text-slate-400 mb-1">Your Stellar Address</p>
+            <p className="font-mono text-xs text-slate-600 dark:text-slate-300 break-all leading-relaxed">
+              {wallet?.address}
             </p>
-            <button onClick={copyAddress} className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 min-h-[40px] min-w-[40px] flex items-center justify-center">
-              <Copy size={16} className="text-slate-500" />
-            </button>
+            <div className="flex gap-2 mt-2">
+              <button onClick={copyAddress}
+                className="flex items-center gap-1.5 text-xs text-primary font-semibold bg-primary/10 px-3 py-1.5 rounded-xl">
+                <Copy size={12} /> Copy
+              </button>
+              <a href={wallet?.explorerUrl} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-xs text-slate-500 font-semibold bg-slate-100 dark:bg-slate-600 px-3 py-1.5 rounded-xl">
+                <ExternalLink size={12} /> Explorer
+              </a>
+              {wallet?.network === 'testnet' && !wallet?.funded && (
+                <button onClick={fundWallet}
+                  className="flex items-center gap-1.5 text-xs text-amber-600 font-semibold bg-amber-50 px-3 py-1.5 rounded-xl ml-auto">
+                  <RefreshCw size={12} /> Fund (testnet)
+                </button>
+              )}
+            </div>
           </div>
+
+          <p className="text-xs text-slate-400 text-center">
+            Your wallet address is automatically linked to {user?.phone}
+          </p>
         </div>
 
-        {/* KYC */}
-        {user?.kycStatus !== 'APPROVED' && (
-          <div className="card">
-            <button
-              onClick={() => setShowKyc(!showKyc)}
-              className="flex items-center w-full gap-3 min-h-[48px]"
-            >
-              <Shield size={20} className="text-amber-500" />
-              <div className="flex-1 text-left">
-                <p className="text-sm font-medium">Verify Identity (KYC)</p>
-                <p className="text-xs text-slate-400">Unlock higher limits</p>
-              </div>
-              <ChevronRight size={16} className={`text-slate-400 transition-transform ${showKyc ? 'rotate-90' : ''}`} />
-            </button>
-
-            {showKyc && (
-              <form onSubmit={handleKycSubmit} className="mt-4 space-y-3 border-t border-slate-100 dark:border-slate-700 pt-4">
-                <div>
-                  <label className="text-xs font-medium text-slate-500 block mb-1">Full name</label>
-                  <input
-                    type="text"
-                    className="input"
-                    value={kycData.name}
-                    onChange={e => setKycData(d => ({ ...d, name: e.target.value }))}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-500 block mb-1">ID Type</label>
-                  <select
-                    className="input"
-                    value={kycData.idType}
-                    onChange={e => setKycData(d => ({ ...d, idType: e.target.value }))}
-                    required
-                  >
-                    <option value="">Select…</option>
-                    <option value="NIDA">NIDA Card</option>
-                    <option value="PASSPORT">Passport</option>
-                    <option value="VOTERS_ID">Voter's ID</option>
-                    <option value="DRIVING_LICENSE">Driving License</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-500 block mb-1">ID Number</label>
-                  <input
-                    type="text"
-                    className="input"
-                    value={kycData.idNumber}
-                    onChange={e => setKycData(d => ({ ...d, idNumber: e.target.value }))}
-                    required
-                  />
-                </div>
-                <button type="submit" disabled={submitting} className="btn-primary w-full">
-                  {submitting ? 'Submitting…' : 'Submit KYC'}
-                </button>
-              </form>
-            )}
+        {/* ── M-Pesa → USDC/XLM info ── */}
+        <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-3xl p-5 text-white">
+          <h3 className="font-bold mb-1">M-Pesa → USDC / XLM</h3>
+          <p className="text-sm text-white/80 mb-3">
+            When you deposit via M-Pesa, your TZS is automatically converted to USDC in your Stellar wallet. You can then swap USDC → XLM anytime.
+          </p>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 bg-white/20 rounded-xl p-2.5 text-sm">
+              <span>1.</span><span>Go to <strong>Deposit</strong> → enter amount → pay via M-Pesa STK push</span>
+            </div>
+            <div className="flex items-center gap-2 bg-white/20 rounded-xl p-2.5 text-sm">
+              <span>2.</span><span>TZS automatically converts to <strong>USDC</strong> in your wallet</span>
+            </div>
+            <div className="flex items-center gap-2 bg-white/20 rounded-xl p-2.5 text-sm">
+              <span>3.</span><span>Use <strong>Swap</strong> to convert USDC ↔ XLM on Stellar DEX</span>
+            </div>
           </div>
-        )}
-
-        {/* Settings links */}
-        <div className="card divide-y divide-slate-100 dark:divide-slate-700">
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-3 w-full py-4 min-h-[56px] text-danger"
-          >
-            <LogOut size={18} />
-            <span className="text-sm font-medium">Sign out</span>
+          <button onClick={() => router.push('/deposit')}
+            className="mt-4 w-full bg-white text-green-600 font-bold py-3 rounded-2xl text-sm">
+            Deposit via M-Pesa →
           </button>
         </div>
 
-        <p className="text-center text-xs text-slate-400 pb-4">
-          OlomiPay v1.0.0 · Powered by Stellar Soroban
-        </p>
-      </div>
+        {/* ── Security ── */}
+        <div className="bg-white dark:bg-slate-800 rounded-3xl divide-y divide-slate-100 dark:divide-slate-700">
+          <button onClick={() => router.push('/kyc')}
+            className="w-full flex items-center gap-3 px-5 py-4 hover:bg-slate-50 dark:hover:bg-slate-700">
+            <Shield size={18} className="text-primary" />
+            <div className="flex-1 text-left">
+              <p className="font-medium text-sm">KYC Verification</p>
+              <p className="text-xs text-slate-400">Verify your identity to unlock higher limits</p>
+            </div>
+          </button>
+          <button onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-5 py-4 hover:bg-red-50 dark:hover:bg-red-900/20 text-danger">
+            <LogOut size={18} />
+            <span className="font-medium text-sm">Sign out</span>
+          </button>
+        </div>
 
+      </div>
       <BottomNav />
     </div>
   );

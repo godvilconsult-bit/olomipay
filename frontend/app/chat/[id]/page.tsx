@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Send, DollarSign, Check, CheckCheck, X, Loader2, Phone } from 'lucide-react';
+import { ArrowLeft, Send, DollarSign, Check, CheckCheck, X, Loader2, Phone, ImageIcon } from 'lucide-react';
 import { useSocket } from '../../../lib/useSocket';
 import { formatUsdc, timeAgo } from '../../../lib/utils';
 import PinInput from '../../../components/PinInput';
@@ -106,6 +106,26 @@ function Bubble({ msg, isMine }: { msg: any; isMine: boolean }) {
     );
   }
 
+  // IMAGE bubble
+  if (msg.type === 'IMAGE' && (msg.mediaThumbUrl || msg.mediaUrl)) {
+    return (
+      <div className={`flex ${isMine ? 'justify-end' : 'justify-start'} mb-0.5 px-3`}>
+        <div>
+          <img
+            src={msg.mediaThumbUrl ?? msg.mediaUrl}
+            alt="Image"
+            className="max-w-[220px] max-h-[220px] rounded-2xl object-cover cursor-pointer border border-slate-200 dark:border-slate-700"
+            onClick={() => window.open(msg.mediaUrl, '_blank')}
+          />
+          <div className={`flex items-center gap-1 mt-0.5 ${isMine ? 'justify-end' : 'justify-start'}`}>
+            <span className="text-[10px] text-slate-400">{timeAgo(msg.createdAt)}</span>
+            {isMine && <Ticks isRead={isRead} isDelivered={isDeliv} />}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // TEXT bubble
   return (
     <div className={`flex ${isMine ? 'justify-end' : 'justify-start'} mb-0.5 px-3`}>
@@ -133,15 +153,17 @@ export default function ChatThread() {
   const myId   = getMyId();
   const { emit, on } = useSocket(getToken());
 
-  const [messages,  setMessages]  = useState<any[]>([]);
-  const [other,     setOther]     = useState<any>(null);
-  const [text,      setText]      = useState('');
-  const [loading,   setLoading]   = useState(true);
-  const [isTyping,  setIsTyping]  = useState(false);
-  const [showMoney, setShowMoney] = useState(false);
+  const [messages,    setMessages]    = useState<any[]>([]);
+  const [other,       setOther]       = useState<any>(null);
+  const [text,        setText]        = useState('');
+  const [loading,     setLoading]     = useState(true);
+  const [isTyping,    setIsTyping]    = useState(false);
+  const [showMoney,   setShowMoney]   = useState(false);
+  const [uploadingImg, setUploadingImg] = useState(false);
   const bottomRef  = useRef<HTMLDivElement>(null);
   const typingRef  = useRef<any>(null);
   const inputRef   = useRef<HTMLTextAreaElement>(null);
+  const imgRef     = useRef<HTMLInputElement>(null);
 
   function scrollToBottom(smooth = true) {
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'instant' }), 60);
@@ -219,6 +241,39 @@ export default function ChatThread() {
 
     return () => { u1(); u2(); u3(); u4(); u5(); u6(); };
   }, [on, convId, myId]);
+
+  async function sendImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { toast.error('Image must be under 10MB'); return; }
+    setUploadingImg(true);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const res = await fetch(`${API}/api/chat/media/upload`, {
+        method:  'POST',
+        headers: { Authorization: `Bearer ${getToken()}` },
+        body:    form,
+      }).then(r => r.json());
+
+      if (!res.success) { toast.error('Image upload failed'); return; }
+
+      emit('send_message', {
+        conversationId:  convId,
+        encryptedContent: '[Image]',
+        type:            'IMAGE',
+        mediaUrl:        res.data.mediaUrl,
+        mediaThumbUrl:   res.data.mediaThumbUrl,
+        mediaMimeType:   res.data.mimeType,
+      });
+      scrollToBottom();
+    } catch {
+      toast.error('Image upload failed');
+    } finally {
+      setUploadingImg(false);
+      if (imgRef.current) imgRef.current.value = '';
+    }
+  }
 
   function sendMessage() {
     const trimmed = text.trim();
@@ -320,6 +375,16 @@ export default function ChatThread() {
 
       {/* Input */}
       <div className="flex-shrink-0 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 px-2 py-2 flex items-end gap-2">
+        {/* Image picker */}
+        <button onClick={() => imgRef.current?.click()} disabled={uploadingImg}
+          className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center flex-shrink-0 mb-0.5">
+          {uploadingImg
+            ? <Loader2 size={16} className="animate-spin text-slate-400" />
+            : <ImageIcon size={16} className="text-slate-500" />}
+        </button>
+        <input ref={imgRef} type="file" accept="image/*" className="hidden" onChange={sendImage} />
+
+        {/* Money button */}
         <button onClick={() => setShowMoney(true)}
           className="w-10 h-10 rounded-full bg-green-50 dark:bg-green-900/20 flex items-center justify-center flex-shrink-0 mb-0.5">
           <DollarSign size={18} className="text-green-600" />
@@ -340,6 +405,7 @@ export default function ChatThread() {
         </button>
       </div>
 
+      {/* Hidden image input (also placed here as backup) */}
       {showMoney && (
         <MoneySheet name={name} recipientId={other?.id} convId={convId}
           onClose={() => setShowMoney(false)}
