@@ -16,9 +16,9 @@ let refreshToken: string | null = null;
 export function setTokens(access: string, refresh: string) {
   accessToken  = access;
   refreshToken = refresh;
-  // Refresh token persisted to sessionStorage (survives reload, cleared on tab close)
   if (typeof window !== 'undefined') {
-    sessionStorage.setItem('olomipay_rt', refresh);
+    sessionStorage.setItem('olomipay_rt',  refresh);
+    sessionStorage.setItem('olomipay_at',  access);   // store access token too
   }
 }
 
@@ -27,6 +27,7 @@ export function clearTokens() {
   refreshToken = null;
   if (typeof window !== 'undefined') {
     sessionStorage.removeItem('olomipay_rt');
+    sessionStorage.removeItem('olomipay_at');
   }
 }
 

@@ -9,11 +9,14 @@ import { ChatEncryption, getMySecretKey } from '../../../lib/chatEncryption';
 import { formatUsdc, formatTzs, timeAgo } from '../../../lib/utils';
 import PinInput from '../../../components/PinInput';
 
+function getToken() {
+  return sessionStorage.getItem('olomipay_at') || sessionStorage.getItem('olomipay_rt') || '';
+}
+
 async function chatApi(path: string, method = 'GET', body?: any) {
-  const token = sessionStorage.getItem('olomipay_rt');
   const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/chat${path}`, {
     method,
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
     body: body ? JSON.stringify(body) : undefined,
   });
   return res.json();

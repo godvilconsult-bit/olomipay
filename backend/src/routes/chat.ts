@@ -61,37 +61,53 @@ router.get('/users/:id/pubkey', async (req, res) => {
 });
 
 // ── GET /api/chat/users/search ────────────────────────────────────────────────
-// Returns all users if no query, or filtered results
 router.get('/users/search', requireAuth, async (req: AuthRequest, res) => {
-  const q = (req.query.q as string ?? '').trim();
+  const q       = (req.query.q as string ?? '').trim();
+  const myId    = req.userId!;
 
-  const where: any = { id: { not: req.userId! } };
+  try {
+    // Get ALL users except self
+    const users = await prisma.user.findMany({
+      where: q.length >= 2
+        ? {
+            AND: [
+              { id: { not: myId } },
+              { OR: [
+                { phone:   { contains: q } },
+                { kycName: { contains: q, mode: 'insensitive' } },
+              ]},
+            ],
+          }
+        : { id: { not: myId } },
+      select: {
+        id:           true,
+        kycName:      true,
+        phone:        true,
+        chatPublicKey: true,
+        isOnline:     true,
+        lastSeenAt:   true,
+        createdAt:    true,
+      },
+      orderBy: [{ createdAt: 'desc' }],
+      take:    100,
+    });
 
-  if (q.length >= 2) {
-    where.OR = [
-      { phone:   { contains: q } },
-      { kycName: { contains: q, mode: 'insensitive' } },
-    ];
+    const result = users.map(u => ({
+      id:           u.id,
+      kycName:      u.kycName,
+      chatPublicKey: u.chatPublicKey,
+      isOnline:     u.isOnline ?? false,
+      lastSeenAt:   u.lastSeenAt,
+      phoneMasked:  u.phone.slice(0, 5) + '****' + u.phone.slice(-4),
+      displayName:  u.kycName ?? (u.phone.slice(0, 5) + '****' + u.phone.slice(-4)),
+    }));
+
+    console.log(`[chat/search] myId=${myId} q="${q}" found=${result.length}`);
+    return res.json(ok({ users: result }));
+  } catch (e: any) {
+    console.error('[chat/search] error:', e.message);
+    return res.status(500).json(fail('Search failed: ' + e.message));
   }
-
-  const users = await prisma.user.findMany({
-    where,
-    select: { id: true, kycName: true, phone: true, chatPublicKey: true, isOnline: true, lastSeenAt: true, createdAt: true },
-    orderBy: [{ createdAt: 'desc' }],
-    take: 50,
-  });
-
-  const result = users.map(u => ({
-    id:           u.id,
-    kycName:      u.kycName,
-    chatPublicKey: u.chatPublicKey,
-    isOnline:     u.isOnline,
-    lastSeenAt:   u.lastSeenAt,
-    phoneMasked:  u.phone.slice(0, 5) + '****' + u.phone.slice(-4),
-    displayName:  u.kycName ?? (u.phone.slice(0, 5) + '****' + u.phone.slice(-4)),
-  }));
-
-  return res.json(ok({ users: result }));
 });
 
 // ── GET /api/chat/conversations ───────────────────────────────────────────────
