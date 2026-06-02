@@ -131,6 +131,13 @@ export default function LoginPage() {
             </button>
           </div>
 
+          {/* Recover wallet — front-and-centre trust promise */}
+          <Link href="/auth/recover"
+            className="mt-4 flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 py-3 text-sm font-medium text-slate-300 transition-colors hover:bg-white/10">
+            <ShieldCheck size={16} className="text-emerald-400" />
+            Lost your phone? Recover your wallet
+          </Link>
+
           <p className="mt-6 text-center text-sm text-slate-400">
             New to OlomiPay?{' '}
             <Link href="/auth/register" className="font-semibold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
