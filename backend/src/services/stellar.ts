@@ -576,28 +576,55 @@ export async function userSendXlm(params: {
   const signer      = getUserKeypair(encryptedSecret, pin, phone);
   const account     = await server.loadAccount(publicKey);
   const feeAccount  = process.env.STELLAR_PUBLIC_KEY ?? process.env.FEE_ACCOUNT;
-  const feeXlm      = amountXlm * 0.01; // 1% fee
-  const netXlm      = amountXlm - feeXlm;
+  const feeXlm      = parseFloat((amountXlm * 0.01).toFixed(7)); // 1% fee
+  const netXlm      = parseFloat((amountXlm - feeXlm).toFixed(7));
+
+  // Does the destination account already exist on-ledger?
+  let destExists = true;
+  try {
+    await server.loadAccount(toAddress);
+  } catch (e: any) {
+    if (e?.response?.status === 404) destExists = false;
+    else throw e;
+  }
 
   const txBuilder = new StellarSdk.TransactionBuilder(account, {
     fee:               StellarSdk.BASE_FEE,
     networkPassphrase: NETWORK_PASSPHRASE,
   });
 
-  // Main payment
-  txBuilder.addOperation(StellarSdk.Operation.payment({
-    destination: toAddress,
-    asset:       XLM_ASSET,
-    amount:      netXlm.toFixed(7),
-  }));
-
-  // Fee collection (only if fee account is configured and we're not sending to ourselves)
-  if (feeAccount && feeAccount !== publicKey && feeXlm >= 0.0000001) {
+  // Main transfer — createAccount if the recipient's wallet isn't activated yet,
+  // otherwise a normal payment.
+  if (destExists) {
     txBuilder.addOperation(StellarSdk.Operation.payment({
-      destination: feeAccount,
+      destination: toAddress,
       asset:       XLM_ASSET,
-      amount:      feeXlm.toFixed(7),
+      amount:      netXlm.toFixed(7),
     }));
+  } else {
+    // A new account needs at least the 1 XLM base reserve to be created.
+    if (netXlm < 1) {
+      throw new Error(
+        'Recipient wallet is not activated yet. Send at least 1 XLM to activate it, or ask them to fund their wallet first.',
+      );
+    }
+    txBuilder.addOperation(StellarSdk.Operation.createAccount({
+      destination:     toAddress,
+      startingBalance: netXlm.toFixed(7),
+    }));
+  }
+
+  // Fee collection (only if fee account is configured, exists, and isn't us)
+  if (feeAccount && feeAccount !== publicKey && feeXlm >= 0.0000001) {
+    let feeExists = true;
+    try { await server.loadAccount(feeAccount); } catch { feeExists = false; }
+    if (feeExists) {
+      txBuilder.addOperation(StellarSdk.Operation.payment({
+        destination: feeAccount,
+        asset:       XLM_ASSET,
+        amount:      feeXlm.toFixed(7),
+      }));
+    }
   }
 
   if (memo) txBuilder.addMemo(StellarSdk.Memo.text(String(memo).slice(0, 28)));
@@ -605,8 +632,19 @@ export async function userSendXlm(params: {
 
   const tx = txBuilder.build();
   tx.sign(signer);
-  const result = await server.submitTransaction(tx);
-  return result.hash;
+
+  try {
+    const result = await server.submitTransaction(tx);
+    return result.hash;
+  } catch (e: any) {
+    // Surface the real Horizon failure so the UI can show something useful
+    const codes = e?.response?.data?.extras?.result_codes;
+    const reason = codes
+      ? `${codes.transaction ?? ''} ${(codes.operations ?? []).join(',')}`.trim()
+      : (e?.message ?? 'unknown');
+    console.error('[userSendXlm] submit failed:', reason, JSON.stringify(codes ?? {}));
+    throw new Error(`XLM transfer failed: ${reason}`);
+  }
 }
 
 /**

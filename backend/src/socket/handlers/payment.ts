@@ -151,7 +151,7 @@ export async function handleSendPayment(io: Server, socket: Socket, data: any) {
 
   } catch (e: any) {
     console.error('[socket:payment]', e.message);
-    socket.emit('payment_error', { error: 'Malipo hayakufanikiwa. Jaribu tena. / Transfer failed.' });
+    socket.emit('payment_error', { error: e?.message ?? 'Transfer failed. Please try again.' });
   }
 }
 
@@ -320,7 +320,7 @@ export async function handlePayRequest(io: Server, socket: Socket, data: any) {
 
   } catch (e: any) {
     console.error('[socket:pay_request]', e.message);
-    socket.emit('payment_error', { error: 'Malipo hayakufanikiwa. Jaribu tena. / Transfer failed.' });
+    socket.emit('payment_error', { error: e?.message ?? 'Transfer failed. Please try again.' });
   }
 }
 
