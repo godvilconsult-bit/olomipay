@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { requireAuth, AuthRequest } from '../middleware/auth';
-import { getBalance, getTransactionHistory, getAccountInfo, buildStellarPayUri, friendbotFund, activateUserWallet, generateKeypair, IS_TESTNET_NETWORK } from '../services/stellar';
+import { getBalance, getTransactionHistory, getAccountInfo, buildStellarPayUri, friendbotFund, activateUserWallet, deriveKeypairFromPhone, IS_TESTNET_NETWORK } from '../services/stellar';
 import { verifyPin, encryptSecret, decryptSecret, WalletKeyError } from '../services/crypto';
 
 const router = Router();
@@ -64,25 +64,30 @@ router.post('/reprovision', requireAuth, async (req: AuthRequest, res) => {
     return res.status(400).json({ success: false, error: 'Your wallet key is healthy — no re-provision needed.' });
   }
 
-  // 2) Don't abandon a wallet that holds funds.
-  // On MAINNET, refuse if the old wallet holds real value (protect funds).
-  // On TESTNET, coins are worthless → always allow recovery.
-  if (!IS_TESTNET_NETWORK) {
+  // 2) Re-derivation returns the SAME address (deterministic), so recovery never
+  //    loses funds. We only need to protect a LEGACY (random) wallet whose derived
+  //    address would DIFFER and that still holds real value — and only on mainnet.
+  const derived = deriveKeypairFromPhone(user.phone);
+  const addressChanges = derived.publicKey !== user.stellarPubKey;
+  if (!IS_TESTNET_NETWORK && addressChanges) {
     try {
       const bal = await getBalance(user.stellarPubKey);
       if (parseFloat(bal.usdc) > 0.01 || parseFloat(bal.xlm) > 1.0) {
         return res.status(409).json({
           success: false,
-          error: 'The old wallet still holds a balance. Contact support to recover it before re-provisioning.',
+          error: 'Your old wallet holds a balance and uses a legacy address. Contact support to migrate it safely.',
         });
       }
     } catch { /* account doesn't exist on-ledger → safe to replace */ }
   }
 
-  // 3) Generate a fresh, correctly-encrypted keypair and activate it.
+  // 3) Re-DERIVE the SAME wallet from the phone (deterministic) and re-encrypt it.
+  //    Because the address is reproducible, this recovers the identical wallet and
+  //    its funds — it never creates a different address.
   try {
-    const { publicKey, secretKey } = generateKeypair();
+    const { publicKey, secretKey } = deriveKeypairFromPhone(user.phone);
     const encrypted = encryptSecret(secretKey, pin, user.phone);
+    const sameAddress = publicKey === user.stellarPubKey;
     await prisma.user.update({
       where: { id: user.id },
       data:  { stellarPubKey: publicKey, stellarSecret: encrypted },
@@ -98,7 +103,10 @@ router.post('/reprovision', requireAuth, async (req: AuthRequest, res) => {
         funded: r.funded,
         trustline: r.trustline,
         balance,
-        message: 'Your wallet has been re-created and activated. You can transact again.',
+        sameAddress,
+        message: sameAddress
+          ? 'Your wallet has been recovered (same address & balance). You can transact again.'
+          : 'Your wallet has been rebuilt and activated. You can transact again.',
       },
     });
   } catch (e: any) {

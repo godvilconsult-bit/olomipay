@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { z } from 'zod';
 import { PrismaClient } from '@prisma/client';
-import { generateKeypair, activateUserWallet, IS_TESTNET_NETWORK } from '../services/stellar';
+import { deriveKeypairFromPhone, activateUserWallet, IS_TESTNET_NETWORK } from '../services/stellar';
 import { encryptSecret, hashPin, verifyPin, isEncryptedKeyValid } from '../services/crypto';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 
@@ -89,8 +89,9 @@ router.post('/register', authLimiter, async (req, res) => {
     return res.status(500).json({ error: 'Database error. Please try again.' });
   }
 
-  // Generate Stellar keypair
-  const { publicKey, secretKey } = generateKeypair();
+  // Deterministically derive the wallet from the phone number, so the SAME wallet
+  // (same address + funds) can always be rebuilt for recovery on any device.
+  const { publicKey, secretKey } = deriveKeypairFromPhone(phone);
   const encryptedSecret          = encryptSecret(secretKey, pin, phone);
   const pinHash                  = hashPin(pin);
 

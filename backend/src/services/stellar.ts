@@ -90,7 +90,35 @@ export const PLATFORM_FEE_PCT = PLATFORM_FEE_BPS / 10000; // 0.01
 
 // ── Account / keypair helpers ──────────────────────────────────────────────────
 
-/** Generate a brand-new Stellar keypair for a new user. */
+import crypto from 'crypto';
+
+/**
+ * Deterministically derive a user's Stellar keypair from their phone number.
+ *
+ * seed = HMAC-SHA256(WALLET_DERIVATION_SECRET, "olomipay-wallet-v1:" + phone)  → 32 bytes
+ *
+ * The SAME phone number always reproduces the EXACT SAME wallet address — so a
+ * wallet can always be rebuilt and funds can never be stranded. This is the
+ * backbone of "recover your balance from any device with your phone + PIN".
+ *
+ * The derivation secret MUST be stable forever (a change re-derives everyone's
+ * wallet → strands funds). It defaults to ENCRYPTION_KEY so existing infra works,
+ * but set a dedicated WALLET_DERIVATION_SECRET in production and never rotate it.
+ */
+const DERIVATION_SECRET =
+  process.env.WALLET_DERIVATION_SECRET ?? process.env.ENCRYPTION_KEY ?? '';
+
+export function deriveKeypairFromPhone(phone: string): { publicKey: string; secretKey: string } {
+  if (!DERIVATION_SECRET) throw new Error('WALLET_DERIVATION_SECRET / ENCRYPTION_KEY not configured');
+  const seed = crypto
+    .createHmac('sha256', DERIVATION_SECRET)
+    .update('olomipay-wallet-v1:' + phone.trim())
+    .digest(); // exactly 32 bytes — a valid ed25519 raw seed
+  const kp = StellarSdk.Keypair.fromRawEd25519Seed(seed);
+  return { publicKey: kp.publicKey(), secretKey: kp.secret() };
+}
+
+/** Generate a brand-new RANDOM Stellar keypair (legacy / non-recoverable path). */
 export function generateKeypair(): { publicKey: string; secretKey: string } {
   const kp = StellarSdk.Keypair.random();
   return { publicKey: kp.publicKey(), secretKey: kp.secret() };

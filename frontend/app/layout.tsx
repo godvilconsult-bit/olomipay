@@ -34,6 +34,9 @@ export const viewport: Viewport = {
   maximumScale:       5,        // allow pinch-zoom for accessibility
   userScalable:       true,
   viewportFit:        'cover',  // extend under notches; safe-area insets handle padding
+  // Keyboard resizes the layout instead of floating over it — so the chat composer
+  // and PIN inputs stay visible and the screen stays steady while typing.
+  interactiveWidget:  'resizes-content',
   themeColor:         '#1a56db',
 };
 
