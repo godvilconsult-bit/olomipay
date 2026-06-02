@@ -292,10 +292,20 @@ router.get('/conversations/:id/messages', requireAuth, async (req: AuthRequest, 
   });
   if (!member) return res.status(403).json(fail('Access denied.'));
 
+  // "Delete for me" — message ids this user has hidden
+  let hiddenIds: string[] = [];
+  try {
+    const rows = await prisma.$queryRawUnsafe<{ messageId: string }[]>(
+      `SELECT "messageId" FROM "MessageHidden" WHERE "userId" = $1`, req.userId!,
+    );
+    hiddenIds = rows.map(r => r.messageId);
+  } catch { /* table may not exist yet — ignore */ }
+
   const messages = await prisma.message.findMany({
     where: {
       conversationId: id,
       isDeleted:      false,
+      ...(hiddenIds.length ? { id: { notIn: hiddenIds } } : {}),
       ...(before ? { createdAt: { lt: new Date(before) } } : {}),
     },
     include: {
@@ -324,6 +334,43 @@ router.post('/conversations/:id/read', requireAuth, async (req: AuthRequest, res
     data:  { lastReadAt: new Date() },
   }).catch(() => {});
   return res.json(ok({ message: 'Read' }));
+});
+
+// ── POST /api/chat/messages/hide — "Delete for me" (one or many) ──────────────
+router.post('/messages/hide', requireAuth, async (req: AuthRequest, res) => {
+  const ids: string[] = Array.isArray(req.body?.messageIds) ? req.body.messageIds : [];
+  if (ids.length === 0) return res.status(400).json(fail('No messages selected.'));
+  try {
+    for (const messageId of ids.slice(0, 200)) {
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO "MessageHidden" ("messageId","userId") VALUES ($1,$2)
+         ON CONFLICT ("messageId","userId") DO NOTHING`,
+        messageId, req.userId!,
+      ).catch(() => {});
+    }
+    return res.json(ok({ hidden: ids.length }));
+  } catch (e: any) {
+    return res.status(500).json(fail('Could not hide messages.'));
+  }
+});
+
+// ── POST /api/chat/messages/delete — "Delete for everyone" (batch, own only) ──
+router.post('/messages/delete', requireAuth, async (req: AuthRequest, res) => {
+  const ids: string[] = Array.isArray(req.body?.messageIds) ? req.body.messageIds : [];
+  if (ids.length === 0) return res.status(400).json(fail('No messages selected.'));
+
+  const msgs = await prisma.message.findMany({ where: { id: { in: ids } } });
+  const deletable = msgs.filter(m => m.senderId === req.userId && !m.isDeleted);
+
+  await prisma.message.updateMany({
+    where: { id: { in: deletable.map(m => m.id) } },
+    data:  { isDeleted: true, deletedAt: new Date(), encryptedContent: null, plainContent: null },
+  });
+
+  return res.json(ok({
+    deleted:    deletable.map(m => m.id),
+    skipped:    ids.length - deletable.length,   // not yours / already deleted
+  }));
 });
 
 // ── DELETE /api/chat/messages/:id ─────────────────────────────────────────────

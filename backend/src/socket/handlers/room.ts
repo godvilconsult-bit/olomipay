@@ -54,16 +54,13 @@ export async function handleDeleteMessage(io: Server, socket: Socket, data: any)
   try {
     const message = await prisma.message.findUnique({ where: { id: messageId } });
     if (!message || message.senderId !== userId) {
-      socket.emit('error', { message: 'You cannot delete this message.' });
+      socket.emit('error', { message: 'You can only delete your own messages for everyone.' });
       return;
     }
-    if (Date.now() - message.createdAt.getTime() > 60_000) {
-      socket.emit('error', { message: 'Delete window has expired.' });
-      return;
-    }
+    // Delete-for-everyone allowed on your own messages at any time.
     await prisma.message.update({
       where: { id: messageId },
-      data:  { isDeleted: true, deletedAt: new Date(), encryptedContent: null },
+      data:  { isDeleted: true, deletedAt: new Date(), encryptedContent: null, plainContent: null },
     });
     io.to(message.conversationId).emit('message_deleted', { messageId });
   } catch (e: any) {

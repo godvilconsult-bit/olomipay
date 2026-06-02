@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import {
   ArrowLeft, Send, DollarSign, Check, CheckCheck, X,
   Loader2, ImageIcon, CheckCircle2, XCircle,
+  Reply, CornerUpRight, Trash2, Copy, CheckSquare, MessageSquare,
 } from 'lucide-react';
 import { useSocket } from '../../../lib/useSocket';
 import { formatUsdc, timeAgo } from '../../../lib/utils';
@@ -259,6 +260,18 @@ function Bubble({
         {hearts.map(id => (
           <span key={id} className="heart-float pointer-events-none absolute -top-2 right-2 text-base">❤️</span>
         ))}
+        {/* quoted reply context */}
+        {msg.replyTo && (
+          <div className={`mb-1.5 rounded-lg border-l-2 px-2 py-1 text-xs ${
+            isMine ? 'border-white/60 bg-white/15 text-white/90' : 'border-blue-400 bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-300'
+          }`}>
+            <p className="line-clamp-2 break-words">
+              {msg.replyTo.type === 'IMAGE' ? '📷 Photo'
+                : msg.replyTo.type === 'PAYMENT' ? '💸 Payment'
+                : (msg.replyTo.encryptedContent ?? msg.replyTo.plainContent ?? 'Message')}
+            </p>
+          </div>
+        )}
         <p className="text-[15px] leading-relaxed break-words whitespace-pre-wrap">{text}</p>
         <div className={`flex items-center gap-1 mt-0.5 ${isMine ? 'justify-end' : 'justify-start'}`}>
           <span className={`text-[10px] ${isMine ? 'text-white/70' : 'text-slate-400'}`}>
@@ -335,8 +348,82 @@ export default function ChatThread() {
   const [acceptModal,  setAcceptModal]  = useState<{ messageId: string; amount: number; asset?: string } | null>(null);
   const [acceptLoading, setAcceptLoading] = useState(false);
 
+  // Message management state
+  const [selectMode,  setSelectMode]  = useState(false);
+  const [selected,    setSelected]    = useState<Set<string>>(new Set());
+  const [replyTo,     setReplyTo]     = useState<any>(null);
+  const [menuMsg,     setMenuMsg]     = useState<any>(null);          // long-press action sheet
+  const [deleteIds,   setDeleteIds]   = useState<string[] | null>(null); // delete options sheet
+  const [forwardIds,  setForwardIds]  = useState<string[] | null>(null); // forward picker
+  const [convList,    setConvList]    = useState<any[]>([]);
+
   const bottomRef  = useRef<HTMLDivElement>(null);
   const typingRef  = useRef<any>(null);
+
+  // ── Selection helpers ──────────────────────────────────────────────────────
+  function toggleSelect(id: string) {
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.size === 0) setSelectMode(false);
+      return next;
+    });
+  }
+  function startSelect(id: string) { setSelectMode(true); setSelected(new Set([id])); setMenuMsg(null); }
+  function exitSelect() { setSelectMode(false); setSelected(new Set()); }
+
+  const selectedMsgs = () => messages.filter(m => selected.has(m.id));
+  const allSelectedMine = () => selectedMsgs().every(m => m.senderId === myId && !m.isDeleted);
+
+  // ── Delete for me (hide locally) ───────────────────────────────────────────
+  async function deleteForMe(ids: string[]) {
+    setMessages(prev => prev.filter(m => !ids.includes(m.id)));
+    setDeleteIds(null); exitSelect();
+    await fetch(`${API}/api/chat/messages/hide`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+      body: JSON.stringify({ messageIds: ids }),
+    }).catch(() => {});
+  }
+  // ── Delete for everyone (own messages) ─────────────────────────────────────
+  function deleteForEveryone(ids: string[]) {
+    ids.forEach(id => emit('delete_message', { messageId: id }));
+    setMessages(prev => prev.map(m => ids.includes(m.id) ? { ...m, isDeleted: true } : m));
+    setDeleteIds(null); exitSelect();
+  }
+
+  // ── Forward ────────────────────────────────────────────────────────────────
+  async function openForward(ids: string[]) {
+    setMenuMsg(null);
+    const r = await api('/conversations');
+    if (r.success) setConvList((r.data.conversations ?? []).filter((c: any) => c.id !== convId));
+    setForwardIds(ids);
+  }
+  function confirmForward(targetConvId: string) {
+    const toSend = messages.filter(m => forwardIds!.includes(m.id));
+    toSend.forEach(m => {
+      if (m.type === 'IMAGE') {
+        emit('send_message', { conversationId: targetConvId, encryptedContent: '[Image]', type: 'IMAGE', mediaUrl: m.mediaUrl, mediaThumbUrl: m.mediaThumbUrl, mediaMimeType: m.mediaMimeType });
+      } else {
+        const body = m.plainContent ?? m.encryptedContent ?? '';
+        if (body) emit('send_message', { conversationId: targetConvId, encryptedContent: body, type: 'TEXT' });
+      }
+    });
+    toast.success(`Forwarded to ${toSend.length > 0 ? 'chat' : ''}`);
+    setForwardIds(null); exitSelect();
+  }
+
+  function copyMessage(m: any) {
+    navigator.clipboard.writeText(m.plainContent ?? m.encryptedContent ?? '');
+    toast.success('Copied'); setMenuMsg(null);
+  }
+
+  // Long-press (mobile) to open the action menu
+  const holdRef = useRef<any>(null);
+  function startHold(m: any) {
+    cancelHold();
+    holdRef.current = setTimeout(() => { if (!selectMode && !m.isDeleted) setMenuMsg(m); }, 480);
+  }
+  function cancelHold() { if (holdRef.current) { clearTimeout(holdRef.current); holdRef.current = null; } }
   const inputRef   = useRef<HTMLTextAreaElement>(null);
   const imgRef     = useRef<HTMLInputElement>(null);
 
@@ -482,14 +569,17 @@ export default function ChatThread() {
   function sendMessage() {
     const trimmed = text.trim();
     if (!trimmed) return;
-    setText('');
+    const rTo = replyTo;
+    setText(''); setReplyTo(null);
     setMessages(prev => [...prev, {
       id: `temp_${Date.now()}`, conversationId: convId, senderId: myId,
       type: 'TEXT', plainContent: trimmed, encryptedContent: trimmed,
+      replyToId: rTo?.id ?? null,
+      replyTo: rTo ? { id: rTo.id, encryptedContent: rTo.plainContent ?? rTo.encryptedContent, senderId: rTo.senderId, type: rTo.type } : null,
       isDeleted: false, deliveredAt: null, createdAt: new Date().toISOString(), receipts: [],
     }]);
     scrollToBottom();
-    emit('send_message', { conversationId: convId, encryptedContent: trimmed, type: 'TEXT' });
+    emit('send_message', { conversationId: convId, encryptedContent: trimmed, type: 'TEXT', replyToId: rTo?.id ?? null });
     clearTimeout(typingRef.current);
     emit('typing_stop', { conversationId: convId });
     inputRef.current?.focus();
@@ -524,7 +614,28 @@ export default function ChatThread() {
   return (
     <div className="h-[100dvh] flex flex-col bg-slate-50 dark:bg-[#0a1120] chat-bg">
 
-      {/* Header — glass with animated presence */}
+      {/* Selection action bar — replaces header in select mode */}
+      {selectMode ? (
+        <div className="flex-shrink-0 z-30 bg-white/90 dark:bg-[#0b1426]/90 backdrop-blur-xl border-b border-slate-200/60 dark:border-white/10 px-3 py-2.5 flex items-center gap-3">
+          <button onClick={exitSelect} className="p-2 -ml-1 rounded-full hover:bg-slate-100 dark:hover:bg-white/10">
+            <X size={20} />
+          </button>
+          <p className="flex-1 font-semibold text-sm">{selected.size} selected</p>
+          <button onClick={() => openForward([...selected])} disabled={selected.size === 0}
+            className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-white/10 disabled:opacity-30" title="Forward">
+            <CornerUpRight size={20} className="text-slate-600 dark:text-slate-300" />
+          </button>
+          <button onClick={() => { const m = selectedMsgs()[0]; if (m && selected.size === 1) { setReplyTo(m); exitSelect(); } }}
+            disabled={selected.size !== 1}
+            className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-white/10 disabled:opacity-30" title="Reply">
+            <Reply size={20} className="text-slate-600 dark:text-slate-300" />
+          </button>
+          <button onClick={() => setDeleteIds([...selected])} disabled={selected.size === 0}
+            className="p-2 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-30" title="Delete">
+            <Trash2 size={20} className="text-red-500" />
+          </button>
+        </div>
+      ) : (
       <div className="flex-shrink-0 z-20 bg-white/80 dark:bg-[#0b1426]/80 backdrop-blur-xl border-b border-slate-200/60 dark:border-white/10 px-3 py-2.5 flex items-center gap-3">
         <button onClick={() => router.push('/chat')}
           className="p-2 -ml-1 rounded-full hover:bg-slate-100 dark:hover:bg-white/10 transition-colors">
@@ -552,6 +663,7 @@ export default function ChatThread() {
           🔒 Encrypted
         </div>
       </div>
+      )}
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto py-3">
@@ -570,10 +682,32 @@ export default function ChatThread() {
           </div>
         ) : (
           <>
-            {messages.map(msg => (
-              <Bubble key={msg.id} msg={msg} isMine={msg.senderId === myId}
-                onAccept={handleAccept} onReject={handleReject} />
-            ))}
+            {messages.map(msg => {
+              const isSel = selected.has(msg.id);
+              return (
+                <div key={msg.id}
+                  className={`relative transition-colors ${selectMode ? 'cursor-pointer' : ''} ${isSel ? 'bg-blue-500/10' : ''}`}
+                  onClick={() => { if (selectMode) toggleSelect(msg.id); }}
+                  onContextMenu={e => { e.preventDefault(); if (!selectMode && !msg.isDeleted) setMenuMsg(msg); }}
+                  onTouchStart={() => startHold(msg)}
+                  onTouchEnd={cancelHold}
+                  onTouchMove={cancelHold}>
+                  {selectMode && (
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 z-10">
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                        isSel ? 'bg-blue-500 border-blue-500' : 'border-slate-300 dark:border-slate-500 bg-white/50'
+                      }`}>
+                        {isSel && <Check size={12} className="text-white" />}
+                      </div>
+                    </div>
+                  )}
+                  <div className={selectMode ? 'pl-9 pointer-events-none' : ''}>
+                    <Bubble msg={msg} isMine={msg.senderId === myId}
+                      onAccept={handleAccept} onReject={handleReject} />
+                  </div>
+                </div>
+              );
+            })}
             {isTyping && (
               <div className="flex items-center px-4 py-1">
                 <div className="bg-white dark:bg-slate-800 rounded-2xl rounded-bl-sm px-4 py-2.5 shadow-sm flex gap-1.5">
@@ -588,6 +722,23 @@ export default function ChatThread() {
           </>
         )}
       </div>
+
+      {/* Reply preview above composer */}
+      {replyTo && !selectMode && (
+        <div className="flex-shrink-0 z-20 bg-white/80 dark:bg-[#0b1426]/80 backdrop-blur-xl border-t border-slate-200/60 dark:border-white/10 px-3 pt-2 flex items-start gap-2">
+          <div className="flex-1 min-w-0 border-l-2 border-blue-500 pl-2.5">
+            <p className="text-xs font-semibold text-blue-500">
+              Reply to {replyTo.senderId === myId ? 'yourself' : name}
+            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+              {replyTo.type === 'IMAGE' ? '📷 Photo'
+                : replyTo.type === 'PAYMENT' ? '💸 Payment'
+                : (replyTo.plainContent ?? replyTo.encryptedContent ?? '')}
+            </p>
+          </div>
+          <button onClick={() => setReplyTo(null)} className="p-1 text-slate-400"><X size={16} /></button>
+        </div>
+      )}
 
       {/* Input bar — glass composer */}
       <div className="flex-shrink-0 z-20 bg-white/80 dark:bg-[#0b1426]/80 backdrop-blur-xl border-t border-slate-200/60 dark:border-white/10 px-2.5 py-2.5 flex items-end gap-2">
@@ -626,6 +777,86 @@ export default function ChatThread() {
           <Send size={17} />
         </button>
       </div>
+
+      {/* Long-press action menu */}
+      {menuMsg && (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end" onClick={() => setMenuMsg(null)}>
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+          <div className="relative rounded-t-3xl bg-white dark:bg-slate-900 p-2 pb-8 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="mx-auto my-2 h-1 w-10 rounded-full bg-slate-200 dark:bg-slate-700" />
+            {[
+              { icon: Reply,        label: 'Reply',   on: () => { setReplyTo(menuMsg); setMenuMsg(null); } },
+              { icon: CornerUpRight, label: 'Forward', on: () => openForward([menuMsg.id]) },
+              { icon: CheckSquare,  label: 'Select',  on: () => startSelect(menuMsg.id) },
+              ...(menuMsg.type === 'TEXT' ? [{ icon: Copy, label: 'Copy', on: () => copyMessage(menuMsg) }] : []),
+              { icon: Trash2,       label: 'Delete',  danger: true, on: () => { setDeleteIds([menuMsg.id]); setMenuMsg(null); } },
+            ].map((a: any) => (
+              <button key={a.label} onClick={a.on}
+                className={`flex w-full items-center gap-4 rounded-2xl px-5 py-3.5 text-left active:bg-slate-100 dark:active:bg-slate-800 ${a.danger ? 'text-red-500' : 'text-slate-700 dark:text-slate-200'}`}>
+                <a.icon size={20} /> <span className="font-medium">{a.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Delete options sheet */}
+      {deleteIds && (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end" onClick={() => setDeleteIds(null)}>
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+          <div className="relative rounded-t-3xl bg-white dark:bg-slate-900 p-5 pb-9 shadow-2xl space-y-2" onClick={e => e.stopPropagation()}>
+            <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-slate-200 dark:bg-slate-700" />
+            <p className="text-center font-semibold mb-2">Delete {deleteIds.length > 1 ? `${deleteIds.length} messages` : 'message'}?</p>
+            {(() => {
+              const sel = messages.filter(m => deleteIds.includes(m.id));
+              const canEveryone = sel.length > 0 && sel.every(m => m.senderId === myId && !m.isDeleted);
+              return (
+                <>
+                  {canEveryone && (
+                    <button onClick={() => deleteForEveryone(deleteIds)}
+                      className="w-full py-3.5 rounded-2xl bg-red-500 text-white font-semibold">
+                      Delete for everyone
+                    </button>
+                  )}
+                  <button onClick={() => deleteForMe(deleteIds)}
+                    className="w-full py-3.5 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold">
+                    Delete for me
+                  </button>
+                  <button onClick={() => setDeleteIds(null)}
+                    className="w-full py-3 text-sm text-slate-400">Cancel</button>
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* Forward picker */}
+      {forwardIds && (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end" onClick={() => setForwardIds(null)}>
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+          <div className="relative rounded-t-3xl bg-white dark:bg-slate-900 p-4 pb-9 shadow-2xl max-h-[70vh] overflow-y-auto thin-scroll" onClick={e => e.stopPropagation()}>
+            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-200 dark:bg-slate-700" />
+            <p className="font-semibold mb-3 px-1">Forward to…</p>
+            {convList.length === 0 ? (
+              <p className="text-center text-slate-400 text-sm py-6">No other conversations</p>
+            ) : convList.map(c => {
+              const o = c.otherParticipants?.[0];
+              const cn = c.groupName ?? o?.kycName ?? o?.displayName ?? o?.phoneMasked ?? 'Chat';
+              return (
+                <button key={c.id} onClick={() => confirmForward(c.id)}
+                  className="flex w-full items-center gap-3 px-2 py-3 rounded-2xl active:bg-slate-100 dark:active:bg-slate-800 text-left">
+                  <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-500 to-emerald-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                    {cn.slice(0, 2).toUpperCase()}
+                  </div>
+                  <span className="font-medium text-sm">{cn}</span>
+                  <CornerUpRight size={16} className="ml-auto text-slate-300" />
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Accept payment PIN modal */}
       {acceptModal && (

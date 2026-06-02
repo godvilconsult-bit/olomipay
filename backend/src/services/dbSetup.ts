@@ -532,6 +532,18 @@ export async function setupDatabase(): Promise<void> {
       );
     `);
 
+    // "Delete for me" — a message hidden only for a specific user
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "MessageHidden" (
+        "id"        TEXT NOT NULL PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        "messageId" TEXT NOT NULL,
+        "userId"    TEXT NOT NULL,
+        "createdAt" TIMESTAMP NOT NULL DEFAULT NOW(),
+        UNIQUE("messageId", "userId")
+      );
+    `);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "MessageHidden_user_idx" ON "MessageHidden" ("userId")`).catch(() => {});
+
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "GroupKey" (
         "id"             TEXT NOT NULL PRIMARY KEY,
