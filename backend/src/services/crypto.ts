@@ -41,22 +41,38 @@ export function encryptSecret(stellarSecret: string, pin: string, phone: string)
   ].join(':');
 }
 
+/** Thrown when a stored key can't be parsed/decrypted (corrupt or legacy format). */
+export class WalletKeyError extends Error {
+  constructor(msg = 'WALLET_KEY_CORRUPT') { super(msg); this.name = 'WalletKeyError'; }
+}
+
 export function decryptSecret(encryptedPayload: string, pin: string, phone: string): string {
-  const [ivHex, tagHex, dataHex] = encryptedPayload.split(':');
-  const key = deriveKey(pin, phone);
+  // Validate the iv:tag:data shape before touching the cipher so we fail with a
+  // clear, actionable error instead of a cryptic "invalid initialization vector".
+  if (!encryptedPayload || typeof encryptedPayload !== 'string') {
+    throw new WalletKeyError();
+  }
+  const parts = encryptedPayload.split(':');
+  if (parts.length !== 3) throw new WalletKeyError();
+  const [ivHex, tagHex, dataHex] = parts;
+  // GCM IV must be 12 bytes (24 hex chars); auth tag 16 bytes (32 hex chars).
+  if (!/^[0-9a-fA-F]{24}$/.test(ivHex) || !/^[0-9a-fA-F]{32}$/.test(tagHex) || !/^[0-9a-fA-F]+$/.test(dataHex)) {
+    throw new WalletKeyError();
+  }
 
-  const decipher = crypto.createDecipheriv(
-    ALGORITHM,
-    key,
-    Buffer.from(ivHex, 'hex'),
-  );
-  decipher.setAuthTag(Buffer.from(tagHex, 'hex'));
-
-  const decrypted = Buffer.concat([
-    decipher.update(Buffer.from(dataHex, 'hex')),
-    decipher.final(),
-  ]);
-  return decrypted.toString('utf8');
+  try {
+    const key = deriveKey(pin, phone);
+    const decipher = crypto.createDecipheriv(ALGORITHM, key, Buffer.from(ivHex, 'hex'));
+    decipher.setAuthTag(Buffer.from(tagHex, 'hex'));
+    const decrypted = Buffer.concat([
+      decipher.update(Buffer.from(dataHex, 'hex')),
+      decipher.final(),
+    ]);
+    return decrypted.toString('utf8');
+  } catch {
+    // Wrong PIN (auth-tag mismatch) or corrupt data — caller decides messaging.
+    throw new WalletKeyError('WALLET_KEY_UNREADABLE');
+  }
 }
 
 export function hashPin(pin: string): string {

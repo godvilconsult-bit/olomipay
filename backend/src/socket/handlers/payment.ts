@@ -151,7 +151,10 @@ export async function handleSendPayment(io: Server, socket: Socket, data: any) {
 
   } catch (e: any) {
     console.error('[socket:payment]', e.message);
-    socket.emit('payment_error', { error: e?.message ?? 'Transfer failed. Please try again.' });
+    const msg = String(e?.message ?? '').includes('WALLET_KEY')
+      ? 'Your wallet needs re-activation. Go to Profile → Re-activate wallet, then try again.'
+      : (e?.message ?? 'Transfer failed. Please try again.');
+    socket.emit('payment_error', { error: msg });
   }
 }
 
@@ -320,7 +323,10 @@ export async function handlePayRequest(io: Server, socket: Socket, data: any) {
 
   } catch (e: any) {
     console.error('[socket:pay_request]', e.message);
-    socket.emit('payment_error', { error: e?.message ?? 'Transfer failed. Please try again.' });
+    const msg = String(e?.message ?? '').includes('WALLET_KEY')
+      ? 'Your wallet needs re-activation. Go to Profile → Re-activate wallet, then try again.'
+      : (e?.message ?? 'Transfer failed. Please try again.');
+    socket.emit('payment_error', { error: msg });
   }
 }
 

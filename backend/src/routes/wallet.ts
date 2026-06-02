@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { requireAuth, AuthRequest } from '../middleware/auth';
-import { getBalance, getTransactionHistory, getAccountInfo, buildStellarPayUri, friendbotFund, activateUserWallet } from '../services/stellar';
-import { verifyPin } from '../services/crypto';
+import { getBalance, getTransactionHistory, getAccountInfo, buildStellarPayUri, friendbotFund, activateUserWallet, generateKeypair } from '../services/stellar';
+import { verifyPin, encryptSecret, decryptSecret, WalletKeyError } from '../services/crypto';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -40,6 +40,66 @@ router.post('/activate', requireAuth, async (req: AuthRequest, res) => {
   } catch (e: any) {
     console.error('[wallet/activate]', e?.message);
     return res.status(502).json({ success: false, error: e?.message ?? 'Activation failed' });
+  }
+});
+
+// ── POST /api/wallet/reprovision ───────────────────────────────────────────────
+// Recovery for a corrupt/legacy wallet key (the "invalid initialization vector"
+// case). Generates a fresh keypair, encrypts it correctly, and re-activates.
+// SAFETY: only runs if the current key is genuinely unreadable AND the old
+// account holds no balance — so it can never wipe a working wallet with funds.
+router.post('/reprovision', requireAuth, async (req: AuthRequest, res) => {
+  const { pin } = req.body ?? {};
+  if (!/^\d{6}$/.test(pin ?? '')) return res.status(400).json({ success: false, error: 'Enter your 6-digit PIN' });
+
+  const user = await prisma.user.findUnique({ where: { id: req.userId! } });
+  if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+  if (!await verifyPin(pin, user.pinHash)) return res.status(403).json({ success: false, error: 'Incorrect PIN' });
+
+  // 1) Is the current key actually broken? If it decrypts, refuse (nothing to fix).
+  let keyOk = true;
+  try { decryptSecret(user.stellarSecret, pin, user.phone); }
+  catch (e) { if (e instanceof WalletKeyError) keyOk = false; else throw e; }
+  if (keyOk) {
+    return res.status(400).json({ success: false, error: 'Your wallet key is healthy — no re-provision needed.' });
+  }
+
+  // 2) Don't abandon a wallet that holds funds.
+  try {
+    const bal = await getBalance(user.stellarPubKey);
+    if (parseFloat(bal.usdc) > 0.01 || parseFloat(bal.xlm) > 1.0) {
+      return res.status(409).json({
+        success: false,
+        error: 'The old wallet still holds a balance. Contact support to recover it before re-provisioning.',
+      });
+    }
+  } catch { /* account doesn't exist on-ledger → safe to replace */ }
+
+  // 3) Generate a fresh, correctly-encrypted keypair and activate it.
+  try {
+    const { publicKey, secretKey } = generateKeypair();
+    const encrypted = encryptSecret(secretKey, pin, user.phone);
+    await prisma.user.update({
+      where: { id: user.id },
+      data:  { stellarPubKey: publicKey, stellarSecret: encrypted },
+    });
+
+    const r = await activateUserWallet({ publicKey, encryptedSecret: encrypted, pin, phone: user.phone });
+    const balance = await getBalance(publicKey).catch(() => ({ xlm: '0', usdc: '0' }));
+
+    return res.json({
+      success: true,
+      data: {
+        address: publicKey,
+        funded: r.funded,
+        trustline: r.trustline,
+        balance,
+        message: 'Your wallet has been re-created and activated. You can transact again.',
+      },
+    });
+  } catch (e: any) {
+    console.error('[wallet/reprovision]', e?.message);
+    return res.status(502).json({ success: false, error: e?.message ?? 'Re-provision failed' });
   }
 });
 

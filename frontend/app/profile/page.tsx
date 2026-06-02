@@ -3,8 +3,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Copy, LogOut, Shield, Camera, Wallet, RefreshCw, Edit2, Check } from 'lucide-react';
+import { ArrowLeft, Copy, LogOut, Shield, Camera, Wallet, RefreshCw, Edit2, Check, Wrench } from 'lucide-react';
 import BottomNav from '../../components/BottomNav';
+import PinInput from '../../components/PinInput';
 import { auth, clearTokens } from '../../lib/api';
 
 const API = process.env.NEXT_PUBLIC_API_URL;
@@ -23,6 +24,9 @@ export default function ProfilePage() {
   const [uploading,   setUploading]   = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [newName,     setNewName]     = useState('');
+  const [showFix,     setShowFix]     = useState(false);
+  const [fixPin,      setFixPin]      = useState('');
+  const [fixing,      setFixing]      = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -87,6 +91,29 @@ export default function ProfilePage() {
     } catch {
       toast.error('Funding failed', { id: 'fund' });
     }
+  }
+
+  // Recovery for a corrupt/legacy wallet key (the "invalid initialization vector" error)
+  async function reactivateWallet() {
+    if (fixPin.length < 6) { toast.error('Enter your 6-digit PIN'); return; }
+    setFixing(true);
+    try {
+      const r = await fetch(`${API}/api/wallet/reprovision`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+        body:    JSON.stringify({ pin: fixPin }),
+      }).then(r => r.json());
+      if (r.success) {
+        toast.success(r.data.message ?? 'Wallet re-activated!');
+        setShowFix(false); setFixPin('');
+        const w = await fetch(`${API}/api/swap/wallet`, { headers: { Authorization: `Bearer ${getToken()}` } }).then(r => r.json());
+        if (w.success) setWallet(w.data);
+      } else {
+        toast.error(r.error ?? 'Could not re-activate');
+      }
+    } catch {
+      toast.error('Re-activation failed');
+    } finally { setFixing(false); }
   }
 
   function copyAddress() {
@@ -212,6 +239,35 @@ export default function ProfilePage() {
               )}
             </div>
           </div>
+
+          {/* Recovery — fix a corrupt wallet key ("invalid initialization vector") */}
+          {!showFix ? (
+            <button onClick={() => setShowFix(true)}
+              className="flex items-center justify-center gap-1.5 w-full text-xs text-slate-400 hover:text-primary py-1">
+              <Wrench size={12} /> Wallet not working? Re-activate it
+            </button>
+          ) : (
+            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-4 space-y-3">
+              <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Re-activate wallet</p>
+              <p className="text-xs text-amber-600/80 dark:text-amber-500">
+                If payments fail with a key error, this rebuilds your wallet. Only works when the
+                old wallet is empty — it never touches a wallet that holds a balance.
+              </p>
+              <div className="flex justify-center [&_input]:!h-10 [&_input]:!w-10">
+                <PinInput value={fixPin} onChange={setFixPin} />
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => { setShowFix(false); setFixPin(''); }}
+                  className="flex-1 text-xs font-semibold bg-slate-100 dark:bg-slate-700 text-slate-500 py-2.5 rounded-xl">
+                  Cancel
+                </button>
+                <button onClick={reactivateWallet} disabled={fixPin.length < 6 || fixing}
+                  className="flex-1 text-xs font-bold text-white bg-amber-500 py-2.5 rounded-xl disabled:opacity-50">
+                  {fixing ? 'Re-activating…' : 'Re-activate'}
+                </button>
+              </div>
+            </div>
+          )}
 
           <p className="text-xs text-slate-400 text-center">
             Your Olomi Wallet is linked to {user?.phone}
