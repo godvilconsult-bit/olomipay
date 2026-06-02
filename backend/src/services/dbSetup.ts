@@ -548,6 +548,28 @@ export async function setupDatabase(): Promise<void> {
     `);
     await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "AdminAuditLog_created_idx" ON "AdminAuditLog" ("createdAt")`).catch(() => {});
 
+    // RBAC role + 2FA on the admin user
+    await prisma.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "adminRole" TEXT`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "isFrozen" BOOLEAN NOT NULL DEFAULT false`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "adminTotpSecret" TEXT`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "adminTotpEnabled" BOOLEAN NOT NULL DEFAULT false`).catch(() => {});
+
+    // Maker-checker (4-eyes) approval queue for money-moving actions
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "AdminApproval" (
+        "id"        TEXT NOT NULL PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        "action"    TEXT NOT NULL,
+        "payload"   TEXT,
+        "makerId"   TEXT NOT NULL,
+        "makerPhone" TEXT,
+        "checkerId" TEXT,
+        "status"    TEXT NOT NULL DEFAULT 'PENDING',
+        "result"    TEXT,
+        "createdAt" TIMESTAMP NOT NULL DEFAULT NOW(),
+        "decidedAt" TIMESTAMP
+      );
+    `);
+
     // "Delete for me" — a message hidden only for a specific user
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "MessageHidden" (

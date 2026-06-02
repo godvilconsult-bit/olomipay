@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { requireAuth, AuthRequest } from '../middleware/auth';
-import { deriveKeypairFromPhone, activateUserWallet, getBalance } from '../services/stellar';
+import { deriveKeypairFromPhone, activateUserWallet, getBalance, platformSendUsdc } from '../services/stellar';
 import { encryptSecret, hashPin } from '../services/crypto';
 
 const router  = Router();
@@ -15,6 +15,18 @@ async function requireAdmin(req: AuthRequest, res: any, next: any) {
   if (!u?.isAdmin) return res.status(403).json(fail('Admin access required'));
   (req as any).adminPhone = u.phone;
   next();
+}
+
+// ── RBAC — gate by admin role (SUPER_ADMIN bypasses everything) ─────────────────
+// Roles: SUPPORT · COMPLIANCE · FINANCE · SUPER_ADMIN
+function requireRole(...roles: string[]) {
+  return async (req: AuthRequest, res: any, next: any) => {
+    const u = await prisma.user.findUnique({ where: { id: req.userId! }, select: { isAdmin: true, adminRole: true } as any });
+    const role = (u as any)?.adminRole;
+    if (!u?.isAdmin) return res.status(403).json(fail('Admin access required'));
+    if (role === 'SUPER_ADMIN' || roles.includes(role)) return next();
+    return res.status(403).json(fail(`Requires role: ${roles.join(' or ')}`));
+  };
 }
 
 // ── Immutable audit — record every back-office action ───────────────────────────
@@ -124,6 +136,87 @@ router.get('/audit', requireAuth, requireAdmin, async (req: AuthRequest, res) =>
   );
   const [{ count }] = await prisma.$queryRawUnsafe<any[]>(`SELECT COUNT(*)::int AS count FROM "AdminAuditLog"`);
   return res.json(ok({ logs: rows, total: count }));
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// PHASE 2 — Maker–checker (4-eyes) for money-moving actions
+// ════════════════════════════════════════════════════════════════════════════
+
+// Maker proposes a manual credit — does NOT execute; queues for a second admin.
+router.post('/users/:id/credit', requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+  const amountUsdc = Number(req.body?.amountUsdc);
+  const reason     = String(req.body?.reason ?? '').slice(0, 300);
+  if (!(amountUsdc > 0)) return res.status(400).json(fail('amountUsdc must be > 0'));
+  if (!reason)           return res.status(400).json(fail('A reason is required'));
+
+  const target = await prisma.user.findUnique({ where: { id: req.params.id }, select: { id: true, phone: true } });
+  if (!target) return res.status(404).json(fail('User not found'));
+
+  const payload = { userId: target.id, phone: target.phone, amountUsdc, reason };
+  const [row] = await prisma.$queryRawUnsafe<any[]>(
+    `INSERT INTO "AdminApproval" ("action","payload","makerId","makerPhone")
+     VALUES ($1,$2,$3,$4) RETURNING id`,
+    'manual_credit', JSON.stringify(payload), req.userId!, (req as any).adminPhone ?? null,
+  );
+  await audit(req, 'propose_credit', target.id, 'user', payload);
+  return res.json(ok({ approvalId: row.id, message: 'Credit queued — a different admin must approve it.' }));
+});
+
+// Pending approvals queue
+router.get('/approvals', requireAuth, requireAdmin, async (_req, res) => {
+  const rows = await prisma.$queryRawUnsafe<any[]>(
+    `SELECT * FROM "AdminApproval" ORDER BY "createdAt" DESC LIMIT 200`,
+  );
+  const [{ count }] = await prisma.$queryRawUnsafe<any[]>(`SELECT COUNT(*)::int AS count FROM "AdminApproval" WHERE "status"='PENDING'`);
+  return res.json(ok({ approvals: rows, total: rows.length, pending: count }));
+});
+
+// Checker approves → executes. Must be a DIFFERENT admin with FINANCE/SUPER role.
+router.post('/approvals/:id/approve', requireAuth, requireRole('FINANCE', 'SUPER_ADMIN'), async (req: AuthRequest, res) => {
+  const [appr] = await prisma.$queryRawUnsafe<any[]>(`SELECT * FROM "AdminApproval" WHERE "id"=$1`, req.params.id);
+  if (!appr) return res.status(404).json(fail('Approval not found'));
+  if (appr.status !== 'PENDING') return res.status(400).json(fail('Already decided'));
+  if (appr.makerId === req.userId) return res.status(403).json(fail('The checker must be a different admin (4-eyes).'));
+
+  try {
+    const payload = JSON.parse(appr.payload ?? '{}');
+    let result = '';
+    if (appr.action === 'manual_credit') {
+      const u = await prisma.user.findUnique({ where: { id: payload.userId } });
+      if (!u) throw new Error('User no longer exists');
+      const hash = await platformSendUsdc(u.stellarPubKey, payload.amountUsdc, `Manual credit: ${payload.reason}`.slice(0, 28));
+      await prisma.transaction.create({ data: {
+        userId: u.id, type: 'RECEIVE', status: 'CONFIRMED', amountUsdc: payload.amountUsdc,
+        stellarTxId: hash, memo: `Manual credit (admin): ${payload.reason}`,
+      }});
+      result = hash;
+    }
+    await prisma.$executeRawUnsafe(
+      `UPDATE "AdminApproval" SET "status"='APPROVED', "checkerId"=$1, "result"=$2, "decidedAt"=NOW() WHERE "id"=$3`,
+      req.userId!, result, appr.id,
+    );
+    await audit(req, 'approve_' + appr.action, appr.id, 'approval', { result });
+    return res.json(ok({ message: 'Approved & executed', result }));
+  } catch (e: any) {
+    await prisma.$executeRawUnsafe(`UPDATE "AdminApproval" SET "status"='FAILED', "checkerId"=$1, "result"=$2, "decidedAt"=NOW() WHERE "id"=$3`, req.userId!, e.message, appr.id);
+    return res.status(502).json(fail(e.message ?? 'Execution failed'));
+  }
+});
+
+router.post('/approvals/:id/reject', requireAuth, requireRole('FINANCE', 'COMPLIANCE', 'SUPER_ADMIN'), async (req: AuthRequest, res) => {
+  await prisma.$executeRawUnsafe(`UPDATE "AdminApproval" SET "status"='REJECTED', "checkerId"=$1, "decidedAt"=NOW() WHERE "id"=$2 AND "status"='PENDING'`, req.userId!, req.params.id);
+  await audit(req, 'reject_approval', req.params.id, 'approval');
+  return res.json(ok({ message: 'Rejected' }));
+});
+
+// Set an admin's RBAC role (SUPER_ADMIN only)
+router.post('/users/:id/admin-role', requireAuth, requireRole('SUPER_ADMIN'), async (req: AuthRequest, res) => {
+  const role = String(req.body?.role ?? '');
+  const valid = ['SUPPORT', 'COMPLIANCE', 'FINANCE', 'SUPER_ADMIN', ''];
+  if (!valid.includes(role)) return res.status(400).json(fail('Invalid role'));
+  await prisma.user.update({ where: { id: req.params.id }, data: { isAdmin: role !== '', adminRole: role || null } as any });
+  await audit(req, 'set_admin_role', req.params.id, 'user', { role });
+  return res.json(ok({ message: `Role set to ${role || 'none'}` }));
 });
 
 export { router as adminSupportRouter };
