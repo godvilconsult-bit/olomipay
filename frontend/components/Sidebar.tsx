@@ -73,7 +73,7 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="hidden md:flex flex-col w-56 lg:w-64 min-h-screen fixed left-0 top-0 z-50
+    <aside className="hidden md:flex flex-col w-56 lg:w-64 h-screen fixed left-0 top-0 z-50
                       bg-[#0a1120]/95 backdrop-blur-xl border-r border-white/10 text-slate-300
                       overflow-hidden">
       {/* ambient glow */}
@@ -97,7 +97,7 @@ export default function Sidebar() {
       </div>
 
       {/* Nav items */}
-      <nav className="relative flex-1 overflow-y-auto py-3 px-3 space-y-1">
+      <nav className="thin-scroll relative flex-1 overflow-y-auto py-3 px-3 space-y-1">
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
           const active    = path === href || path.startsWith(href + '/');
           const showBadge = href === '/chat' && unread > 0 && !active;

@@ -296,6 +296,13 @@
    (Cards, sticky headers, sheets keep their own bg — they aren't min-h-screen.) */
 .app-canvas .min-h-screen { background-color: transparent !important; }
 
+/* Thin, theme-matched scrollbar (sidebar nav, scroll areas) */
+.thin-scroll { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.15) transparent; }
+.thin-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+.thin-scroll::-webkit-scrollbar-track { background: transparent; }
+.thin-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 999px; }
+.thin-scroll:hover::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.28); }
+
 /* Glass-blur the sticky page headers so they blend into the backdrop
    instead of looking like a hard solid bar. */
 .app-canvas .sticky.top-0 {
