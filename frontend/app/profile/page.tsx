@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Copy, LogOut, Shield, Camera, Wallet, RefreshCw, Edit2, Check, Wrench } from 'lucide-react';
+import { ArrowLeft, Copy, LogOut, Shield, Camera, Wallet, RefreshCw, Edit2, Check, Wrench, LifeBuoy } from 'lucide-react';
 import BottomNav from '../../components/BottomNav';
 import PinInput from '../../components/PinInput';
 import { auth, clearTokens } from '../../lib/api';
@@ -314,6 +314,14 @@ export default function ProfilePage() {
             <div className="flex-1 text-left">
               <p className="font-medium text-sm">KYC Verification</p>
               <p className="text-xs text-slate-400">Verify your identity to unlock higher limits</p>
+            </div>
+          </button>
+          <button onClick={() => router.push('/support')}
+            className="w-full flex items-center gap-3 px-5 py-4 hover:bg-slate-50 dark:hover:bg-slate-700">
+            <LifeBuoy size={18} className="text-primary" />
+            <div className="flex-1 text-left">
+              <p className="font-medium text-sm">Help &amp; support</p>
+              <p className="text-xs text-slate-400">Open a request — our team will help you</p>
             </div>
           </button>
           <button onClick={handleLogout}

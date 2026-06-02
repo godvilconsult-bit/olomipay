@@ -570,6 +570,49 @@ export async function setupDatabase(): Promise<void> {
       );
     `);
 
+    // Auto-reconciler log — what the self-healing job did to stuck transactions
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "AutoReconcileLog" (
+        "id"        TEXT NOT NULL PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        "action"    TEXT NOT NULL,
+        "txId"      TEXT NOT NULL,
+        "detail"    TEXT,
+        "createdAt" TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+    `);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "AutoReconcileLog_created_idx" ON "AutoReconcileLog" ("createdAt")`).catch(() => {});
+
+    // In-app support tickets — customer opens a ticket that lands in the admin console
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "SupportTicket" (
+        "id"            TEXT NOT NULL PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        "userId"        TEXT NOT NULL,
+        "subject"       TEXT NOT NULL,
+        "category"      TEXT NOT NULL DEFAULT 'GENERAL',
+        "status"        TEXT NOT NULL DEFAULT 'OPEN',
+        "priority"      TEXT NOT NULL DEFAULT 'NORMAL',
+        "lastMessageAt" TIMESTAMP NOT NULL DEFAULT NOW(),
+        "unreadForAdmin" BOOLEAN NOT NULL DEFAULT true,
+        "unreadForUser"  BOOLEAN NOT NULL DEFAULT false,
+        "createdAt"     TIMESTAMP NOT NULL DEFAULT NOW(),
+        "updatedAt"     TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+    `);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "SupportTicket_user_idx" ON "SupportTicket" ("userId")`).catch(() => {});
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "SupportTicket_status_idx" ON "SupportTicket" ("status")`).catch(() => {});
+
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "SupportTicketMessage" (
+        "id"         TEXT NOT NULL PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        "ticketId"   TEXT NOT NULL,
+        "authorId"   TEXT NOT NULL,
+        "authorType" TEXT NOT NULL DEFAULT 'USER',
+        "body"       TEXT NOT NULL,
+        "createdAt"  TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+    `);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "SupportTicketMessage_ticket_idx" ON "SupportTicketMessage" ("ticketId")`).catch(() => {});
+
     // Support case notes — append-only context per customer, carried across agents/shifts
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "SupportNote" (

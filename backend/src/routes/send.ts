@@ -22,6 +22,46 @@ const sendLimiter = rateLimit({
 const stellarAddressSchema = z.string().length(56).startsWith('G');
 const phoneSchema = z.string().regex(/^\+255\d{9}$/);
 
+// ── GET /api/send/resolve — who am I about to pay? ──────────────────────────────
+// Lets the app show "You're sending to <Name>" + confirm BEFORE the irreversible
+// on-chain send. Kills most "I sent to the wrong person" tickets.
+router.get('/resolve', requireAuth, async (req: AuthRequest, res) => {
+  const phone   = (req.query.phone   as string | undefined)?.trim();
+  const address = (req.query.address as string | undefined)?.trim();
+
+  let recipient: { phone: string; kycName: string | null; stellarPubKey: string } | null = null;
+  if (phone) {
+    recipient = await prisma.user.findUnique({ where: { phone }, select: { phone: true, kycName: true, stellarPubKey: true } });
+  } else if (address && /^G[A-Z0-9]{55}$/.test(address)) {
+    recipient = await prisma.user.findUnique({ where: { stellarPubKey: address }, select: { phone: true, kycName: true, stellarPubKey: true } });
+  } else {
+    return res.status(400).json(fail('Provide a phone or a valid Stellar address'));
+  }
+
+  // Don't let a user "confirm" sending to themselves.
+  const me = await prisma.user.findUnique({ where: { id: req.userId! }, select: { stellarPubKey: true } });
+  const isSelf = !!recipient && me?.stellarPubKey === recipient.stellarPubKey;
+
+  if (!recipient) {
+    // External Stellar address (not one of our users) — still valid, but warn.
+    if (address) return res.json({ success: true, data: { found: false, external: true, name: null, address, isSelf: false } });
+    return res.json({ success: true, data: { found: false, external: false, name: null, isSelf: false } });
+  }
+
+  // Mask the phone for privacy: +255 7XX XXX 012
+  const p = recipient.phone;
+  const masked = p.length >= 6 ? `${p.slice(0, 5)}${'•'.repeat(Math.max(0, p.length - 8))}${p.slice(-3)}` : p;
+
+  return res.json({ success: true, data: {
+    found:   true,
+    external: false,
+    name:    recipient.kycName ?? 'OlomiPay user',
+    phoneMasked: masked,
+    address: recipient.stellarPubKey,
+    isSelf,
+  }});
+});
+
 // ── POST /api/send/stellar ─────────────────────────────────────────────────────
 
 router.post('/stellar', requireAuth, sendLimiter, async (req: AuthRequest, res) => {

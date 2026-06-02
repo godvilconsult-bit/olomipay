@@ -19,6 +19,7 @@ export const SupportList = () => {
   const [m, setM] = useState<any>(null);
   const [stuck, setStuck] = useState<any[]>([]);
   const [attn, setAttn] = useState<any[]>([]);
+  const [rec, setRec] = useState<any>(null);
   const notify = useNotify();
   const redirect = useRedirect();
 
@@ -26,8 +27,14 @@ export const SupportList = () => {
     get('/support/metrics').then(r => r.success && setM(r.data));
     get('/support/stuck').then(r => r.success && setStuck(r.data.stuck ?? []));
     get('/support/attention').then(r => r.success && setAttn(r.data.attention ?? []));
+    get('/support/reconciler').then(r => r.success && setRec(r.data));
   };
   useEffect(() => { load(); }, []);
+
+  const runReconciler = async () => {
+    try { const d = await adminAction('/support/reconciler/run'); notify(`Reconciler ran — expired ${d.summary.expiredDeposits} deposit(s)`, { type: 'success' }); load(); }
+    catch (e: any) { notify(e.message, { type: 'error' }); }
+  };
 
   const resolve = async (id: string, status: 'CONFIRMED' | 'FAILED') => {
     try { await adminAction(`/transactions/${id}/resolve`, { status }); notify(`Marked ${status}`, { type: 'success' }); load(); }
@@ -55,6 +62,17 @@ export const SupportList = () => {
           <Metric label="Open approvals" value={m.openApprovals} />
         </div>
       )}
+
+      {/* Auto-reconciler */}
+      <div style={{ background: '#fff', borderRadius: 12, padding: 16, boxShadow: '0 1px 4px rgba(0,0,0,.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h3 style={{ margin: '0 0 4px' }}>Auto-reconciler <span style={{ fontWeight: 400, color: '#94a3b8', fontSize: 13 }}>— self-heals stuck deposits</span></h3>
+          <div style={{ fontSize: 13, color: '#475569' }}>
+            {rec ? <>Last run: {rec.status.ranAt ? new Date(rec.status.ranAt).toLocaleString() : 'not yet'} · deposit timeout {rec.status.depositTimeoutMin}m · {rec.logs?.length ?? 0} recent actions</> : 'Loading…'}
+          </div>
+        </div>
+        <button onClick={runReconciler} style={{ background: '#0f172a', color: '#fff', border: 0, borderRadius: 8, padding: '8px 16px' }}>Run now</button>
+      </div>
 
       {/* Stuck transactions */}
       <div style={{ background: '#fff', borderRadius: 12, padding: 16, boxShadow: '0 1px 4px rgba(0,0,0,.08)' }}>

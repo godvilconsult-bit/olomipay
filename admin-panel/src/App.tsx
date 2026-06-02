@@ -9,11 +9,13 @@ import { KycList } from './resources/kyc';
 import { ApprovalsList } from './resources/approvals';
 import { OpsList } from './resources/ops';
 import { SupportList } from './resources/support';
+import { TicketsList } from './resources/tickets';
 
 export default function App() {
   return (
     <Admin dataProvider={dataProvider} authProvider={authProvider} dashboard={Dashboard} title="OlomiPay Admin">
       <Resource name="support"      list={SupportList}   options={{ label: 'Support console' }} />
+      <Resource name="tickets"      list={TicketsList}   options={{ label: 'Support tickets' }} />
       <Resource name="users"        list={UserList} show={UserShow} />
       <Resource name="transactions" list={TransactionList} />
       <Resource name="kyc"          list={KycList}       options={{ label: 'KYC review' }} />

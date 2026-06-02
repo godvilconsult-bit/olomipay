@@ -29,6 +29,8 @@ function SendPageInner() {
   const [loading,   setLoading]   = useState(false);
   const [txHash,    setTxHash]    = useState('');
   const [isTestnet, setIsTestnet] = useState(true);
+  const [resolved,  setResolved]  = useState<any>(null);
+  const [resolving, setResolving] = useState(false);
 
   // Pre-fill from QR scan params
   useEffect(() => {
@@ -45,7 +47,28 @@ function SendPageInner() {
   const recipientType = parseRecipient(recipient);
   const amountNum     = parseAmount(amount);
   const { fee, net }  = calcFee(amountNum);
-  const canProceed    = amountNum > 0 && recipientType !== 'unknown';
+
+  // Resolve who we're about to pay (debounced) — show their name before sending.
+  useEffect(() => {
+    setResolved(null);
+    if (recipientType === 'unknown') return;
+    let cancelled = false;
+    setResolving(true);
+    const t = setTimeout(async () => {
+      try {
+        const params = recipientType === 'phone' ? { phone: recipient } : { address: recipient };
+        const r: any = await send.resolve(params);
+        if (!cancelled) setResolved(r?.data ?? null);
+      } catch { if (!cancelled) setResolved(null); }
+      finally { if (!cancelled) setResolving(false); }
+    }, 400);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [recipient, recipientType]);
+
+  const isSelf      = !!resolved?.isSelf;
+  // Phone recipients must be registered users; addresses may be external (with a warning).
+  const phoneNotUser = recipientType === 'phone' && resolved && !resolved.found;
+  const canProceed  = amountNum > 0 && recipientType !== 'unknown' && !resolving && !isSelf && !phoneNotUser;
 
   async function handleSend() {
     if (pin.length < 6) { toast.error('Enter your PIN'); return; }
@@ -147,16 +170,35 @@ function SendPageInner() {
                 className="input"
                 autoFocus
               />
-              {recipient.length > 5 && (
-                <p className={`text-xs font-medium ${
-                  recipientType === 'unknown'
-                    ? 'text-danger'
-                    : 'text-success'
+              {recipient.length > 5 && recipientType === 'unknown' && (
+                <p className="text-xs font-medium text-danger">✗ Not a valid phone or wallet address</p>
+              )}
+              {recipientType !== 'unknown' && resolving && (
+                <p className="text-xs font-medium text-slate-400">Looking up recipient…</p>
+              )}
+              {/* Resolved recipient confirmation card */}
+              {resolved && (
+                <div className={`rounded-xl p-3 text-sm ${
+                  isSelf || phoneNotUser ? 'bg-danger/10' : resolved.external ? 'bg-amber-500/10' : 'bg-success/10'
                 }`}>
-                  {recipientType === 'phone'    ? '✓ Tanzania phone number' :
-                   recipientType === 'stellar'  ? '✓ Valid wallet address' :
-                   '✗ Not a valid phone or wallet address'}
-                </p>
+                  {isSelf ? (
+                    <span className="font-semibold text-danger">That's your own wallet — choose someone else.</span>
+                  ) : phoneNotUser ? (
+                    <span className="font-semibold text-danger">No OlomiPay user has this number. Invite them first.</span>
+                  ) : resolved.found ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-9 h-9 rounded-full bg-success/20 flex items-center justify-center font-bold text-success">
+                        {(resolved.name?.[0] ?? '?').toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-900 dark:text-white">{resolved.name}</p>
+                        {resolved.phoneMasked && <p className="text-xs text-slate-400">{resolved.phoneMasked}</p>}
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="font-medium text-amber-600">⚠ External wallet — double-check the address. On-chain sends can't be reversed.</span>
+                  )}
+                </div>
               )}
             </div>
 
@@ -223,10 +265,14 @@ function SendPageInner() {
                 {net.toFixed(2)} {asset}
               </p>
               <p className="text-sm text-slate-400 mt-1">
-                to {recipient.length > 20
+                to <span className="font-semibold text-slate-700 dark:text-slate-200">{resolved?.found ? resolved.name : (recipient.length > 20
                   ? recipient.slice(0, 8) + '…' + recipient.slice(-4)
-                  : recipient}
+                  : recipient)}</span>
               </p>
+              {resolved?.phoneMasked && <p className="text-xs text-slate-400">{resolved.phoneMasked}</p>}
+              {resolved && !resolved.found && (
+                <p className="text-xs text-amber-600 mt-1">⚠ External wallet — irreversible</p>
+              )}
               <p className="text-xs text-slate-400 mt-3">
                 Fee: {fee.toFixed(4)} {asset} (1%)
               </p>

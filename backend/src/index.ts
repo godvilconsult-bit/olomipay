@@ -50,6 +50,7 @@ async function loadRoutes() {
   try { const { adminSupportRouter }  = await import('./routes/admin-support'); app.use('/api/admin',         adminSupportRouter);  } catch(e: any) { console.error('[route] admin-support failed:', e.message); }
   try { const { adminOpsRouter }      = await import('./routes/admin-ops');     app.use('/api/admin',         adminOpsRouter);      } catch(e: any) { console.error('[route] admin-ops failed:', e.message); }
   try { const { adminCasesRouter }    = await import('./routes/admin-cases');   app.use('/api/admin',         adminCasesRouter);    } catch(e: any) { console.error('[route] admin-cases failed:', e.message); }
+  try { const { supportRouter }       = await import('./routes/support');       app.use('/api/support',       supportRouter);       } catch(e: any) { console.error('[route] support failed:', e.message); }
   try { const { savingsRouter }       = await import('./routes/savings');       app.use('/api/savings',       savingsRouter);       } catch(e: any) { console.error('[route] savings failed:', e.message); }
   try { const { billsRouter }         = await import('./routes/bills');         app.use('/api/bills',         billsRouter);         } catch(e: any) { console.error('[route] bills failed:', e.message); }
   try { const { contactsRouter }      = await import('./routes/contacts');      app.use('/api/contacts',      contactsRouter);      } catch(e: any) { console.error('[route] contacts failed:', e.message); }
@@ -152,6 +153,12 @@ httpServer.listen(PORT, async () => {
     const { startScheduler } = await import('./services/scheduler');
     startScheduler();
   } catch(e: any) { console.error('[scheduler]', e.message); }
+
+  // Auto-reconciler — self-heals stuck deposits
+  try {
+    const { startReconciler } = await import('./services/reconciler');
+    startReconciler();
+  } catch(e: any) { console.error('[reconciler]', e.message); }
 });
 
 export default app;

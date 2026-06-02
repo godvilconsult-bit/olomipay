@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 import { deriveKeypairFromPhone, getAccountInfo } from '../services/stellar';
 import { isEncryptedKeyValid } from '../services/crypto';
+import { runReconciler, getReconcilerStatus } from '../services/reconciler';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -82,6 +83,20 @@ router.get('/support/metrics', requireAuth, requireAdmin, async (_req, res) => {
     prisma.$queryRawUnsafe<any[]>(`SELECT COUNT(*)::int AS c FROM "AdminApproval" WHERE "status"='PENDING'`).then(r => r[0]?.c ?? 0).catch(() => 0),
   ]);
   return res.json(ok({ stuck, failed24, pendingKyc: kyc, openApprovals: approvals }));
+});
+
+// Auto-reconciler — status, recent actions, and a manual "run now" trigger.
+router.get('/support/reconciler', requireAuth, requireAdmin, async (_req, res) => {
+  const logs = await prisma.$queryRawUnsafe<any[]>(
+    `SELECT * FROM "AutoReconcileLog" ORDER BY "createdAt" DESC LIMIT 50`,
+  ).catch(() => []);
+  return res.json(ok({ status: getReconcilerStatus(), logs }));
+});
+
+router.post('/support/reconciler/run', requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+  const summary = await runReconciler();
+  await audit(req, 'run_reconciler', undefined, 'system', summary);
+  return res.json(ok({ message: 'Reconciler ran', summary }));
 });
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -177,6 +192,60 @@ router.post('/users/:id/notes', requireAuth, requireAdmin, async (req: AuthReque
   );
   await audit(req, 'add_support_note', req.params.id, 'user');
   return res.json(ok({ note: row }));
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// SUPPORT TICKETS — the in-app customer inbox lands here
+// ════════════════════════════════════════════════════════════════════════════
+router.get('/support/tickets', requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+  const status = String(req.query.status ?? '');
+  const where  = ['OPEN', 'PENDING', 'RESOLVED'].includes(status) ? `WHERE t."status"='${status}'` : '';
+  const rows = await prisma.$queryRawUnsafe<any[]>(
+    `SELECT t.*, u."phone", u."kycName",
+            (SELECT COUNT(*)::int FROM "SupportTicketMessage" m WHERE m."ticketId"=t."id") AS "messageCount"
+     FROM "SupportTicket" t JOIN "User" u ON u."id"=t."userId"
+     ${where} ORDER BY t."unreadForAdmin" DESC, t."lastMessageAt" DESC LIMIT 200`,
+  ).catch(() => []);
+  const [{ open }] = await prisma.$queryRawUnsafe<any[]>(`SELECT COUNT(*)::int AS open FROM "SupportTicket" WHERE "status"!='RESOLVED'`).catch(() => [{ open: 0 }]);
+  return res.json(ok({ tickets: rows, openCount: open }));
+});
+
+router.get('/support/tickets/:id', requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+  const [ticket] = await prisma.$queryRawUnsafe<any[]>(
+    `SELECT t.*, u."phone", u."kycName", u."id" AS "customerId"
+     FROM "SupportTicket" t JOIN "User" u ON u."id"=t."userId" WHERE t."id"=$1`, req.params.id,
+  );
+  if (!ticket) return res.status(404).json(fail('Ticket not found'));
+  const messages = await prisma.$queryRawUnsafe<any[]>(
+    `SELECT "id","authorType","body","createdAt" FROM "SupportTicketMessage" WHERE "ticketId"=$1 ORDER BY "createdAt" ASC`, ticket.id,
+  );
+  await prisma.$executeRawUnsafe(`UPDATE "SupportTicket" SET "unreadForAdmin"=false WHERE "id"=$1`, ticket.id).catch(() => {});
+  return res.json(ok({ ticket, messages }));
+});
+
+router.post('/support/tickets/:id/reply', requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+  const body = String(req.body?.body ?? '').trim().slice(0, 4000);
+  if (!body) return res.status(400).json(fail('Reply is empty'));
+  const [ticket] = await prisma.$queryRawUnsafe<any[]>(`SELECT * FROM "SupportTicket" WHERE "id"=$1`, req.params.id);
+  if (!ticket) return res.status(404).json(fail('Ticket not found'));
+
+  await prisma.$executeRawUnsafe(
+    `INSERT INTO "SupportTicketMessage" ("ticketId","authorId","authorType","body") VALUES ($1,$2,'ADMIN',$3)`,
+    ticket.id, req.userId!, body,
+  );
+  await prisma.$executeRawUnsafe(
+    `UPDATE "SupportTicket" SET "lastMessageAt"=NOW(),"updatedAt"=NOW(),"unreadForUser"=true,"unreadForAdmin"=false,"status"='PENDING' WHERE "id"=$1`, ticket.id,
+  );
+  await audit(req, 'reply_ticket', ticket.id, 'ticket');
+  return res.json(ok({ message: 'Reply sent' }));
+});
+
+router.post('/support/tickets/:id/status', requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+  const status = String(req.body?.status ?? '');
+  if (!['OPEN', 'PENDING', 'RESOLVED'].includes(status)) return res.status(400).json(fail('Invalid status'));
+  await prisma.$executeRawUnsafe(`UPDATE "SupportTicket" SET "status"=$1,"updatedAt"=NOW() WHERE "id"=$2`, status, req.params.id);
+  await audit(req, 'set_ticket_status', req.params.id, 'ticket', { status });
+  return res.json(ok({ message: `Ticket ${status}` }));
 });
 
 // ════════════════════════════════════════════════════════════════════════════

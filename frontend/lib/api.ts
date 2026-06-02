@@ -173,6 +173,23 @@ export const send = {
     apiFetch('/api/send/phone', { method: 'POST', body: JSON.stringify(params) }),
 
   feePreview: (amount: number) => apiFetch(`/api/send/fee-preview?amount=${amount}`),
+
+  // Resolve who you're about to pay — show name + confirm before the irreversible send.
+  resolve: (params: { phone?: string; address?: string }) => {
+    const q = new URLSearchParams(params as Record<string, string>).toString();
+    return apiFetch(`/api/send/resolve?${q}`);
+  },
+};
+
+// ── Support tickets (in-app help) ───────────────────────────────────────────────
+
+export const support = {
+  list:   () => apiFetch('/api/support/tickets'),
+  get:    (id: string) => apiFetch(`/api/support/tickets/${id}`),
+  open:   (params: { subject: string; category: string; body: string }) =>
+    apiFetch('/api/support/tickets', { method: 'POST', body: JSON.stringify(params) }),
+  reply:  (id: string, body: string) =>
+    apiFetch(`/api/support/tickets/${id}/messages`, { method: 'POST', body: JSON.stringify({ body }) }),
 };
 
 // ── KYC ───────────────────────────────────────────────────────────────────────
