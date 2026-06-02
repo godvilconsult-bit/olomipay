@@ -684,8 +684,9 @@ export default function ChatThread() {
         </div>
       )}
 
-      {/* Input bar — glass composer */}
-      <div className="flex-shrink-0 z-20 bg-white/80 dark:bg-[#0b1426]/80 backdrop-blur-xl border-t border-slate-200/60 dark:border-white/10 px-2.5 py-2.5 flex items-end gap-2">
+      {/* Input bar — SOLID composer, stays anchored at the bottom (phone & tablet) */}
+      <div className="flex-shrink-0 z-30 bg-white dark:bg-[#0b1426] border-t border-slate-200 dark:border-white/10 px-2.5 py-2.5 flex items-end gap-2"
+        style={{ paddingBottom: 'calc(0.625rem + env(safe-area-inset-bottom))' }}>
         {/* Money — prominent gradient */}
         <button onClick={() => setShowMoney(true)}
           className="relative w-11 h-11 rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center flex-shrink-0 shadow-lg shadow-emerald-500/30 active:scale-95 transition-transform">

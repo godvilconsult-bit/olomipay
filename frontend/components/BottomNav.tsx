@@ -82,9 +82,11 @@ export default function BottomNav() {
         </div>
       )}
 
-      <nav className="fixed bottom-0 inset-x-0 z-40 md:hidden px-3 pb-[calc(env(safe-area-inset-bottom)+10px)] pt-1">
-        <div className="mx-auto flex max-w-md items-center justify-around rounded-[1.75rem] border border-white/10
-                        bg-[#0a1120]/90 px-2 py-1.5 shadow-2xl backdrop-blur-xl">
+      <nav className="fixed bottom-0 inset-x-0 z-40 md:hidden px-3 pb-[calc(env(safe-area-inset-bottom)+10px)] pt-1 pointer-events-none">
+        <div className="pointer-events-auto mx-auto flex max-w-md items-center justify-around rounded-[1.9rem]
+                        border border-black/5 dark:border-white/10
+                        bg-white/65 dark:bg-[#0a1120]/65 px-2 py-1.5
+                        shadow-[0_8px_30px_-8px_rgba(0,0,0,0.25)] backdrop-blur-2xl backdrop-saturate-150">
           {MAIN_NAV.map(({ href, label, icon: Icon, hasBadge }) => {
             const active = path.startsWith(href);
             return (

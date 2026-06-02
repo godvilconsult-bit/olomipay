@@ -59,6 +59,7 @@ export default function ChatPage() {
   const [contactsLoaded,  setContactsLoaded]  = useState(false);
   const [query,           setQuery]           = useState('');
   const [tab,             setTab]             = useState<'chats'|'people'>('chats');
+  const [filter,          setFilter]          = useState<'all'|'unread'|'groups'>('all');
   const [loading,         setLoading]         = useState(true);
   const [searching,       setSearching]       = useState(false);
   const [inviteLink,      setInviteLink]      = useState('');
@@ -203,32 +204,60 @@ export default function ChatPage() {
   const displayedUsers = query.length >= 2 ? searchResults : allUsers;
 
   return (
-    <div className="min-h-screen bg-white dark:bg-slate-900 pb-24">
-      {/* Header — gradient brand band */}
-      <div className="sticky top-0 z-40 bg-white/85 dark:bg-[#0b1426]/85 backdrop-blur-xl border-b border-slate-200/60 dark:border-white/10">
-        <div className="bg-gradient-to-r from-blue-600 to-emerald-500 px-4 py-4 flex items-center gap-3">
-          <img src="/logo.svg" alt="" className="h-7 w-7 brightness-0 invert" />
-          <div className="flex-1">
-            <h1 className="text-lg font-bold leading-tight text-white">Chats</h1>
-            <p className="text-[10px] text-white/70 leading-tight">Encrypted · pay inside the conversation</p>
-          </div>
+    <div className="min-h-screen bg-slate-50 dark:bg-[#0a1120] pb-28">
+      {/* Frosted translucent header — content scrolls behind it */}
+      <div className="sticky top-0 z-40 bg-slate-50/80 dark:bg-[#0a1120]/75 backdrop-blur-2xl backdrop-saturate-150"
+           style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+        {/* Title row */}
+        <div className="px-4 pt-2 pb-1 flex items-center gap-3">
+          <h1 className="text-2xl font-extrabold tracking-tight flex-1 text-slate-900 dark:text-white">
+            {tab === 'chats' ? 'Chats' : 'People'}
+          </h1>
           <button onClick={shareInvite}
-            className="flex items-center gap-1.5 bg-white/20 text-white px-3 py-1.5 rounded-full text-xs font-semibold backdrop-blur active:scale-95 transition-transform">
+            className="flex items-center gap-1.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 px-3 py-1.5 rounded-full text-xs font-semibold active:scale-95 transition-transform">
             <UserPlus size={14} /> Invite
           </button>
         </div>
-        {/* Tabs */}
-        <div className="flex">
-          {(['chats','people'] as const).map(t => (
-            <button key={t} onClick={() => setTab(t)}
-              className={`flex-1 py-3 text-sm font-semibold flex items-center justify-center gap-2 border-b-2 transition-colors ${
-                tab === t ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-slate-400'
-              }`}>
-              {t === 'chats'
-                ? <><MessageCircle size={15}/> Chats {conversations.reduce((s,c)=>s+(c.unreadCount??0),0) > 0 && <span className="bg-gradient-to-r from-blue-500 to-emerald-500 text-white text-[9px] px-1.5 py-0.5 rounded-full">{conversations.reduce((s,c)=>s+(c.unreadCount??0),0)}</span>}</>
-                : <><Users size={15}/> People ({allUsers.length})</>}
+
+        {/* Search bar — always visible, frosted */}
+        <div className="px-4 pb-2">
+          <div className="flex items-center gap-2 rounded-full bg-slate-200/70 dark:bg-white/10 px-4 py-2.5">
+            <Search size={16} className="text-slate-400 flex-shrink-0" />
+            <input value={query} onChange={e => setQuery(e.target.value)}
+              placeholder={tab === 'chats' ? 'Search chats' : 'Search by name or phone'}
+              className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400" />
+            {query && <button onClick={() => setQuery('')}><X size={15} className="text-slate-400" /></button>}
+          </div>
+        </div>
+
+        {/* Filter chips (chats tab) / tab toggle */}
+        <div className="px-4 pb-2 flex items-center gap-2 overflow-x-auto thin-scroll">
+          {tab === 'chats' ? (
+            <>
+              {([['all','All'],['unread','Unread'],['groups','Groups']] as const).map(([f, label]) => {
+                const count = f === 'unread'
+                  ? conversations.filter(c => (c.unreadCount ?? 0) > 0).length
+                  : f === 'groups' ? conversations.filter(c => c.type === 'GROUP').length : 0;
+                return (
+                  <button key={f} onClick={() => setFilter(f)}
+                    className={`flex-shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+                      filter === f ? 'bg-gradient-to-r from-blue-500 to-emerald-500 text-white' : 'bg-slate-200/70 dark:bg-white/10 text-slate-500 dark:text-slate-300'
+                    }`}>
+                    {label}{count > 0 ? ` ${count}` : ''}
+                  </button>
+                );
+              })}
+              <button onClick={() => setTab('people')}
+                className="flex-shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold bg-slate-200/70 dark:bg-white/10 text-slate-500 dark:text-slate-300 flex items-center gap-1">
+                <Users size={13} /> People
+              </button>
+            </>
+          ) : (
+            <button onClick={() => setTab('chats')}
+              className="flex-shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold bg-gradient-to-r from-blue-500 to-emerald-500 text-white flex items-center gap-1">
+              <MessageCircle size={13} /> Back to Chats
             </button>
-          ))}
+          )}
         </div>
       </div>
 
@@ -249,7 +278,18 @@ export default function ChatPage() {
             </button>
           </div>
         ) : (
-          conversations.map(conv => {
+          conversations.filter(conv => {
+            // filter chip
+            if (filter === 'unread' && (conv.unreadCount ?? 0) === 0) return false;
+            if (filter === 'groups' && conv.type !== 'GROUP') return false;
+            // search query
+            if (query.trim()) {
+              const o = conv.otherParticipants?.[0];
+              const nm = (conv.groupName ?? o?.displayName ?? o?.kycName ?? o?.phoneMasked ?? '').toLowerCase();
+              if (!nm.includes(query.toLowerCase())) return false;
+            }
+            return true;
+          }).map(conv => {
             const other  = conv.otherParticipants?.[0];
             const name   = conv.groupName ?? other?.displayName ?? other?.kycName ?? other?.phoneMasked ?? 'Unknown';
             const unread = conv.unreadCount ?? 0;
@@ -282,18 +322,6 @@ export default function ChatPage() {
       {/* ── PEOPLE TAB ── */}
       {tab === 'people' && (
         <>
-          {/* Search bar */}
-          <div className="px-4 py-3 sticky top-[105px] bg-white dark:bg-slate-900 z-30">
-            <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 rounded-2xl px-4 py-2.5">
-              <Search size={16} className="text-slate-400 flex-shrink-0" />
-              <input type="text" placeholder="Search by name or phone number..."
-                value={query} onChange={e => setQuery(e.target.value)}
-                className="bg-transparent flex-1 text-sm outline-none" />
-              {searching && <Loader2 size={14} className="animate-spin text-slate-400 flex-shrink-0" />}
-              {query && !searching && <button onClick={() => { setQuery(''); setPhoneCheck(null); }}><X size={14} className="text-slate-400" /></button>}
-            </div>
-          </div>
-
           {/* Phone not registered */}
           {phoneCheck && !phoneCheck.registered && (
             <div className="mx-4 mb-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 rounded-2xl p-4">
