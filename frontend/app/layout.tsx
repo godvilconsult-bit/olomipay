@@ -4,6 +4,7 @@ import Sidebar from '../components/Sidebar';
 import AppShell from '../components/AppShell';
 import PushRegistrar from '../components/PushRegistrar';
 import ChatNotifier from '../components/ChatNotifier';
+import KeyboardAware from '../components/KeyboardAware';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -50,6 +51,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="font-sans bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-50 antialiased">
         <PushRegistrar />
         <ChatNotifier />
+        <KeyboardAware />
         <Sidebar />
         <AppShell>{children}</AppShell>
         <Toaster

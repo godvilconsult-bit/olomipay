@@ -522,7 +522,7 @@ export default function ChatThread() {
   const name = other?.kycName ?? other?.displayName ?? other?.phoneMasked ?? '...';
 
   return (
-    <div className="h-screen flex flex-col bg-slate-50 dark:bg-[#0a1120] chat-bg">
+    <div className="h-[100dvh] flex flex-col bg-slate-50 dark:bg-[#0a1120] chat-bg">
 
       {/* Header — glass with animated presence */}
       <div className="flex-shrink-0 z-20 bg-white/80 dark:bg-[#0b1426]/80 backdrop-blur-xl border-b border-slate-200/60 dark:border-white/10 px-3 py-2.5 flex items-center gap-3">
