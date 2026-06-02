@@ -532,6 +532,22 @@ export async function setupDatabase(): Promise<void> {
       );
     `);
 
+    // Immutable audit log of every admin/back-office action
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "AdminAuditLog" (
+        "id"         TEXT NOT NULL PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        "adminId"    TEXT NOT NULL,
+        "adminPhone" TEXT,
+        "action"     TEXT NOT NULL,
+        "targetId"   TEXT,
+        "targetType" TEXT,
+        "detail"     TEXT,
+        "ip"         TEXT,
+        "createdAt"  TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+    `);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "AdminAuditLog_created_idx" ON "AdminAuditLog" ("createdAt")`).catch(() => {});
+
     // "Delete for me" — a message hidden only for a specific user
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "MessageHidden" (

@@ -47,6 +47,7 @@ async function loadRoutes() {
   try { const { sendRouter }          = await import('./routes/send');          app.use('/api/send',          sendRouter);          } catch(e: any) { console.error('[route] send failed:', e.message); }
   try { const { kycRouter }           = await import('./routes/kyc');           app.use('/api/kyc',           kycRouter);           } catch(e: any) { console.error('[route] kyc failed:', e.message); }
   try { const { adminRouter }         = await import('./routes/admin');         app.use('/api/admin',         adminRouter);         } catch(e: any) { console.error('[route] admin failed:', e.message); }
+  try { const { adminSupportRouter }  = await import('./routes/admin-support'); app.use('/api/admin',         adminSupportRouter);  } catch(e: any) { console.error('[route] admin-support failed:', e.message); }
   try { const { savingsRouter }       = await import('./routes/savings');       app.use('/api/savings',       savingsRouter);       } catch(e: any) { console.error('[route] savings failed:', e.message); }
   try { const { billsRouter }         = await import('./routes/bills');         app.use('/api/bills',         billsRouter);         } catch(e: any) { console.error('[route] bills failed:', e.message); }
   try { const { contactsRouter }      = await import('./routes/contacts');      app.use('/api/contacts',      contactsRouter);      } catch(e: any) { console.error('[route] contacts failed:', e.message); }
