@@ -1,6 +1,6 @@
 import { Server, Socket } from 'socket.io';
 import { PrismaClient }   from '@prisma/client';
-import { userSendUsdcWithFee, getBalance } from '../../services/stellar';
+import { userSendUsdcWithFee, userSendXlm, getBalance, getFeeWalletPublic } from '../../services/stellar';
 import { verifyPin }      from '../../services/crypto';
 import { sendPushToUser } from '../../services/notifications';
 
@@ -11,6 +11,8 @@ const TZS_RATE = 2600;
 
 export async function handleSendPayment(io: Server, socket: Socket, data: any) {
   const { conversationId, amountUsdc, encryptedNote, recipientId, pin } = data;
+  const asset: 'USDC' | 'XLM' = data.asset === 'XLM' ? 'XLM' : 'USDC';
+  const amt      = Number(amountUsdc); // amount in the chosen asset
   const senderId = socket.data.userId;
 
   try {
@@ -22,12 +24,14 @@ export async function handleSendPayment(io: Server, socket: Socket, data: any) {
       return;
     }
 
-    // Balance check: need grossUsdc (before 1% fee)
+    // Balance check in the chosen asset (gross — fee comes from the amount)
     const balance = await getBalance(sender.stellarPubKey);
-    const totalNeeded = amountUsdc; // gross; fee comes from the amount
-    if (parseFloat(balance.usdc) < totalNeeded) {
+    const have    = asset === 'XLM' ? parseFloat(balance.xlm) : parseFloat(balance.usdc);
+    // For XLM keep a tiny reserve buffer for network fee + base reserve
+    const buffer  = asset === 'XLM' ? 1.5 : 0;
+    if (have < amt + buffer) {
       socket.emit('payment_error', {
-        error: `Salio halikutosha. Una $${parseFloat(balance.usdc).toFixed(2)} USDC / Insufficient balance.`,
+        error: `Salio halikutosha. Una ${asset === 'XLM' ? have.toFixed(2) + ' XLM' : '$' + have.toFixed(2)} / Insufficient balance.`,
       });
       return;
     }
@@ -41,8 +45,9 @@ export async function handleSendPayment(io: Server, socket: Socket, data: any) {
         conversationId,
         senderId,
         type:          'PAYMENT',
-        amountUsdc,
-        amountTzs:     amountUsdc * TZS_RATE,
+        amountUsdc:    amt,                                     // amount in chosen asset
+        amountTzs:     asset === 'USDC' ? amt * TZS_RATE : null,
+        paymentAsset:  asset,
         paymentStatus: 'PENDING',
         paymentNote:   encryptedNote ?? null,
         deliveredAt:   new Date(),
@@ -52,21 +57,31 @@ export async function handleSendPayment(io: Server, socket: Socket, data: any) {
     // Optimistic update — show pending immediately
     io.to(conversationId).emit('new_message', message);
 
-    // Execute Stellar transfer with 1% fee split
-    const { hash, netUsdc, feeUsdc, feeWallet } = await userSendUsdcWithFee({
-      encryptedSecret: sender.stellarSecret,
-      pin,
-      phone:           sender.phone,
-      publicKey:       sender.stellarPubKey,
-      toAddress:       recipient.stellarPubKey,
-      grossUsdc:       amountUsdc,
-      memo:            `Chat:${message.id.slice(0, 16)}`,
-    });
+    // Execute Stellar transfer with 1% fee split — USDC or XLM
+    let hash: string; let netAmount: number; let feeAmount: number; let feeWallet: string;
+    if (asset === 'XLM') {
+      hash      = await userSendXlm({
+        encryptedSecret: sender.stellarSecret, pin, phone: sender.phone,
+        publicKey: sender.stellarPubKey, toAddress: recipient.stellarPubKey,
+        amountXlm: amt, memo: `Chat:${message.id.slice(0, 16)}`,
+      });
+      feeAmount = parseFloat((amt * 0.01).toFixed(7));
+      netAmount = parseFloat((amt - feeAmount).toFixed(7));
+      feeWallet = getFeeWalletPublic();
+    } else {
+      const r = await userSendUsdcWithFee({
+        encryptedSecret: sender.stellarSecret, pin, phone: sender.phone,
+        publicKey: sender.stellarPubKey, toAddress: recipient.stellarPubKey,
+        grossUsdc: amt, memo: `Chat:${message.id.slice(0, 16)}`,
+      });
+      hash = r.hash; netAmount = r.netUsdc; feeAmount = r.feeUsdc; feeWallet = r.feeWallet;
+    }
+    const netUsdc = netAmount; const feeUsdc = feeAmount;
 
     // Update message confirmed
     const confirmed = await prisma.message.update({
       where: { id: message.id },
-      data:  { stellarTxId: hash, paymentStatus: 'CONFIRMED', amountUsdc: netUsdc },
+      data:  { stellarTxId: hash, paymentStatus: 'CONFIRMED', amountUsdc: netAmount },
     });
 
     // DB transaction records
@@ -111,11 +126,12 @@ export async function handleSendPayment(io: Server, socket: Socket, data: any) {
       stellarTxId:   hash,
       paymentStatus: 'CONFIRMED',
       netUsdc,
+      asset,
     });
 
     // ── Push notifications ──────────────────────────────────────────────────
     const senderName = sender.kycName ?? sender.phone.slice(-4);
-    const amount     = `$${netUsdc.toFixed(2)} USDC`;
+    const amount     = asset === 'XLM' ? `${netUsdc.toFixed(2)} XLM` : `$${netUsdc.toFixed(2)} USDC`;
 
     // Receiver: money arrived
     sendPushToUser(recipientId, {
@@ -143,6 +159,8 @@ export async function handleSendPayment(io: Server, socket: Socket, data: any) {
 
 export async function handlePaymentRequest(io: Server, socket: Socket, data: any) {
   const { conversationId, amountUsdc, encryptedNote, expiresInHours = 24 } = data;
+  const asset: 'USDC' | 'XLM' = data.asset === 'XLM' ? 'XLM' : 'USDC';
+  const amount   = Number(amountUsdc);
   const senderId = socket.data.userId;
 
   try {
@@ -154,8 +172,9 @@ export async function handlePaymentRequest(io: Server, socket: Socket, data: any
         conversationId,
         senderId,
         type:          'PAYMENT_REQUEST',
-        amountUsdc,
-        amountTzs:     amountUsdc * TZS_RATE,
+        amountUsdc:    amount,
+        amountTzs:     asset === 'USDC' ? amount * TZS_RATE : null,
+        paymentAsset:  asset,
         paymentStatus: 'PENDING',
         paymentNote:   encryptedNote ?? null,
         deliveredAt:   new Date(),
@@ -223,26 +242,38 @@ export async function handlePayRequest(io: Server, socket: Socket, data: any) {
     }
 
     const grossUsdc = requestMsg.amountUsdc!;
+    const asset: 'USDC' | 'XLM' = (requestMsg as any).paymentAsset === 'XLM' ? 'XLM' : 'USDC';
 
-    // Balance check
+    // Balance check in the requested asset
     const balance = await getBalance(payer.stellarPubKey);
-    if (parseFloat(balance.usdc) < grossUsdc) {
+    const have    = asset === 'XLM' ? parseFloat(balance.xlm) : parseFloat(balance.usdc);
+    const buffer  = asset === 'XLM' ? 1.5 : 0;
+    if (have < grossUsdc + buffer) {
       socket.emit('payment_error', {
-        error: `Salio halikutosha. Una $${parseFloat(balance.usdc).toFixed(2)} / Insufficient balance.`,
+        error: `Salio halikutosha. Una ${asset === 'XLM' ? have.toFixed(2) + ' XLM' : '$' + have.toFixed(2)} / Insufficient balance.`,
       });
       return;
     }
 
-    // Execute with fee split
-    const { hash, netUsdc, feeUsdc, feeWallet } = await userSendUsdcWithFee({
-      encryptedSecret: payer.stellarSecret,
-      pin,
-      phone:           payer.phone,
-      publicKey:       payer.stellarPubKey,
-      toAddress:       requestMsg.sender.stellarPubKey,
-      grossUsdc,
-      memo:            `PayReq:${messageId.slice(0, 14)}`,
-    });
+    // Execute with 1% fee split — USDC or XLM
+    let hash: string; let netUsdc: number; let feeUsdc: number; let feeWallet: string;
+    if (asset === 'XLM') {
+      hash      = await userSendXlm({
+        encryptedSecret: payer.stellarSecret, pin, phone: payer.phone,
+        publicKey: payer.stellarPubKey, toAddress: requestMsg.sender.stellarPubKey,
+        amountXlm: grossUsdc, memo: `PayReq:${messageId.slice(0, 14)}`,
+      });
+      feeUsdc   = parseFloat((grossUsdc * 0.01).toFixed(7));
+      netUsdc   = parseFloat((grossUsdc - feeUsdc).toFixed(7));
+      feeWallet = getFeeWalletPublic();
+    } else {
+      const r = await userSendUsdcWithFee({
+        encryptedSecret: payer.stellarSecret, pin, phone: payer.phone,
+        publicKey: payer.stellarPubKey, toAddress: requestMsg.sender.stellarPubKey,
+        grossUsdc, memo: `PayReq:${messageId.slice(0, 14)}`,
+      });
+      hash = r.hash; netUsdc = r.netUsdc; feeUsdc = r.feeUsdc; feeWallet = r.feeWallet;
+    }
 
     // Update request message
     await prisma.message.update({
@@ -264,12 +295,12 @@ export async function handlePayRequest(io: Server, socket: Socket, data: any) {
     ]).catch(() => {});
 
     io.to(requestMsg.conversationId).emit('payment_confirmed', {
-      messageId, stellarTxId: hash, paymentStatus: 'CONFIRMED', netUsdc,
+      messageId, stellarTxId: hash, paymentStatus: 'CONFIRMED', netUsdc, asset,
     });
 
     // ── Push notifications ────────────────────────────────────────────────
     const payerName   = payer.kycName   ?? payer.phone.slice(-4);
-    const amount      = `$${netUsdc.toFixed(2)} USDC`;
+    const amount      = asset === 'XLM' ? `${netUsdc.toFixed(2)} XLM` : `$${netUsdc.toFixed(2)} USDC`;
 
     // Requester: money received
     sendPushToUser(requestMsg.senderId, {

@@ -516,9 +516,11 @@ export async function setupDatabase(): Promise<void> {
         "isDeleted"        BOOLEAN NOT NULL DEFAULT false,
         "deletedAt"        TIMESTAMP,
         "deliveredAt"      TIMESTAMP,
+        "paymentAsset"     TEXT DEFAULT 'USDC',
         "createdAt"        TIMESTAMP NOT NULL DEFAULT NOW()
       );
     `);
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Message" ADD COLUMN IF NOT EXISTS "paymentAsset" TEXT DEFAULT 'USDC'`).catch(() => {});
 
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "MessageReceipt" (

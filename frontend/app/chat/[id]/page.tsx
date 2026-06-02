@@ -105,13 +105,15 @@ function PaymentBubble({
 }: {
   msg:      any;
   isMine:   boolean;
-  onAccept: (messageId: string, amount: number) => void;
+  onAccept: (messageId: string, amount: number, asset?: string) => void;
   onReject: (messageId: string) => void;
 }) {
   const confirmed = msg.paymentStatus === 'CONFIRMED';
   const failed    = msg.paymentStatus === 'FAILED';
   const pending   = msg.paymentStatus === 'PENDING';
   const isRequest = msg.type === 'PAYMENT_REQUEST';
+  const isXlm     = msg.paymentAsset === 'XLM';
+  const fmtAmt    = (n: number) => isXlm ? `${Number(n).toFixed(Number(n) < 1 ? 4 : 2)} XLM` : formatUsdc(n);
 
   const borderCls = confirmed
     ? 'border-green-200 bg-green-50 dark:bg-green-900/20'
@@ -132,7 +134,7 @@ function PaymentBubble({
 
           {/* Amount */}
           <p className="text-2xl font-bold text-slate-900 dark:text-white">
-            {formatUsdc(msg.amountUsdc ?? 0)}
+            {fmtAmt(msg.amountUsdc ?? 0)}
           </p>
 
           {/* Note */}
@@ -169,7 +171,7 @@ function PaymentBubble({
               Decline
             </button>
             <button
-              onClick={() => onAccept(msg.id, msg.amountUsdc)}
+              onClick={() => onAccept(msg.id, msg.amountUsdc, msg.paymentAsset)}
               className="flex-1 flex items-center justify-center gap-1.5 py-3 text-sm font-bold text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors">
               <CheckCircle2 size={16} />
               Pay Now
@@ -195,7 +197,7 @@ function Bubble({
 }: {
   msg:      any;
   isMine:   boolean;
-  onAccept: (messageId: string, amount: number) => void;
+  onAccept: (messageId: string, amount: number, asset?: string) => void;
   onReject: (messageId: string) => void;
 }) {
   const [hearts, setHearts] = useState<number[]>([]);
@@ -271,14 +273,16 @@ function Bubble({
 
 // ── Accept Payment PIN modal ───────────────────────────────────────────────────
 function AcceptPayModal({
-  amount, onConfirm, onClose, loading,
+  amount, asset, onConfirm, onClose, loading,
 }: {
   amount:    number;
+  asset?:    string;
   onConfirm: (pin: string) => void;
   onClose:   () => void;
   loading:   boolean;
 }) {
   const [pin, setPin] = useState('');
+  const fmtAmt = (n: number) => asset === 'XLM' ? `${Number(n).toFixed(Number(n) < 1 ? 4 : 2)} XLM` : formatUsdc(n);
   return (
     <div className="fixed inset-0 z-50 flex flex-col justify-end">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
@@ -290,7 +294,7 @@ function AcceptPayModal({
           </div>
           <h3 className="font-bold text-lg">Confirm Payment</h3>
           <p className="text-slate-500 text-sm mt-1">
-            You are about to send <strong>{formatUsdc(amount)}</strong>
+            You are about to send <strong>{fmtAmt(amount)}</strong>
           </p>
           <p className="text-xs text-slate-400 mt-0.5">1% platform fee applies</p>
         </div>
@@ -304,7 +308,7 @@ function AcceptPayModal({
           className="w-full py-4 rounded-2xl font-bold text-white bg-green-500 disabled:opacity-40 flex items-center justify-center gap-2">
           {loading
             ? <><Loader2 size={16} className="animate-spin" /> Processing…</>
-            : `Pay ${formatUsdc(amount)}`}
+            : `Pay ${fmtAmt(amount)}`}
         </button>
         <button onClick={onClose} className="w-full text-sm text-slate-400 py-2">Cancel</button>
       </div>
@@ -328,7 +332,7 @@ export default function ChatThread() {
   const [uploadingImg, setUploadingImg] = useState(false);
 
   // Accept/reject state
-  const [acceptModal,  setAcceptModal]  = useState<{ messageId: string; amount: number } | null>(null);
+  const [acceptModal,  setAcceptModal]  = useState<{ messageId: string; amount: number; asset?: string } | null>(null);
   const [acceptLoading, setAcceptLoading] = useState(false);
 
   const bottomRef  = useRef<HTMLDivElement>(null);
@@ -499,8 +503,8 @@ export default function ChatThread() {
   }
 
   // ── Accept/Reject handlers ────────────────────────────────────────────────
-  function handleAccept(messageId: string, amount: number) {
-    setAcceptModal({ messageId, amount });
+  function handleAccept(messageId: string, amount: number, asset?: string) {
+    setAcceptModal({ messageId, amount, asset });
   }
 
   function handleAcceptConfirm(pin: string) {
@@ -627,6 +631,7 @@ export default function ChatThread() {
       {acceptModal && (
         <AcceptPayModal
           amount={acceptModal.amount}
+          asset={acceptModal.asset}
           loading={acceptLoading}
           onConfirm={handleAcceptConfirm}
           onClose={() => { setAcceptModal(null); setAcceptLoading(false); }}
@@ -650,117 +655,136 @@ export default function ChatThread() {
 
 // ── Send / Request Money bottom sheet ─────────────────────────────────────────
 function MoneySheet({ name, recipientId, convId, onClose, onSent, emit }: any) {
-  const [amount, setAmount]   = useState('');
-  const [note,   setNote]     = useState('');
-  const [pin,    setPin]      = useState('');
-  const [step,   setStep]     = useState<'amount' | 'pin'>('amount');
-  const [req,    setReq]      = useState(false);
-  const [busy,   setBusy]     = useState(false);
+  const [amount, setAmount] = useState('');
+  const [note,   setNote]   = useState('');
+  const [pin,    setPin]    = useState('');
+  const [step,   setStep]   = useState<'amount' | 'pin'>('amount');
+  const [req,    setReq]    = useState(false);
+  const [busy,   setBusy]   = useState(false);
+  const [asset,  setAsset]  = useState<'USDC' | 'XLM'>('USDC');
+
+  const amt = parseFloat(amount) || 0;
+  const fmt = (n: number) =>
+    asset === 'XLM' ? `${n.toFixed(n < 1 ? 4 : 2)} XLM` : `$${n.toFixed(2)}`;
+  const quick = asset === 'XLM' ? [5, 10, 25, 50] : [1, 5, 10, 20];
 
   function doSend() {
     if (req) {
-      emit('payment_request', {
-        conversationId: convId,
-        amountUsdc:     parseFloat(amount),
-        encryptedNote:  note || null,
-      });
-      toast.success('💛 Ombi limetumwa / Request sent!');
+      emit('payment_request', { conversationId: convId, amountUsdc: amt, asset, encryptedNote: note || null });
+      toast.success('💛 Request sent!');
+      onSent();
     } else {
       setBusy(true);
-      emit('send_payment', {
-        conversationId: convId,
-        amountUsdc:     parseFloat(amount),
-        encryptedNote:  note || null,
-        recipientId,
-        pin,
-      });
-      // Success/error come via socket events — handled in ChatThread
-      setTimeout(() => setBusy(false), 15_000); // auto-reset after 15s
+      emit('send_payment', { conversationId: convId, amountUsdc: amt, asset, encryptedNote: note || null, recipientId, pin });
+      setTimeout(() => { setBusy(false); onSent(); }, 1200);
     }
-    onSent();
   }
+
+  const accent = req ? 'amber' : 'blue';
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col justify-end">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white dark:bg-slate-900 rounded-t-3xl px-5 pt-4 pb-10">
-        <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-4" />
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="font-bold text-lg">
-            {req ? `💛 Omba kutoka ${name}` : `💸 Tuma kwa ${name}`}
-          </h3>
-          <button onClick={onClose}><X size={20} className="text-slate-400" /></button>
-        </div>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm anim-pop" onClick={onClose} />
 
-        {/* Send / Request toggle */}
-        <div className="flex gap-2 mb-4">
+      <div className="relative anim-pop rounded-t-[2rem] border-t border-white/10 bg-[#0b1426] text-white px-5 pt-3 pb-9 shadow-2xl overflow-hidden">
+        {/* glow */}
+        <div className={`anim-glow pointer-events-none absolute -top-16 left-1/2 -translate-x-1/2 h-40 w-40 rounded-full blur-3xl ${req ? 'bg-amber-500/20' : 'bg-blue-500/25'}`} />
+
+        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/20" />
+
+        {/* Send / Request segmented toggle */}
+        <div className="relative mb-5 flex rounded-2xl bg-white/5 p-1">
+          <span className={`absolute inset-y-1 w-[calc(50%-4px)] rounded-xl bg-gradient-to-r ${req ? 'from-amber-500 to-orange-500 translate-x-[calc(100%+4px)]' : 'from-blue-500 to-emerald-500'} transition-transform duration-300`} />
           <button onClick={() => { setReq(false); setStep('amount'); }}
-            className={`flex-1 py-2.5 rounded-xl text-sm font-semibold ${
-              !req ? 'bg-primary text-white' : 'bg-slate-100 text-slate-500'
-            }`}>
-            💸 Send
+            className={`relative z-10 flex-1 py-2.5 text-sm font-semibold ${!req ? 'text-white' : 'text-slate-400'}`}>
+            Send
           </button>
           <button onClick={() => { setReq(true); setStep('amount'); }}
-            className={`flex-1 py-2.5 rounded-xl text-sm font-semibold ${
-              req ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-500'
-            }`}>
-            💛 Request
+            className={`relative z-10 flex-1 py-2.5 text-sm font-semibold ${req ? 'text-white' : 'text-slate-400'}`}>
+            Request
           </button>
         </div>
 
         {step === 'amount' && (
-          <div className="space-y-3">
-            <input
-              type="number" inputMode="decimal" placeholder="0.00 USDC" value={amount}
-              onChange={e => setAmount(e.target.value)} autoFocus
-              className="w-full text-3xl font-bold text-center bg-slate-50 dark:bg-slate-800 rounded-2xl py-4 outline-none border-2 border-transparent focus:border-primary" />
-            <input
-              type="text" placeholder="Note / Maelezo (optional)" value={note}
-              onChange={e => setNote(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-slate-800 rounded-2xl px-4 py-3 text-sm outline-none" />
+          <>
+            <p className="mb-1 text-center text-xs text-slate-400">
+              {req ? `Request from ${name}` : `Send to ${name}`}
+            </p>
 
-            {/* Fee note for sends */}
-            {!req && parseFloat(amount) > 0 && (
-              <div className="bg-slate-50 dark:bg-slate-800 rounded-xl px-4 py-2.5 space-y-1">
-                <div className="flex justify-between text-xs text-slate-500">
-                  <span>You send</span><span>{formatUsdc(parseFloat(amount))}</span>
-                </div>
-                <div className="flex justify-between text-xs text-amber-600">
-                  <span>Fee (1%)</span><span>−{formatUsdc(parseFloat(amount) * 0.01)}</span>
-                </div>
-                <div className="flex justify-between text-xs font-bold border-t pt-1.5 text-green-600">
-                  <span>They receive</span><span>{formatUsdc(parseFloat(amount) * 0.99)}</span>
-                </div>
+            {/* Big amount */}
+            <div className="mb-3 flex items-center justify-center gap-2">
+              <input
+                type="number" inputMode="decimal" placeholder="0" value={amount}
+                onChange={e => setAmount(e.target.value)} autoFocus
+                className="w-40 bg-transparent text-center text-5xl font-extrabold outline-none placeholder:text-white/20" />
+            </div>
+
+            {/* Asset selector */}
+            <div className="mb-4 flex justify-center gap-2">
+              {(['USDC', 'XLM'] as const).map(a => (
+                <button key={a} onClick={() => setAsset(a)}
+                  className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-semibold transition-all ${
+                    asset === a ? 'bg-gradient-to-r from-blue-500 to-emerald-500 text-white shadow-lg shadow-blue-500/25' : 'bg-white/5 text-slate-400'
+                  }`}>
+                  <span className={`h-2 w-2 rounded-full ${a === 'USDC' ? 'bg-emerald-400' : 'bg-cyan-400'}`} />
+                  {a}
+                </button>
+              ))}
+            </div>
+
+            {/* Quick chips */}
+            <div className="mb-4 grid grid-cols-4 gap-2">
+              {quick.map(q => (
+                <button key={q} onClick={() => setAmount(String(q))}
+                  className={`rounded-xl py-2 text-sm font-semibold transition-colors ${
+                    amt === q ? 'bg-white/15 text-white' : 'bg-white/5 text-slate-400 hover:bg-white/10'
+                  }`}>
+                  {asset === 'XLM' ? q : `$${q}`}
+                </button>
+              ))}
+            </div>
+
+            {/* Note */}
+            <input
+              type="text" placeholder="Add a note (optional)" value={note}
+              onChange={e => setNote(e.target.value)}
+              className="mb-4 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm outline-none placeholder:text-slate-500 focus:border-blue-400/50" />
+
+            {/* Fee line for sends */}
+            {!req && amt > 0 && (
+              <div className="mb-4 flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm">
+                <span className="text-slate-400">{name} receives</span>
+                <span className="font-bold text-emerald-400">{fmt(amt * 0.99)}</span>
               </div>
             )}
 
             <button
               onClick={() => req ? doSend() : setStep('pin')}
-              disabled={!(parseFloat(amount) > 0)}
-              className="w-full py-4 rounded-2xl font-bold text-white bg-primary disabled:opacity-40">
-              {req ? `Request ${formatUsdc(parseFloat(amount) || 0)}` : `Continue →`}
+              disabled={amt <= 0}
+              className="cta-glow flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-500 to-emerald-500 py-4 text-base font-bold shadow-xl transition-transform hover:scale-[1.02] disabled:opacity-40 disabled:hover:scale-100">
+              {req ? `Request ${fmt(amt)}` : `Continue · ${fmt(amt)}`}
             </button>
-          </div>
+          </>
         )}
 
         {step === 'pin' && !req && (
           <div className="flex flex-col items-center gap-4">
             <div className="text-center">
-              <p className="font-bold text-lg">{formatUsdc(parseFloat(amount))}</p>
-              <p className="text-slate-500 text-sm">to {name}</p>
-              <p className="text-xs text-slate-400">They receive {formatUsdc(parseFloat(amount) * 0.99)}</p>
+              <p className="text-3xl font-extrabold">{fmt(amt)}</p>
+              <p className="text-sm text-slate-400">to {name}</p>
+              <p className="text-xs text-emerald-400 mt-0.5">they receive {fmt(amt * 0.99)}</p>
             </div>
-            <p className="text-slate-500 text-sm">Enter PIN to confirm</p>
-            <PinInput value={pin} onChange={setPin} autoFocus />
+            <p className="text-sm text-slate-400">Enter PIN to confirm</p>
+            <div className="[&_input]:!bg-white/5 [&_input]:!border-white/10 [&_input]:!text-white">
+              <PinInput value={pin} onChange={setPin} autoFocus />
+            </div>
             <button
               onClick={doSend}
               disabled={pin.length < 6 || busy}
-              className="w-full py-4 rounded-2xl font-bold text-white bg-primary disabled:opacity-40 flex items-center justify-center gap-2">
-              {busy
-                ? <><Loader2 size={16} className="animate-spin" /> Sending…</>
-                : `Send ${formatUsdc(parseFloat(amount))}`}
+              className="cta-glow flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-500 to-emerald-500 py-4 text-base font-bold shadow-xl disabled:opacity-40">
+              {busy ? <><Loader2 size={16} className="animate-spin" /> Sending…</> : `Send ${fmt(amt)}`}
             </button>
-            <button onClick={() => setStep('amount')} className="text-sm text-slate-400">← Back</button>
+            <button onClick={() => setStep('amount')} className="text-sm text-slate-500">← Back</button>
           </div>
         )}
       </div>

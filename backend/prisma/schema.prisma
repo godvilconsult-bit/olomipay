@@ -628,6 +628,7 @@ model Message {
   plainContent     String?
   amountUsdc       Float?
   amountTzs        Float?
+  paymentAsset     String?       @default("USDC")
   stellarTxId      String?
   paymentStatus    PaymentStatus?
   paymentNote      String?
