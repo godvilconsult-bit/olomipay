@@ -42,6 +42,8 @@ import {
   userSendUsdcToPlatform,
   getAccountInfo,
   getFeeWalletPublic,
+  IS_TESTNET_NETWORK,
+  ACTIVATION_FEE_USD,
 } from '../services/stellar';
 import { verifyPin }   from '../services/crypto';
 import { notify }      from '../services/notifications';
@@ -244,14 +246,34 @@ router.post('/callback', async (req, res) => {
       }
     }
 
-    // Step 3: ATOMIC — send net USDC (99%) to user + fee (1%) to fee wallet in ONE tx
+    // One-time wallet-activation fee (MAINNET only, first deposit). Reimburses the
+    // platform for the XLM it fronted at registration. Testnet = free (skip).
+    let activationFeeUsdc = 0;
+    if (!IS_TESTNET_NETWORK && !dbTx.user.activationFeePaid) {
+      activationFeeUsdc = Math.min(ACTIVATION_FEE_USD, grossUsdc * 0.5); // never take >50% of a tiny first deposit
+    }
+    const creditGross = parseFloat((grossUsdc - activationFeeUsdc).toFixed(7));
+
+    // Step 3: ATOMIC — send net USDC (99% of credit) to user + fee (1%) to fee wallet in ONE tx
     const memo = `OlomiPay ${(payload.mpesaReceiptNumber ?? ycOrder.id).slice(0, 20)}`;
     const { hash: stellarHash, netUsdc, feeUsdc } = await platformSendUsdcWithFee(
       dbTx.user.stellarPubKey,
-      grossUsdc,
+      creditGross,
       memo,
     );
-    console.log(`[callback] ✓ Stellar: ${stellarHash} | user=${netUsdc} USDC fee=${feeUsdc} USDC -> ${feeWallet.slice(0,8)}...`);
+    console.log(`[callback] ✓ Stellar: ${stellarHash} | user=${netUsdc} USDC fee=${feeUsdc} activation=${activationFeeUsdc} -> ${feeWallet.slice(0,8)}...`);
+
+    // Mark activation paid + record the one-time fee (the USDC stays with the platform)
+    if (activationFeeUsdc > 0) {
+      await prisma.user.update({ where: { id: dbTx.userId }, data: { activationFeePaid: true } }).catch(() => {});
+      await prisma.transaction.create({
+        data: {
+          userId: dbTx.userId, type: 'FEE', status: 'CONFIRMED',
+          amountUsdc: activationFeeUsdc, toAddress: feeWallet,
+          memo: 'One-time wallet activation',
+        },
+      }).catch(() => {});
+    }
 
     // Step 4: Record fee transaction
     await prisma.transaction.create({
@@ -282,6 +304,7 @@ router.post('/callback', async (req, res) => {
           grossUsdc,
           netUsdc,
           feeUsdc,
+          activationFeeUsdc,
           feeWallet,
           fees:     ycOrder.fees,
           stellarHash,

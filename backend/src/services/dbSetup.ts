@@ -555,6 +555,7 @@ export async function setupDatabase(): Promise<void> {
     // Add admin columns if missing
     await prisma.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "isAdmin" BOOLEAN NOT NULL DEFAULT false`).catch(() => {});
     await prisma.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "isFeeCollector" BOOLEAN NOT NULL DEFAULT false`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "activationFeePaid" BOOLEAN NOT NULL DEFAULT false`).catch(() => {});
     await prisma.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "profilePicUrl" TEXT`).catch(() => {});
 
     console.log('[db] All tables created successfully ✓');

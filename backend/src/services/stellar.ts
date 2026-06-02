@@ -12,6 +12,17 @@ import { decryptSecret } from './crypto';
 
 const IS_TESTNET = (process.env.STELLAR_NETWORK ?? 'testnet') !== 'mainnet';
 
+/** True on testnet (free Friendbot gas), false on mainnet (user-funded activation). */
+export const IS_TESTNET_NETWORK = IS_TESTNET;
+
+/**
+ * One-time wallet-activation fee charged on MAINNET only, auto-deducted from the
+ * user's first deposit. It reimburses the platform for the XLM it fronted at
+ * registration to create the account + USDC trustline. On testnet this is 0
+ * (Friendbot funds gas for free).
+ */
+export const ACTIVATION_FEE_USD = Number(process.env.ACTIVATION_FEE_USD ?? '0.5');
+
 const NETWORK_PASSPHRASE = IS_TESTNET
   ? StellarSdk.Networks.TESTNET
   : StellarSdk.Networks.PUBLIC;

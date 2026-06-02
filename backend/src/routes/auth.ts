@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { z } from 'zod';
 import { PrismaClient } from '@prisma/client';
-import { generateKeypair, activateUserWallet } from '../services/stellar';
+import { generateKeypair, activateUserWallet, IS_TESTNET_NETWORK } from '../services/stellar';
 import { encryptSecret, hashPin, verifyPin } from '../services/crypto';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 
@@ -144,7 +144,14 @@ router.post('/register', authLimiter, async (req, res) => {
   // user's key — we have the PIN here). This lets the first deposit land and
   // gives the user a little XLM for fees from day one.
   activateUserWallet({ publicKey, encryptedSecret, pin, phone })
-    .then(r => console.log(`[stellar] wallet activated ${phone}: funded=${r.funded} trustline=${r.trustline}`))
+    .then(async r => {
+      console.log(`[stellar] wallet activated ${phone}: funded=${r.funded} trustline=${r.trustline}`);
+      // On testnet gas is free (Friendbot) → no activation fee owed.
+      // On mainnet the platform fronted the XLM → fee is collected from 1st deposit.
+      if (IS_TESTNET_NETWORK) {
+        await prisma.user.update({ where: { id: user.id }, data: { activationFeePaid: true } }).catch(() => {});
+      }
+    })
     .catch(err => console.error('[stellar] activation failed:', err?.message));
 
   const accessToken  = signAccessToken(user.id, phone);
