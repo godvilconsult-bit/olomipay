@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { z } from 'zod';
 import { PrismaClient } from '@prisma/client';
-import { generateKeypair, createAndFundAccount } from '../services/stellar';
+import { generateKeypair, activateUserWallet } from '../services/stellar';
 import { encryptSecret, hashPin, verifyPin } from '../services/crypto';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 
@@ -139,10 +139,13 @@ router.post('/register', authLimiter, async (req, res) => {
     }
   }
 
-  // Fund the account asynchronously (don't block registration)
-  createAndFundAccount(publicKey).catch(err =>
-    console.error('[stellar] failed to fund new account:', err),
-  );
+  // Activate the wallet asynchronously (don't block registration):
+  // fund the account with min XLM + add the USDC trustline (signed with the
+  // user's key — we have the PIN here). This lets the first deposit land and
+  // gives the user a little XLM for fees from day one.
+  activateUserWallet({ publicKey, encryptedSecret, pin, phone })
+    .then(r => console.log(`[stellar] wallet activated ${phone}: funded=${r.funded} trustline=${r.trustline}`))
+    .catch(err => console.error('[stellar] activation failed:', err?.message));
 
   const accessToken  = signAccessToken(user.id, phone);
   const refreshToken = signRefreshToken(user.id);

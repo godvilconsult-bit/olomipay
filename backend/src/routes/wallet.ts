@@ -1,10 +1,47 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { requireAuth, AuthRequest } from '../middleware/auth';
-import { getBalance, getTransactionHistory, getAccountInfo, buildStellarPayUri, friendbotFund } from '../services/stellar';
+import { getBalance, getTransactionHistory, getAccountInfo, buildStellarPayUri, friendbotFund, activateUserWallet } from '../services/stellar';
+import { verifyPin } from '../services/crypto';
 
 const router = Router();
 const prisma = new PrismaClient();
+
+// ── POST /api/wallet/activate ──────────────────────────────────────────────────
+// Fund the account with min XLM + add the USDC trustline (signed with user's PIN).
+// For users registered before auto-activation, or whose activation didn't finish.
+router.post('/activate', requireAuth, async (req: AuthRequest, res) => {
+  const { pin } = req.body ?? {};
+  if (!/^\d{6}$/.test(pin ?? '')) return res.status(400).json({ success: false, error: 'Enter your 6-digit PIN' });
+
+  const user = await prisma.user.findUnique({ where: { id: req.userId! } });
+  if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+  if (!await verifyPin(pin, user.pinHash)) return res.status(403).json({ success: false, error: 'Incorrect PIN' });
+
+  try {
+    const r = await activateUserWallet({
+      publicKey:       user.stellarPubKey,
+      encryptedSecret: user.stellarSecret,
+      pin,
+      phone:           user.phone,
+    });
+    const balance = await getBalance(user.stellarPubKey).catch(() => ({ xlm: '0', usdc: '0' }));
+    return res.json({
+      success: true,
+      data: {
+        funded:    r.funded,
+        trustline: r.trustline,
+        balance,
+        message:   r.funded
+          ? (r.trustline ? 'Wallet activated — ready to receive deposits.' : 'Wallet funded, but USDC trustline pending. Try again.')
+          : 'Could not activate wallet. Please try again shortly.',
+      },
+    });
+  } catch (e: any) {
+    console.error('[wallet/activate]', e?.message);
+    return res.status(502).json({ success: false, error: e?.message ?? 'Activation failed' });
+  }
+});
 
 // ── GET /api/wallet/balance ────────────────────────────────────────────────────
 

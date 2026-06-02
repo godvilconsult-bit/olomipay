@@ -108,11 +108,80 @@ export async function createAndFundAccount(publicKey: string): Promise<string> {
     // Use friendbot for testnet (free XLM for testing)
     await fetch(`https://friendbot.stellar.org?addr=${encodeURIComponent(publicKey)}`);
   }
-
-  // Regardless of network, the anchor establishes the USDC trustline for the user
-  await addUsdcTrustline(publicKey, getPlatformKeypair().secret());
-
   return publicKey;
+}
+
+/**
+ * Fully activate a brand-new user wallet so it can hold funds and transact:
+ *   1. Ensure the account EXISTS on-ledger (funded with the minimum XLM reserve).
+ *        • testnet → Friendbot (free)
+ *        • mainnet → platform createAccount with a small sponsored starting balance
+ *   2. Establish the USDC trustline — signed by the USER's own key (we have the
+ *      PIN at registration), which is the only key allowed to authorise it.
+ *
+ * Idempotent & non-fatal: safe to re-run; skips steps already done.
+ * Call this at registration (we hold the PIN) so the first deposit can land and
+ * the user has a little XLM for network fees from day one.
+ */
+export async function activateUserWallet(params: {
+  publicKey:       string;
+  encryptedSecret: string;
+  pin:             string;
+  phone:           string;
+}): Promise<{ funded: boolean; trustline: boolean }> {
+  const { publicKey, encryptedSecret, pin, phone } = params;
+
+  // ── 1) Ensure the account exists ───────────────────────────────────────────
+  const exists = async () => {
+    try { await server.loadAccount(publicKey); return true; }
+    catch (e: any) { if (e?.response?.status === 404) return false; throw e; }
+  };
+
+  let funded = await exists();
+  if (!funded) {
+    if (IS_TESTNET) {
+      await fetch(`https://friendbot.stellar.org?addr=${encodeURIComponent(publicKey)}`);
+    } else {
+      // Mainnet: platform creates + funds the new account (base + trustline reserve + a little gas)
+      const platform = getPlatformKeypair();
+      const pAcct    = await server.loadAccount(platform.publicKey());
+      const tx = new StellarSdk.TransactionBuilder(pAcct, {
+        fee: StellarSdk.BASE_FEE, networkPassphrase: NETWORK_PASSPHRASE,
+      }).addOperation(StellarSdk.Operation.createAccount({
+        destination: publicKey, startingBalance: '2.5',
+      })).setTimeout(60).build();
+      tx.sign(platform);
+      await server.submitTransaction(tx);
+    }
+    // Wait for the account to appear on-ledger (a few seconds)
+    for (let i = 0; i < 8 && !funded; i++) {
+      await new Promise(r => setTimeout(r, 1500));
+      funded = await exists();
+    }
+  }
+  if (!funded) return { funded: false, trustline: false };
+
+  // ── 2) Add the USDC trustline, signed by the USER ──────────────────────────
+  const acct  = await server.loadAccount(publicKey);
+  const hasTl = acct.balances.some(
+    (b: any) => b.asset_code === 'USDC' && b.asset_issuer === USDC_ISSUER,
+  );
+  if (hasTl) return { funded: true, trustline: true };
+
+  try {
+    const signer = getUserKeypair(encryptedSecret, pin, phone);
+    const tx = new StellarSdk.TransactionBuilder(acct, {
+      fee: StellarSdk.BASE_FEE, networkPassphrase: NETWORK_PASSPHRASE,
+    }).addOperation(StellarSdk.Operation.changeTrust({
+      asset: USDC_ASSET, limit: '1000000',
+    })).setTimeout(60).build();
+    tx.sign(signer);
+    await server.submitTransaction(tx);
+    return { funded: true, trustline: true };
+  } catch (e: any) {
+    console.error('[activateUserWallet] trustline failed:', e?.message);
+    return { funded: true, trustline: false };
+  }
 }
 
 /**
