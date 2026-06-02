@@ -460,6 +460,11 @@ export default function ChatThread() {
       setAcceptModal(null);
     });
 
+    // Payment failed — flip the stuck "pending" bubble to FAILED for both sides
+    const u11 = on('payment_failed', ({ messageId }: any) => {
+      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, paymentStatus: 'FAILED' } : m));
+    });
+
     // Money received from REST API (e.g. from /send page) — real-time toast
     const u9 = on('money_received', ({ amount, from, asset }: any) => {
       sounds.moneyIn();
@@ -472,7 +477,7 @@ export default function ChatThread() {
       toast.success(`💚 Amana imefanikiwa! $${Number(amountUsdc).toFixed(2)} USDC`);
     });
 
-    return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); };
+    return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); u11(); };
   }, [on, convId, myId, emit]);
 
   // ── Send image ─────────────────────────────────────────────────────────────

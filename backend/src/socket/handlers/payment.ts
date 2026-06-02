@@ -14,6 +14,7 @@ export async function handleSendPayment(io: Server, socket: Socket, data: any) {
   const asset: 'USDC' | 'XLM' = data.asset === 'XLM' ? 'XLM' : 'USDC';
   const amt      = Number(amountUsdc); // amount in the chosen asset
   const senderId = socket.data.userId;
+  let createdMsgId: string | null = null; // so we can mark it FAILED on error
 
   try {
     const sender = await prisma.user.findUnique({ where: { id: senderId } });
@@ -53,6 +54,7 @@ export async function handleSendPayment(io: Server, socket: Socket, data: any) {
         deliveredAt:   new Date(),
       },
     });
+    createdMsgId = message.id;
 
     // Optimistic update — show pending immediately
     io.to(conversationId).emit('new_message', message);
@@ -151,6 +153,11 @@ export async function handleSendPayment(io: Server, socket: Socket, data: any) {
 
   } catch (e: any) {
     console.error('[socket:payment]', e.message);
+    // Mark the pending message FAILED so it never hangs on "pending" for either side.
+    if (createdMsgId) {
+      await prisma.message.update({ where: { id: createdMsgId }, data: { paymentStatus: 'FAILED' } }).catch(() => {});
+      io.to(conversationId).emit('payment_failed', { messageId: createdMsgId });
+    }
     const msg = String(e?.message ?? '').includes('WALLET_KEY')
       ? 'Your wallet needs re-activation. Go to Profile → Re-activate wallet, then try again.'
       : (e?.message ?? 'Transfer failed. Please try again.');

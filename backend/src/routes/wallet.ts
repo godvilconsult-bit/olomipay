@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { requireAuth, AuthRequest } from '../middleware/auth';
-import { getBalance, getTransactionHistory, getAccountInfo, buildStellarPayUri, friendbotFund, activateUserWallet, generateKeypair } from '../services/stellar';
+import { getBalance, getTransactionHistory, getAccountInfo, buildStellarPayUri, friendbotFund, activateUserWallet, generateKeypair, IS_TESTNET_NETWORK } from '../services/stellar';
 import { verifyPin, encryptSecret, decryptSecret, WalletKeyError } from '../services/crypto';
 
 const router = Router();
@@ -65,15 +65,19 @@ router.post('/reprovision', requireAuth, async (req: AuthRequest, res) => {
   }
 
   // 2) Don't abandon a wallet that holds funds.
-  try {
-    const bal = await getBalance(user.stellarPubKey);
-    if (parseFloat(bal.usdc) > 0.01 || parseFloat(bal.xlm) > 1.0) {
-      return res.status(409).json({
-        success: false,
-        error: 'The old wallet still holds a balance. Contact support to recover it before re-provisioning.',
-      });
-    }
-  } catch { /* account doesn't exist on-ledger → safe to replace */ }
+  // On MAINNET, refuse if the old wallet holds real value (protect funds).
+  // On TESTNET, coins are worthless → always allow recovery.
+  if (!IS_TESTNET_NETWORK) {
+    try {
+      const bal = await getBalance(user.stellarPubKey);
+      if (parseFloat(bal.usdc) > 0.01 || parseFloat(bal.xlm) > 1.0) {
+        return res.status(409).json({
+          success: false,
+          error: 'The old wallet still holds a balance. Contact support to recover it before re-provisioning.',
+        });
+      }
+    } catch { /* account doesn't exist on-ledger → safe to replace */ }
+  }
 
   // 3) Generate a fresh, correctly-encrypted keypair and activate it.
   try {

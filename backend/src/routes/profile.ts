@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { PrismaClient } from '@prisma/client';
 import { requireAuth, AuthRequest } from '../middleware/auth';
+import { isEncryptedKeyValid } from '../services/crypto';
 
 const router = Router();
 const prisma  = new PrismaClient();
@@ -87,14 +88,16 @@ router.get('/me', requireAuth, async (req: AuthRequest, res) => {
   const user = await prisma.user.findUnique({
     where:  { id: req.userId! },
     select: { id: true, phone: true, kycName: true, kycStatus: true,
-              stellarPubKey: true, profilePicUrl: true, createdAt: true,
+              stellarPubKey: true, stellarSecret: true, profilePicUrl: true, createdAt: true,
               chatPublicKey: true, isOnline: true, lastSeenAt: true,
               isAdmin: true, isFeeCollector: true },
   });
   if (!user) return res.status(404).json(fail('User not found'));
+  const walletKeyValid = isEncryptedKeyValid(user.stellarSecret);
+  const { stellarSecret, ...safe } = user; // never return the secret
   const clean  = user.id.replace(/[^a-z0-9]/gi, '').toUpperCase();
   const userTag = `OP-${(clean.slice(-8) + clean.slice(0, 4)).slice(0, 8)}`;
-  return res.json(ok({ user: { ...user, userTag } }));
+  return res.json(ok({ user: { ...safe, userTag, walletKeyValid } }));
 });
 
 // ── PUT /api/profile/name ─────────────────────────────────────────────────────

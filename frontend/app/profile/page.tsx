@@ -33,7 +33,12 @@ export default function ProfilePage() {
       fetch(`${API}/api/profile/me`, { headers: { Authorization: `Bearer ${getToken()}` } }).then(r => r.json()),
       fetch(`${API}/api/swap/wallet`, { headers: { Authorization: `Bearer ${getToken()}` } }).then(r => r.json()),
     ]).then(([profileRes, walletRes]) => {
-      if (profileRes.success) { setUser(profileRes.data.user); setNewName(profileRes.data.user.kycName ?? ''); }
+      if (profileRes.success) {
+        setUser(profileRes.data.user);
+        setNewName(profileRes.data.user.kycName ?? '');
+        // Corrupt/legacy key → steer the user straight to the real fix (re-activate)
+        if (profileRes.data.user.walletKeyValid === false) setShowFix(true);
+      }
       else router.replace('/auth/login');
       if (walletRes.success) setWallet(walletRes.data);
       setLoading(false);
@@ -231,10 +236,10 @@ export default function ProfilePage() {
                 className="flex items-center gap-1.5 text-xs text-primary font-semibold bg-primary/10 px-3 py-1.5 rounded-xl">
                 <Copy size={12} /> Copy ID
               </button>
-              {wallet?.network === 'testnet' && (
+              {wallet?.network === 'testnet' && user?.walletKeyValid !== false && (
                 <button onClick={fundWallet}
                   className="flex items-center gap-1.5 text-xs text-amber-600 font-semibold bg-amber-50 px-3 py-1.5 rounded-xl ml-auto">
-                  <RefreshCw size={12} /> Activate
+                  <RefreshCw size={12} /> Get test XLM
                 </button>
               )}
             </div>
