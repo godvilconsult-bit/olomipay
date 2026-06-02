@@ -570,6 +570,19 @@ export async function setupDatabase(): Promise<void> {
       );
     `);
 
+    // Support case notes — append-only context per customer, carried across agents/shifts
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "SupportNote" (
+        "id"          TEXT NOT NULL PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        "userId"      TEXT NOT NULL,
+        "authorId"    TEXT NOT NULL,
+        "authorPhone" TEXT,
+        "note"        TEXT NOT NULL,
+        "createdAt"   TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+    `);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "SupportNote_user_idx" ON "SupportNote" ("userId")`).catch(() => {});
+
     // "Delete for me" — a message hidden only for a specific user
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "MessageHidden" (
