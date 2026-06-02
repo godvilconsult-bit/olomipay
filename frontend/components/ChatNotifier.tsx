@@ -28,30 +28,13 @@ function getToken(): string {
   return sessionStorage.getItem('olomipay_at') || sessionStorage.getItem('olomipay_rt') || '';
 }
 
-// ── Sound engine (Web Audio API) ──────────────────────────────────────────────
+// ── Shared sound engine (one consistent voice across the whole app) ───────────
+import { sounds } from '../lib/sounds';
 
 function playSound(type: 'message' | 'payment' | 'request') {
-  try {
-    const ctx  = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const gain = ctx.createGain();
-    gain.connect(ctx.destination);
-
-    const notes: [number, number, number][] =
-      type === 'payment' ? [[523,0,0.12],[659,0.1,0.12],[784,0.22,0.15],[1047,0.38,0.22]]
-      : type === 'request' ? [[900,0,0.07],[700,0.09,0.07],[900,0.22,0.1]]
-      : [[880,0,0.09],[1100,0.1,0.09],[1320,0.21,0.14]];
-
-    notes.forEach(([freq, start, dur]) => {
-      const o = ctx.createOscillator();
-      o.type = type === 'payment' ? 'triangle' : type === 'request' ? 'square' : 'sine';
-      o.frequency.value = freq;
-      gain.gain.setValueAtTime(0.28, ctx.currentTime + start);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + dur);
-      o.connect(gain);
-      o.start(ctx.currentTime + start);
-      o.stop(ctx.currentTime + start + dur + 0.01);
-    });
-  } catch {}
+  if (type === 'payment')      sounds.moneyIn();   // 💰 rich celebratory cha-ching
+  else if (type === 'request') sounds.request();   // 💛 friendly ping
+  else                         sounds.message();   // 💬 light chime
 }
 
 // ── Toast pop-up component ────────────────────────────────────────────────────

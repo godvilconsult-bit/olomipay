@@ -29,69 +29,8 @@ async function api(path: string, method = 'GET', body?: any) {
   return r.json();
 }
 
-// ── Sound player (Web Audio API — works even on mobile) ───────────────────────
-const sounds = {
-  /** Incoming chat message */
-  message(): void {
-    try {
-      const ctx  = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const gain = ctx.createGain();
-      gain.connect(ctx.destination);
-      [[880, 0, 0.12], [1100, 0.13, 0.12], [1320, 0.26, 0.18]].forEach(([f, s, d]) => {
-        const o = ctx.createOscillator();
-        o.type = 'sine'; o.frequency.value = f;
-        gain.gain.setValueAtTime(0.3, ctx.currentTime + s);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + s + d);
-        o.connect(gain); o.start(ctx.currentTime + s); o.stop(ctx.currentTime + s + d);
-      });
-    } catch {}
-  },
-  /** Money received — longer, celebratory */
-  moneyIn(): void {
-    try {
-      const ctx  = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const gain = ctx.createGain();
-      gain.connect(ctx.destination);
-      [[523, 0, 0.15], [659, 0.12, 0.15], [784, 0.25, 0.15], [1047, 0.38, 0.25]].forEach(([f, s, d]) => {
-        const o = ctx.createOscillator();
-        o.type = 'triangle'; o.frequency.value = f;
-        gain.gain.setValueAtTime(0.4, ctx.currentTime + s);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + s + d);
-        o.connect(gain); o.start(ctx.currentTime + s); o.stop(ctx.currentTime + s + d);
-      });
-    } catch {}
-  },
-  /** Money sent — short confirm */
-  moneyOut(): void {
-    try {
-      const ctx  = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const gain = ctx.createGain();
-      gain.connect(ctx.destination);
-      [[659, 0, 0.1], [523, 0.11, 0.15]].forEach(([f, s, d]) => {
-        const o = ctx.createOscillator();
-        o.type = 'sine'; o.frequency.value = f;
-        gain.gain.setValueAtTime(0.25, ctx.currentTime + s);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + s + d);
-        o.connect(gain); o.start(ctx.currentTime + s); o.stop(ctx.currentTime + s + d);
-      });
-    } catch {}
-  },
-  /** Payment request — attention-grabbing ping */
-  request(): void {
-    try {
-      const ctx  = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const gain = ctx.createGain();
-      gain.connect(ctx.destination);
-      [[1200, 0, 0.08], [900, 0.1, 0.08], [1200, 0.25, 0.12]].forEach(([f, s, d]) => {
-        const o = ctx.createOscillator();
-        o.type = 'square'; o.frequency.value = f;
-        gain.gain.setValueAtTime(0.2, ctx.currentTime + s);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + s + d);
-        o.connect(gain); o.start(ctx.currentTime + s); o.stop(ctx.currentTime + s + d);
-      });
-    } catch {}
-  },
-};
+// Shared, app-wide notification sounds (rich celebratory money-in, etc.)
+import { sounds } from '../../../lib/sounds';
 
 // ── Tick icons ─────────────────────────────────────────────────────────────────
 function Ticks({ isRead, isDelivered }: { isRead: boolean; isDelivered: boolean }) {
