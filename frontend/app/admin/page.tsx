@@ -210,8 +210,15 @@ export default function AdminPage() {
           </button>
         </div>
         {stats && (
-          <p className="text-xs text-blue-200 mt-1 font-mono">
+          <p className="text-xs text-blue-200 mt-1 font-mono flex items-center gap-2 flex-wrap">
             Fee wallet: {stats.adminWallet?.slice(0, 8)}…{stats.adminWallet?.slice(-6)}
+            {feeWallet && (
+              <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold ${
+                feeWallet.isSameAsPlatform ? 'bg-amber-400/30 text-amber-100' : 'bg-green-400/30 text-green-100'
+              }`}>
+                {feeWallet.isSameAsPlatform ? '🔗 shared' : '✓ dedicated'}
+              </span>
+            )}
           </p>
         )}
       </div>
@@ -385,6 +392,32 @@ export default function AdminPage() {
                   <p className="text-xs text-slate-400 mb-1">Fee Wallet Address</p>
                   <p className="font-mono text-xs break-all text-slate-600 dark:text-slate-300">{feeWallet.feeWallet}</p>
                 </div>
+
+                {/* Shared vs dedicated status — never confusing again */}
+                <div className={`rounded-xl p-3 border ${
+                  feeWallet.isSameAsPlatform
+                    ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
+                    : 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+                }`}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">{feeWallet.isSameAsPlatform ? '🔗' : '✓'}</span>
+                    <p className={`text-sm font-bold ${feeWallet.isSameAsPlatform ? 'text-amber-700 dark:text-amber-400' : 'text-green-700 dark:text-green-400'}`}>
+                      {feeWallet.isSameAsPlatform ? 'Shared with platform wallet' : 'Dedicated fee wallet'}
+                    </p>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed">
+                    {feeWallet.isSameAsPlatform
+                      ? 'Fees collect into the SAME address that funds accounts & disburses deposits. To separate revenue for cleaner accounting, set FEE_WALLET_PUBLIC in Railway.'
+                      : 'Fees collect into their OWN address, separate from operating funds — ideal for clean revenue accounting.'}
+                  </p>
+                  {feeWallet.platformWallet && (
+                    <div className="mt-2 pt-2 border-t border-slate-200/60 dark:border-white/10 space-y-0.5">
+                      <p className="text-[10px] text-slate-400">Platform wallet: <span className="font-mono">{feeWallet.platformWallet.slice(0,8)}…{feeWallet.platformWallet.slice(-6)}</span></p>
+                      <p className="text-[10px] text-slate-400">Configured via: <span className="font-semibold">{feeWallet.configuredVia}</span></p>
+                    </div>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-3 gap-2">
                   <button onClick={() => { navigator.clipboard.writeText(feeWallet.feeWallet); toast.success('Copied!'); }}
                     className="bg-primary/10 text-primary font-semibold text-sm py-2 rounded-xl">Copy</button>
