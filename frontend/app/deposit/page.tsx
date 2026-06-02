@@ -438,11 +438,31 @@ export default function DepositPage() {
                     <span>{feePreview.stellarFeeXlm} XLM ≈ ${feePreview.stellarFeeUsd.toFixed(5)}</span>
                   </div>
                   <div className="text-[10px] text-slate-400 -mt-1 pl-2">XLM price: ${feePreview.xlmPriceUsd} · paid by platform wallet</div>
+
+                  {/* One-time wallet activation (mainnet first deposit only) */}
+                  {feePreview.isFirstDeposit && feePreview.activationFeeUsdc > 0 && (
+                    <div className="flex justify-between text-blue-600">
+                      <span className="flex items-center gap-1">
+                        Wallet activation
+                        <span className="text-[9px] bg-blue-100 text-blue-700 px-1 rounded">one-time</span>
+                      </span>
+                      <span>− ${feePreview.activationFeeUsdc.toFixed(2)}</span>
+                    </div>
+                  )}
+
                   {/* Total */}
                   <div className="border-t border-slate-200 dark:border-slate-700 pt-2 flex justify-between font-bold text-base">
                     <span>You receive</span>
-                    <span className="text-green-600">${feePreview.netUsdc.toFixed(4)} USDC</span>
+                    <span className="text-green-600">
+                      ${(feePreview.netUsdcAfterActivation ?? feePreview.netUsdc).toFixed(4)} USDC
+                    </span>
                   </div>
+
+                  {feePreview.isFirstDeposit && feePreview.activationFeeUsdc > 0 && (
+                    <p className="text-[11px] text-blue-500 text-center -mt-1">
+                      A one-time ${feePreview.activationFeeUsdc.toFixed(2)} activates your wallet — every future deposit has no activation fee.
+                    </p>
+                  )}
                   <div className="text-xs text-slate-400 text-center">
                     Settlement: ~{feePreview.estimatedMins === 0 ? 'instant (testnet)' : `${feePreview.estimatedMins} min`}
                     {' · '}via {feePreview.provider}

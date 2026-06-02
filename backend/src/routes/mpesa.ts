@@ -103,15 +103,33 @@ router.get('/rate', async (req, res) => {
 
 // ── GET /api/mpesa/fee-preview ─────────────────────────────────────────────────
 
-router.get('/fee-preview', requireAuth, async (req, res) => {
+router.get('/fee-preview', requireAuth, async (req: AuthRequest, res) => {
   const amount   = Number(req.query.amount ?? 0);
   const currency = ((req.query.currency as string) ?? 'TZS').toUpperCase();
   const type     = (req.query.type as string ?? 'deposit') as 'deposit' | 'withdraw';
   if (!amount || amount <= 0) return res.status(400).json({ error: 'amount required' });
   try {
-    const fees = type === 'withdraw'
+    const fees: any = type === 'withdraw'
       ? await calculateWithdrawFees(amount, currency)
       : await calculateDepositFees(amount, currency);
+
+    // One-time wallet-activation fee — MAINNET first deposit only. Show it up-front.
+    let activationFeeUsdc = 0;
+    if (type === 'deposit' && !IS_TESTNET_NETWORK) {
+      const user = await prisma.user.findUnique({
+        where: { id: req.userId! }, select: { activationFeePaid: true },
+      });
+      if (user && !user.activationFeePaid) {
+        activationFeeUsdc = Math.min(ACTIVATION_FEE_USD, (fees.grossUsdc ?? 0) * 0.5);
+      }
+    }
+    fees.activationFeeUsdc = activationFeeUsdc;
+    fees.isFirstDeposit    = activationFeeUsdc > 0;
+    // The amount the user actually receives after this one-time fee
+    if (activationFeeUsdc > 0 && typeof fees.netUsdc === 'number') {
+      fees.netUsdcAfterActivation = parseFloat((fees.netUsdc - activationFeeUsdc).toFixed(7));
+    }
+
     return res.json({ success: true, fees, isSandbox: isYCSandbox });
   } catch (e: any) {
     return res.status(502).json({ error: e.message });
