@@ -46,6 +46,20 @@ export class WalletKeyError extends Error {
   constructor(msg = 'WALLET_KEY_CORRUPT') { super(msg); this.name = 'WalletKeyError'; }
 }
 
+/**
+ * Validate that a stored encrypted key has the current iv:tag:data shape —
+ * WITHOUT needing the PIN. Lets us proactively flag corrupt/legacy wallets.
+ */
+export function isEncryptedKeyValid(payload?: string | null): boolean {
+  if (!payload || typeof payload !== 'string') return false;
+  const parts = payload.split(':');
+  if (parts.length !== 3) return false;
+  const [ivHex, tagHex, dataHex] = parts;
+  return /^[0-9a-fA-F]{24}$/.test(ivHex)
+    && /^[0-9a-fA-F]{32}$/.test(tagHex)
+    && /^[0-9a-fA-F]+$/.test(dataHex);
+}
+
 export function decryptSecret(encryptedPayload: string, pin: string, phone: string): string {
   // Validate the iv:tag:data shape before touching the cipher so we fail with a
   // clear, actionable error instead of a cryptic "invalid initialization vector".

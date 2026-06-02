@@ -5,7 +5,7 @@ import crypto from 'crypto';
 import { z } from 'zod';
 import { PrismaClient } from '@prisma/client';
 import { generateKeypair, activateUserWallet, IS_TESTNET_NETWORK } from '../services/stellar';
-import { encryptSecret, hashPin, verifyPin } from '../services/crypto';
+import { encryptSecret, hashPin, verifyPin, isEncryptedKeyValid } from '../services/crypto';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 
 const router  = Router();
@@ -249,13 +249,18 @@ router.get('/me', requireAuth, async (req: AuthRequest, res) => {
   const user = await prisma.user.findUnique({
     where:  { id: req.userId },
     select: {
-      id: true, phone: true, stellarPubKey: true,
+      id: true, phone: true, stellarPubKey: true, stellarSecret: true,
       kycStatus: true, kycName: true, profilePicUrl: true,
       isAdmin: true, isFeeCollector: true, createdAt: true,
     },
   });
   if (!user) return res.status(404).json({ error: 'User not found' });
-  return res.json({ user: { ...user, userTag: makeUserTag(user.id) } });
+
+  // Proactive health flag — does the stored key have the current iv:tag:data shape?
+  const walletKeyValid = isEncryptedKeyValid(user.stellarSecret);
+  const { stellarSecret, ...safe } = user; // never return the secret
+
+  return res.json({ user: { ...safe, userTag: makeUserTag(user.id), walletKeyValid } });
 });
 
 /** Derive a short unique display tag from the user's DB id.
