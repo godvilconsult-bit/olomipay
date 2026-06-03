@@ -5,6 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
+    "gen:secrets": "node scripts/gen-secrets.mjs",
     "build": "prisma generate && tsc --skipLibCheck --noEmitOnError false || true",
     "start": "node dist/index.js",
     "postinstall": "prisma generate",

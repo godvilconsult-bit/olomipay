@@ -12,12 +12,17 @@
 import crypto from 'crypto';
 
 const SERVER_SECRET = process.env.ENCRYPTION_KEY!;
+// Optional previous key, used ONLY for decryption during an ENCRYPTION_KEY rotation.
+// Set ENCRYPTION_KEY_PREVIOUS=<old key> alongside the new ENCRYPTION_KEY so existing
+// encrypted wallet keys keep decrypting; new writes always use the current key. Remove
+// it after the transition window. (See SECRET_ROTATION.md.)
+const SERVER_SECRET_PREVIOUS = process.env.ENCRYPTION_KEY_PREVIOUS;
 const ALGORITHM = 'aes-256-gcm';
 
-function deriveKey(pin: string, phone: string): Buffer {
+function deriveKey(pin: string, phone: string, serverSecret: string = SERVER_SECRET): Buffer {
   // PBKDF2 with server secret mixed in as salt material
   const salt = crypto.createHash('sha256')
-    .update(phone + SERVER_SECRET)
+    .update(phone + serverSecret)
     .digest();
   return crypto.pbkdf2Sync(pin, salt, 310_000, 32, 'sha512');
 }
@@ -74,8 +79,8 @@ export function decryptSecret(encryptedPayload: string, pin: string, phone: stri
     throw new WalletKeyError();
   }
 
-  try {
-    const key = deriveKey(pin, phone);
+  const attempt = (serverSecret: string): string => {
+    const key = deriveKey(pin, phone, serverSecret);
     const decipher = crypto.createDecipheriv(ALGORITHM, key, Buffer.from(ivHex, 'hex'));
     decipher.setAuthTag(Buffer.from(tagHex, 'hex'));
     const decrypted = Buffer.concat([
@@ -83,7 +88,16 @@ export function decryptSecret(encryptedPayload: string, pin: string, phone: stri
       decipher.final(),
     ]);
     return decrypted.toString('utf8');
+  };
+
+  try {
+    return attempt(SERVER_SECRET);
   } catch {
+    // During an ENCRYPTION_KEY rotation, fall back to the previous key so existing
+    // blobs keep working. Callers re-encrypt under the current key on the next PIN use.
+    if (SERVER_SECRET_PREVIOUS) {
+      try { return attempt(SERVER_SECRET_PREVIOUS); } catch { /* fall through */ }
+    }
     // Wrong PIN (auth-tag mismatch) or corrupt data — caller decides messaging.
     throw new WalletKeyError('WALLET_KEY_UNREADABLE');
   }
