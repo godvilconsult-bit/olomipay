@@ -10,6 +10,14 @@ import BottomNav from '../../components/BottomNav';
 import UserAvatar from '../../components/UserAvatar';
 import { auth, wallet } from '../../lib/api';
 
+/** Time-aware greeting for the header eyebrow. */
+function greeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const [user,   setUser]   = useState<any>(null);
@@ -36,7 +44,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pb-24">
       {/* Header */}
-      <div className="sticky top-0 z-40 bg-slate-50 dark:bg-slate-900 px-5 pt-safe-top pt-4 pb-2">
+      <div className="sticky top-0 z-40 px-5 pt-safe-top pt-4 pb-3">
         <div className="flex items-center justify-between max-w-md mx-auto">
           <div className="flex items-center gap-3 min-w-0">
             <UserAvatar
@@ -44,17 +52,18 @@ export default function DashboardPage() {
               profilePicUrl={user?.profilePicUrl}
               size="md"
               onClick={() => router.push('/profile')}
+              className="ring-2 ring-primary/15"
             />
             <div className="min-w-0">
-              <p className="text-xs text-slate-400">Good day,</p>
-              <p className="font-semibold text-slate-800 dark:text-slate-200 truncate">
+              <p className="ds-eyebrow !text-[10px] text-slate-400">{greeting()}</p>
+              <p className="font-bold text-slate-800 dark:text-slate-100 truncate leading-tight">
                 {loading ? '…' : (user?.kycName || user?.userTag || 'OlomiPay User')}
               </p>
             </div>
           </div>
           <button onClick={() => router.push('/notifications')}
-            className="p-2 rounded-full bg-white dark:bg-slate-800 shadow-sm min-h-[44px] min-w-[44px] flex items-center justify-center">
-            <Bell size={20} className="text-slate-600 dark:text-slate-300" />
+            className="relative p-2.5 rounded-full bg-white/70 dark:bg-white/5 backdrop-blur border border-white/60 dark:border-white/10 shadow-sm min-h-[44px] min-w-[44px] flex items-center justify-center active:scale-95 transition-transform">
+            <Bell size={19} className="text-slate-600 dark:text-slate-300" />
           </button>
         </div>
       </div>
@@ -84,16 +93,16 @@ export default function DashboardPage() {
 
         {/* Quick actions */}
         <section>
-          <h2 className="text-sm font-semibold text-slate-500 dark:text-slate-400 mb-3">Quick actions</h2>
+          <h2 className="ds-eyebrow mb-3">Quick actions</h2>
           <QuickActions />
         </section>
 
         {/* Recent transactions */}
         <section>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-slate-500 dark:text-slate-400">Recent</h2>
-            <button onClick={() => router.push('/history')} className="text-xs text-primary font-medium min-h-[32px] px-2">
-              View all
+            <h2 className="ds-eyebrow">Recent activity</h2>
+            <button onClick={() => router.push('/history')} className="text-xs text-primary font-semibold min-h-[32px] px-2 active:scale-95 transition-transform">
+              View all →
             </button>
           </div>
 
