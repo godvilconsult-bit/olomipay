@@ -14,11 +14,16 @@
 
 import { PrismaClient } from '@prisma/client';
 import { notify } from './notifications';
+import { findTxHashByMemo } from './stellar';
+import { writeLedgerRows, drainLedgerBackfill } from './ledger';
 
 const prisma = new PrismaClient();
 
 const DEPOSIT_TIMEOUT_MIN = Number(process.env.RECONCILE_DEPOSIT_TIMEOUT_MIN ?? 30);
 const INTERVAL_MS         = Number(process.env.RECONCILE_INTERVAL_MS ?? 120_000); // every 2 min
+// Chat payments resolve in seconds; if still PENDING after this, reconcile against chain.
+const PAYMENT_CHECK_MIN   = Number(process.env.RECONCILE_PAYMENT_CHECK_MIN ?? 3);
+const PAYMENT_FAIL_MIN    = Number(process.env.RECONCILE_PAYMENT_FAIL_MIN  ?? 30);
 
 async function log(action: string, txId: string, detail?: any) {
   try {
@@ -29,8 +34,58 @@ async function log(action: string, txId: string, detail?: any) {
   } catch {}
 }
 
-let lastSummary = { ranAt: null as string | null, expiredDeposits: 0, flaggedWithdrawals: 0 };
+let lastSummary = { ranAt: null as string | null, expiredDeposits: 0, flaggedWithdrawals: 0, paymentsHealed: 0, paymentsFailed: 0, backfilled: 0 };
 export function getReconcilerStatus() { return { ...lastSummary, depositTimeoutMin: DEPOSIT_TIMEOUT_MIN, intervalMs: INTERVAL_MS }; }
+
+/**
+ * Reconcile stuck chat PAYMENT messages against Stellar (chain = source of truth).
+ * Resolves the "submitted-but-response-lost" divergence:
+ *   - PENDING payment with a memo that DID land on-chain → mark CONFIRMED + backfill ledger.
+ *   - PENDING payment past the fail timeout with NO matching on-chain tx → mark FAILED.
+ */
+async function reconcilePayments(): Promise<{ healed: number; failed: number }> {
+  let healed = 0, failed = 0;
+  const checkCutoff = new Date(Date.now() - PAYMENT_CHECK_MIN * 60_000);
+  const failCutoff  = new Date(Date.now() - PAYMENT_FAIL_MIN  * 60_000);
+
+  let stuck: any[] = [];
+  try {
+    stuck = await prisma.message.findMany({
+      where: { type: 'PAYMENT' as any, paymentStatus: 'PENDING' as any, createdAt: { lt: checkCutoff } },
+      include: { sender: { select: { stellarPubKey: true, phone: true } } },
+      take: 50,
+    });
+  } catch { return { healed, failed }; }
+
+  for (const m of stuck) {
+    try {
+      const memo = `Chat:${m.id.slice(0, 16)}`;
+      const hash = m.sender?.stellarPubKey ? await findTxHashByMemo(m.sender.stellarPubKey, memo) : null;
+
+      if (hash) {
+        // Money actually moved — heal the record + backfill ledger rows
+        await prisma.message.update({ where: { id: m.id }, data: { paymentStatus: 'CONFIRMED', stellarTxId: hash } });
+        const net = Number(m.amountUsdc ?? 0);
+        const conv = await prisma.conversationMember.findMany({
+          where: { conversationId: m.conversationId, userId: { not: m.senderId } }, select: { userId: true },
+        });
+        const rows: any[] = [{ userId: m.senderId, type: 'SEND', amountUsdc: net, stellarTxId: hash, memo: 'Chat payment (reconciled)' }];
+        if (conv[0]) rows.push({ userId: conv[0].userId, type: 'RECEIVE', amountUsdc: net, stellarTxId: hash, memo: 'Chat payment (reconciled)' });
+        await writeLedgerRows(rows);
+        await log('heal_payment', m.id, { hash });
+        healed++;
+      } else if (m.createdAt < failCutoff) {
+        // No on-chain trace after the fail window — safe to mark FAILED
+        await prisma.message.update({ where: { id: m.id }, data: { paymentStatus: 'FAILED' } });
+        await log('fail_payment', m.id, { reason: 'no on-chain tx within window' });
+        failed++;
+      }
+    } catch (e: any) {
+      console.error('[reconciler] payment reconcile failed', m.id, e.message);
+    }
+  }
+  return { healed, failed };
+}
 
 export async function runReconciler(): Promise<typeof lastSummary> {
   let expiredDeposits = 0, flaggedWithdrawals = 0;
@@ -66,8 +121,15 @@ export async function runReconciler(): Promise<typeof lastSummary> {
     });
   } catch {}
 
-  lastSummary = { ranAt: new Date().toISOString(), expiredDeposits, flaggedWithdrawals };
-  if (expiredDeposits > 0) console.log(`[reconciler] expired ${expiredDeposits} abandoned deposits; ${flaggedWithdrawals} withdrawals need review`);
+  // 3) Reconcile stuck chat payments against the chain (heal or fail).
+  const { healed: paymentsHealed, failed: paymentsFailed } = await reconcilePayments().catch(() => ({ healed: 0, failed: 0 }));
+
+  // 4) Drain the ledger backfill queue (rows whose DB write failed after money moved).
+  const backfilled = await drainLedgerBackfill().catch(() => 0);
+
+  lastSummary = { ranAt: new Date().toISOString(), expiredDeposits, flaggedWithdrawals, paymentsHealed, paymentsFailed, backfilled };
+  if (expiredDeposits || paymentsHealed || paymentsFailed || backfilled)
+    console.log(`[reconciler] deposits expired=${expiredDeposits} · payments healed=${paymentsHealed} failed=${paymentsFailed} · ledger backfilled=${backfilled}`);
   return lastSummary;
 }
 

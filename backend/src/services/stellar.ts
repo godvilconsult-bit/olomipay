@@ -313,6 +313,26 @@ export async function getTransactionHistory(publicKey: string, limit = 20) {
   }));
 }
 
+/**
+ * On-chain verification helper for reconciliation / verify-before-retry.
+ * Scans an account's recent transactions for one whose text memo matches.
+ * Returns the transaction hash if found (proof the payment actually landed),
+ * or null. Used to detect the "submitted-but-response-lost" divergence.
+ */
+export async function findTxHashByMemo(publicKey: string, memoText: string, limit = 50): Promise<string | null> {
+  try {
+    const txs = await server.transactions().forAccount(publicKey).limit(limit).order('desc').call();
+    for (const t of txs.records as any[]) {
+      if (t.memo_type === 'text' && t.memo === memoText && t.successful) {
+        return t.hash as string;
+      }
+    }
+    return null;
+  } catch {
+    return null; // Horizon unreachable → treat as "unknown", caller decides
+  }
+}
+
 // ── USDC transfer via Soroban contract ────────────────────────────────────────
 
 /**

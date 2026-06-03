@@ -639,6 +639,9 @@ model Message {
   paymentAsset     String?       @default("USDC")
   stellarTxId      String?
   paymentStatus    PaymentStatus?
+  // Idempotency: client-supplied UUID per payment attempt; a retry with the
+  // same ref returns the original result instead of sending a second payment.
+  clientRef        String?       @unique
   paymentNote      String?
   mediaUrl         String?
   mediaThumbUrl    String?

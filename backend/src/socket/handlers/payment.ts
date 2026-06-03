@@ -3,6 +3,7 @@ import { PrismaClient }   from '@prisma/client';
 import { userSendUsdcWithFee, userSendXlm, getBalance, getFeeWalletPublic } from '../../services/stellar';
 import { verifyPin }      from '../../services/crypto';
 import { sendPushToUser } from '../../services/notifications';
+import { writeLedgerRows } from '../../services/ledger';
 
 const prisma   = new PrismaClient();
 const TZS_RATE = 2600;
@@ -10,13 +11,29 @@ const TZS_RATE = 2600;
 // ── Send payment in chat ───────────────────────────────────────────────────────
 
 export async function handleSendPayment(io: Server, socket: Socket, data: any) {
-  const { conversationId, amountUsdc, encryptedNote, recipientId, pin } = data;
+  const { conversationId, amountUsdc, encryptedNote, recipientId, pin, clientRef } = data;
   const asset: 'USDC' | 'XLM' = data.asset === 'XLM' ? 'XLM' : 'USDC';
   const amt      = Number(amountUsdc); // amount in the chosen asset
   const senderId = socket.data.userId;
   let createdMsgId: string | null = null; // so we can mark it FAILED on error
 
   try {
+    // ── Idempotency guard — prevents double-send on retry ────────────────────
+    // If this exact attempt (clientRef) already produced a message, return its
+    // current state instead of sending a SECOND on-chain payment.
+    if (clientRef) {
+      const existing = await prisma.message.findUnique({ where: { clientRef } });
+      if (existing) {
+        io.to(conversationId).emit(
+          existing.paymentStatus === 'CONFIRMED' ? 'payment_confirmed'
+          : existing.paymentStatus === 'FAILED'  ? 'payment_failed'
+          : 'new_message',
+          { messageId: existing.id, stellarTxId: existing.stellarTxId, paymentStatus: existing.paymentStatus },
+        );
+        return; // do NOT send again
+      }
+    }
+
     const sender = await prisma.user.findUnique({ where: { id: senderId } });
     if (!sender) { socket.emit('payment_error', { error: 'Mtumiaji hakupatikana.' }); return; }
 
@@ -51,6 +68,7 @@ export async function handleSendPayment(io: Server, socket: Socket, data: any) {
         paymentAsset:  asset,
         paymentStatus: 'PENDING',
         paymentNote:   encryptedNote ?? null,
+        clientRef:     clientRef ?? null,
         deliveredAt:   new Date(),
       },
     });
@@ -86,41 +104,12 @@ export async function handleSendPayment(io: Server, socket: Socket, data: any) {
       data:  { stellarTxId: hash, paymentStatus: 'CONFIRMED', amountUsdc: netAmount },
     });
 
-    // DB transaction records
-    await Promise.all([
-      prisma.transaction.create({
-        data: {
-          userId:      senderId,
-          type:        'SEND',
-          status:      'CONFIRMED',
-          amountUsdc:  netUsdc,
-          stellarTxId: hash,
-          toAddress:   recipient.stellarPubKey,
-          memo:        `Chat payment`,
-        },
-      }),
-      prisma.transaction.create({
-        data: {
-          userId:      recipientId,
-          type:        'RECEIVE',
-          status:      'CONFIRMED',
-          amountUsdc:  netUsdc,
-          stellarTxId: hash,
-          memo:        `Chat payment from ${sender.phone}`,
-        },
-      }),
-      prisma.transaction.create({
-        data: {
-          userId:      senderId,
-          type:        'FEE',
-          status:      'CONFIRMED',
-          amountUsdc:  feeUsdc,
-          stellarTxId: hash,
-          toAddress:   feeWallet,
-          memo:        `1% fee chat payment`,
-        },
-      }),
-    ]).catch(() => {});
+    // DB ledger rows — durable: any write failure is queued for backfill, never dropped
+    await writeLedgerRows([
+      { userId: senderId,    type: 'SEND',    amountUsdc: netUsdc, stellarTxId: hash, toAddress: recipient.stellarPubKey, memo: 'Chat payment' },
+      { userId: recipientId, type: 'RECEIVE', amountUsdc: netUsdc, stellarTxId: hash, memo: `Chat payment from ${sender.phone}` },
+      { userId: senderId,    type: 'FEE',     amountUsdc: feeUsdc, stellarTxId: hash, toAddress: feeWallet, memo: '1% fee chat payment' },
+    ]);
 
     // Emit confirmed to room
     io.to(conversationId).emit('payment_confirmed', {

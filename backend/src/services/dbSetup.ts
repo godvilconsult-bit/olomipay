@@ -598,6 +598,28 @@ export async function setupDatabase(): Promise<void> {
     await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "RiskReview_user_idx" ON "RiskReview" ("userId")`).catch(() => {});
     await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "RiskReview_created_idx" ON "RiskReview" ("createdAt")`).catch(() => {});
 
+    // Idempotency for chat payments — prevents double-send on retry
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Message" ADD COLUMN IF NOT EXISTS "clientRef" TEXT`).catch(() => {});
+    await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "Message_clientRef_key" ON "Message" ("clientRef") WHERE "clientRef" IS NOT NULL`).catch(() => {});
+
+    // Ledger backfill queue — money moved on-chain but a DB ledger write failed.
+    // The reconciler drains this so internal records always catch up to chain truth.
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "LedgerBackfill" (
+        "id"         TEXT NOT NULL PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        "userId"     TEXT NOT NULL,
+        "type"       TEXT NOT NULL,
+        "amountUsdc" DOUBLE PRECISION,
+        "stellarTxId" TEXT,
+        "toAddress"  TEXT,
+        "memo"       TEXT,
+        "applied"    BOOLEAN NOT NULL DEFAULT false,
+        "attempts"   INTEGER NOT NULL DEFAULT 0,
+        "createdAt"  TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+    `);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "LedgerBackfill_applied_idx" ON "LedgerBackfill" ("applied")`).catch(() => {});
+
     // In-app support tickets — customer opens a ticket that lands in the admin console
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "SupportTicket" (

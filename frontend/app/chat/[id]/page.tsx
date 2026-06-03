@@ -838,6 +838,11 @@ function MoneySheet({ name, recipientId, convId, onClose, onSent, emit }: any) {
   const [req,    setReq]    = useState(false);
   const [busy,   setBusy]   = useState(false);
   const [asset,  setAsset]  = useState<'USDC' | 'XLM'>('USDC');
+  // Idempotency: one stable ref per opened sheet; a retry reuses it so the
+  // server never sends a second payment for the same intent.
+  const clientRefRef = useRef<string>(
+    (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `cr_${Date.now()}_${Math.random().toString(36).slice(2)}`
+  );
 
   const amt = parseFloat(amount) || 0;
   const fmt = (n: number) =>
@@ -851,7 +856,7 @@ function MoneySheet({ name, recipientId, convId, onClose, onSent, emit }: any) {
       onSent();
     } else {
       setBusy(true);
-      emit('send_payment', { conversationId: convId, amountUsdc: amt, asset, encryptedNote: note || null, recipientId, pin });
+      emit('send_payment', { conversationId: convId, amountUsdc: amt, asset, encryptedNote: note || null, recipientId, pin, clientRef: clientRefRef.current });
       setTimeout(() => { setBusy(false); onSent(); }, 1200);
     }
   }
