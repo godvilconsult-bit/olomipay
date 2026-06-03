@@ -78,6 +78,7 @@ router.get('/list', requireAuth, async (req: AuthRequest, res) => {
 });
 
 // ── GET /api/chama/:id ────────────────────────────────────────────────────────
+// BOLA-safe: only the chama admin or a member may view it (members include phones).
 router.get('/:id', requireAuth, async (req: AuthRequest, res) => {
   const chama = await prisma.chama.findUnique({
     where: { id: req.params.id },
@@ -87,6 +88,12 @@ router.get('/:id', requireAuth, async (req: AuthRequest, res) => {
     },
   });
   if (!chama) return res.status(404).json(fail('Chama not found'));
+
+  // Object-level authorization — requester must be the admin or a member.
+  const isMember = chama.adminId === req.userId
+    || chama.members.some(m => m.userId === req.userId);
+  if (!isMember) return res.status(404).json(fail('Chama not found')); // 404 (not 403) prevents ID enumeration
+
   return res.json(ok({ chama }));
 });
 

@@ -8,6 +8,11 @@ const app  = express();
 const PORT = process.env.PORT ?? 3001;
 
 app.set('trust proxy', 1);
+
+// ── Observability — request-id tracing + latency metrics (mounted first) ──────
+import { observability, metricsSnapshot } from './services/observability';
+app.use(observability);
+
 app.use(helmet({ crossOriginResourcePolicy: false }));
 
 // ── CORS — allow all vercel.app + localhost ───────────────────────────────────
@@ -30,7 +35,7 @@ app.options('*', cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(rateLimit({ windowMs: 60_000, max: 200, standardHeaders: true, legacyHeaders: false }));
 
-// ── Health (load this first to confirm server is up) ──────────────────────────
+// ── Health / Readiness / Metrics ──────────────────────────────────────────────
 app.get('/health', (_req, res) => res.json({
   status:  'ok',
   ts:      new Date().toISOString(),
@@ -38,6 +43,32 @@ app.get('/health', (_req, res) => res.json({
   version: '4.2.0',
   build:   'chat+payments+gov',
 }));
+
+// Readiness probe — verifies the DB is actually reachable (for load balancers)
+app.get('/ready', async (_req, res) => {
+  try {
+    const { PrismaClient } = await import('@prisma/client');
+    const p = new PrismaClient();
+    await p.$queryRawUnsafe('SELECT 1');
+    return res.json({ ready: true, db: 'up', ts: new Date().toISOString() });
+  } catch (e: any) {
+    return res.status(503).json({ ready: false, db: 'down', error: e.message });
+  }
+});
+
+// Latency + error metrics (p50/p95/p99) — no external collector needed
+app.get('/metrics', (_req, res) => res.json({ success: true, ...metricsSnapshot() }));
+
+// ── API documentation (OpenAPI 3.1 + Swagger UI) ──────────────────────────────
+app.get('/api/openapi.json', async (_req, res) => {
+  const { openapiSpec } = await import('./services/openapi');
+  res.json(openapiSpec);
+});
+app.get('/api/docs', async (_req, res) => {
+  const { swaggerHtml } = await import('./services/openapi');
+  res.setHeader('Content-Type', 'text/html');
+  res.send(swaggerHtml());
+});
 
 // ── Load routes safely ────────────────────────────────────────────────────────
 async function loadRoutes() {
