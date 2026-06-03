@@ -53,7 +53,7 @@ function PaymentBubble({
   const pending   = msg.paymentStatus === 'PENDING';
   const isRequest = msg.type === 'PAYMENT_REQUEST';
   const isXlm     = msg.paymentAsset === 'XLM';
-  const fmtAmt    = (n: number) => isXlm ? `${Number(n).toFixed(Number(n) < 1 ? 4 : 2)} XLM` : formatUsdc(n);
+  const fmtAmt    = (n: number) => isXlm ? `${Number(n).toFixed(Number(n) < 1 ? 4 : 2)} coins` : formatUsdc(n);
 
   const borderCls = confirmed
     ? 'border-green-200 bg-green-50 dark:bg-green-900/20'
@@ -95,7 +95,7 @@ function PaymentBubble({
               <a href={`https://stellar.expert/explorer/testnet/tx/${msg.stellarTxId}`}
                 target="_blank" rel="noopener noreferrer"
                 className="text-xs text-primary underline">
-                Stellar ↗
+                Receipt ↗
               </a>
             )}
           </div>
@@ -234,7 +234,7 @@ function AcceptPayModal({
   loading:   boolean;
 }) {
   const [pin, setPin] = useState('');
-  const fmtAmt = (n: number) => asset === 'XLM' ? `${Number(n).toFixed(Number(n) < 1 ? 4 : 2)} XLM` : formatUsdc(n);
+  const fmtAmt = (n: number) => asset === 'XLM' ? `${Number(n).toFixed(Number(n) < 1 ? 4 : 2)} coins` : formatUsdc(n);
   return (
     <div className="fixed inset-0 z-50 flex flex-col justify-end">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />

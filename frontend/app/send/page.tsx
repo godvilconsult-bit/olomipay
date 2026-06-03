@@ -121,7 +121,7 @@ function SendPageInner() {
                 href={`https://stellar.expert/explorer/testnet/tx/${txHash}`}
                 target="_blank" rel="noopener noreferrer"
                 className="flex items-center justify-center gap-1.5 text-xs text-primary font-semibold">
-                <ExternalLink size={12} /> View on Stellar Explorer
+                <ExternalLink size={12} /> View on-chain receipt
               </a>
             </div>
           )}
@@ -164,7 +164,7 @@ function SendPageInner() {
               </div>
               <input
                 type="text"
-                placeholder="+255712345678 or G... Stellar address"
+                placeholder="+255712345678 or wallet address"
                 value={recipient}
                 onChange={e => setRecipient(e.target.value.trim())}
                 className="input"
@@ -218,14 +218,14 @@ function SendPageInner() {
                   autoFocus
                 />
               </div>
-              {/* Asset pills */}
+              {/* Asset pills — friendly labels (USDC→USD, XLM→Coins); value stays the asset code */}
               <div className="flex gap-2 bg-slate-100 dark:bg-white/5 rounded-full p-1">
-                {(['USDC', 'XLM'] as const).map(a => (
+                {([['USDC', 'USD'], ['XLM', 'Coins']] as const).map(([a, lbl]) => (
                   <button key={a} type="button" onClick={() => setAsset(a)}
                     className={`px-5 py-1.5 rounded-full text-sm font-semibold transition-all ${
                       asset === a ? 'bg-grad-brand text-white shadow-ds-btn' : 'text-slate-500 dark:text-slate-400'
                     }`}>
-                    {a}
+                    {lbl}
                   </button>
                 ))}
               </div>

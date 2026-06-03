@@ -143,7 +143,7 @@ export default function ChatPage() {
     // Global money events — show toasts even outside a chat window
     const u2 = on('money_received', ({ amount, from, asset }: any) => {
       toast.success(
-        `💚 Umepokea ${asset === 'XLM' ? `${Number(amount).toFixed(4)} XLM` : `$${Number(amount).toFixed(2)} USDC`} kutoka ${from}`,
+        `💚 Umepokea ${asset === 'XLM' ? `${Number(amount).toFixed(4)} coins` : `$${Number(amount).toFixed(2)}`} kutoka ${from}`,
         { duration: 6000 }
       );
     });
@@ -154,7 +154,7 @@ export default function ChatPage() {
 
     const u4 = on('money_sent', ({ amount, asset }: any) => {
       toast.success(
-        `✅ Sent ${asset === 'XLM' ? `${Number(amount).toFixed(4)} XLM` : `$${Number(amount).toFixed(2)}`}`,
+        `✅ Sent ${asset === 'XLM' ? `${Number(amount).toFixed(4)} coins` : `$${Number(amount).toFixed(2)}`}`,
         { duration: 4000 }
       );
     });

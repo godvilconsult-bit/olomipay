@@ -218,7 +218,7 @@ export default function ChatNotifier() {
     const u3 = on('money_received', ({ amount, from, asset, conversationId }: any) => {
       playSound('payment');
       const amtStr = asset === 'XLM'
-        ? `${Number(amount).toFixed(4)} XLM`
+        ? `${Number(amount).toFixed(4)} coins`
         : `$${Number(amount).toFixed(2)} USDC`;
       toast.custom(
         t => (

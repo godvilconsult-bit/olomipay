@@ -111,8 +111,8 @@ export default function DepositPage() {
     if (!receiveData?.address) return;
     if (navigator.share) {
       await navigator.share({
-        title: 'My OlomiPay Stellar Address',
-        text:  `Send XLM or USDC to my OlomiPay wallet:\n${receiveData.address}`,
+        title: 'My OlomiPay Wallet Address',
+        text:  `Send money to my OlomiPay wallet:\n${receiveData.address}`,
         url:   receiveData.explorerUrl,
       }).catch(() => {});
     } else {
@@ -206,7 +206,7 @@ export default function DepositPage() {
       {/* Tabs */}
       <div className="flex bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 overflow-x-auto">
         {([
-          { id: 'receive', label: '📥 Receive XLM', icon: QrCode },
+          { id: 'receive', label: '📥 Receive', icon: QrCode },
           { id: 'mobile',  label: '📱 Mobile Money', icon: Smartphone },
           { id: 'bank',    label: '🏦 Bank',          icon: Building2 },
         ] as const).map(t => (
@@ -241,12 +241,12 @@ export default function DepositPage() {
                   {accountInfo?.funded ? (
                     <>
                       <p className="text-sm font-semibold text-green-700 dark:text-green-400">Wallet Active ✓</p>
-                      <p className="text-xs text-green-600">{parseFloat(accountInfo.xlm).toFixed(4)} XLM · {parseFloat(accountInfo.usdc).toFixed(2)} USDC</p>
+                      <p className="text-xs text-green-600">{parseFloat(accountInfo.xlm).toFixed(4)} coins · ${parseFloat(accountInfo.usdc).toFixed(2)}</p>
                     </>
                   ) : (
                     <>
                       <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Wallet Not Yet Funded</p>
-                      <p className="text-xs text-amber-600">Get free testnet XLM to activate</p>
+                      <p className="text-xs text-amber-600">Get free test coins to activate</p>
                     </>
                   )}
                 </div>
@@ -254,7 +254,7 @@ export default function DepositPage() {
                   <button onClick={triggerFriendbot} disabled={fundLoading}
                     className="bg-amber-500 text-white text-xs font-bold px-3 py-1.5 rounded-xl disabled:opacity-60 flex items-center gap-1">
                     {fundLoading ? <RefreshCw size={12} className="animate-spin" /> : <Zap size={12} />}
-                    Get XLM
+                    Get coins
                   </button>
                 )}
               </div>
@@ -264,21 +264,21 @@ export default function DepositPage() {
                 <button onClick={() => setQrAsset('XLM')}
                   className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all ${
                     qrAsset === 'XLM' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-400'
-                  }`}>Receive XLM</button>
+                  }`}>Receive Coins</button>
                 <button onClick={() => setQrAsset('USDC')}
                   className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all ${
                     qrAsset === 'USDC' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-400'
-                  }`}>Receive USDC</button>
+                  }`}>Receive USD</button>
               </div>
 
               {/* QR Code */}
               <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 flex flex-col items-center gap-5">
                 <div>
                   <p className="text-center text-sm font-semibold mb-1">
-                    Scan to Send {qrAsset} on Stellar {receiveData?.network === 'testnet' ? '(Testnet)' : '(Mainnet)'}
+                    Scan to send {qrAsset === 'XLM' ? 'coins' : 'USD'} · settled on-chain {receiveData?.network === 'testnet' ? '(Test)' : ''}
                   </p>
                   <p className="text-center text-xs text-slate-400 mb-4">
-                    Opens automatically in any Stellar wallet app
+                    Opens automatically in any compatible wallet app
                   </p>
                 </div>
 
@@ -313,7 +313,7 @@ export default function DepositPage() {
 
                 {/* Address display */}
                 <div className="w-full bg-slate-50 dark:bg-slate-700 rounded-2xl p-3">
-                  <p className="text-xs text-slate-400 mb-1 text-center">Your Stellar Address</p>
+                  <p className="text-xs text-slate-400 mb-1 text-center">Your Wallet Address</p>
                   <p className="font-mono text-xs text-center break-all text-slate-700 dark:text-slate-300 leading-relaxed">
                     {receiveData?.address}
                   </p>
@@ -341,15 +341,15 @@ export default function DepositPage() {
 
               {/* How it works */}
               <div className="bg-blue-50 dark:bg-blue-900/20 rounded-2xl p-4 space-y-2">
-                <p className="text-sm font-semibold text-blue-700 dark:text-blue-400">How to receive XLM</p>
+                <p className="text-sm font-semibold text-blue-700 dark:text-blue-400">How to receive money</p>
                 <ol className="space-y-1.5 text-xs text-blue-600 dark:text-blue-300">
                   <li>1. Share your QR code or address with the sender</li>
-                  <li>2. The sender scans the QR with their Stellar wallet app</li>
+                  <li>2. The sender scans the QR with their wallet app</li>
                   <li>3. It auto-fills your address — they just enter amount and send</li>
-                  <li>4. Funds arrive in seconds on Stellar's network</li>
+                  <li>4. Funds arrive in seconds, settled on-chain</li>
                 </ol>
                 <p className="text-xs text-blue-500 mt-2">
-                  Compatible with: Lobstr, StellarX, Solar Wallet, Freighter, and any SEP-0007 wallet
+                  Works with any compatible wallet app that reads payment QR codes
                 </p>
               </div>
 
@@ -432,12 +432,12 @@ export default function DepositPage() {
                     <span className="flex items-center gap-1">OlomiPay fee (1%)<span className="text-[9px] bg-amber-100 text-amber-700 px-1 rounded">to fee wallet</span></span>
                     <span>− ${feePreview.platformFeeUsdc.toFixed(4)}</span>
                   </div>
-                  {/* Stellar network fee */}
+                  {/* Network fee */}
                   <div className="flex justify-between text-slate-400 text-xs">
-                    <span className="flex items-center gap-1">Stellar network fee<span className="text-[9px] bg-purple-100 text-purple-600 px-1 rounded">{feePreview.stellarOps} op</span></span>
-                    <span>{feePreview.stellarFeeXlm} XLM ≈ ${feePreview.stellarFeeUsd.toFixed(5)}</span>
+                    <span className="flex items-center gap-1">Network fee<span className="text-[9px] bg-purple-100 text-purple-600 px-1 rounded">{feePreview.stellarOps} op</span></span>
+                    <span>{feePreview.stellarFeeXlm} coins ≈ ${feePreview.stellarFeeUsd.toFixed(5)}</span>
                   </div>
-                  <div className="text-[10px] text-slate-400 -mt-1 pl-2">XLM price: ${feePreview.xlmPriceUsd} · paid by platform wallet</div>
+                  <div className="text-[10px] text-slate-400 -mt-1 pl-2">paid by platform · settled on-chain</div>
 
                   {/* One-time wallet activation (mainnet first deposit only) */}
                   {feePreview.isFirstDeposit && feePreview.activationFeeUsdc > 0 && (

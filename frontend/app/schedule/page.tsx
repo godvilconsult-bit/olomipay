@@ -100,8 +100,8 @@ export default function SchedulePage() {
               <div>
                 <label className="text-xs text-slate-500 block mb-1">Asset</label>
                 <select value={form.asset} onChange={e => setForm(f => ({ ...f, asset: e.target.value }))} className="input w-24">
-                  <option value="USDC">USDC</option>
-                  <option value="XLM">XLM</option>
+                  <option value="USDC">USD</option>
+                  <option value="XLM">Coins</option>
                 </select>
               </div>
             </div>

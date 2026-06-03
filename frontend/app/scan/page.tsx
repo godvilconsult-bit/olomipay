@@ -127,7 +127,7 @@ export default function ScanPage() {
     stopCamera();
     const parsed = parseStellarUri(raw.trim());
     if (!parsed) {
-      setError(`Not a valid Stellar QR code.\nScanned: ${raw.slice(0, 80)}`);
+      setError(`Not a valid payment QR code.\nScanned: ${raw.slice(0, 80)}`);
       return;
     }
     setResult(parsed);
@@ -162,7 +162,7 @@ export default function ScanPage() {
           className="p-2 rounded-full bg-white/10 hover:bg-white/20">
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-lg font-semibold">Scan Stellar QR</h1>
+        <h1 className="text-lg font-semibold">Scan to pay</h1>
         <div className="ml-auto flex gap-1">
           <button onClick={() => setTab('scan')}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold ${tab === 'scan' ? 'bg-primary' : 'bg-white/10'}`}>
@@ -202,7 +202,7 @@ export default function ScanPage() {
               )}
             </div>
             <p className="text-white/70 text-sm text-center">
-              Point camera at a Stellar QR code
+              Point camera at a payment QR code
             </p>
           </div>
 
@@ -223,7 +223,7 @@ export default function ScanPage() {
             <QrCode size={30} className="text-primary" />
           </div>
           <div className="w-full">
-            <p className="text-white/60 text-sm mb-3 text-center">Paste a Stellar address or SEP-0007 URI</p>
+            <p className="text-white/60 text-sm mb-3 text-center">Paste a wallet address or payment link</p>
             <form onSubmit={handleManualSubmit} className="space-y-3">
               <textarea
                 value={manualInput}
@@ -263,13 +263,13 @@ export default function ScanPage() {
               {result.amount && (
                 <div className="flex justify-between">
                   <span className="text-white/40">Amount</span>
-                  <span className="font-semibold">{result.amount} {result.assetCode ?? 'XLM'}</span>
+                  <span className="font-semibold">{result.amount} {result.assetCode === 'USDC' ? 'USD' : 'coins'}</span>
                 </div>
               )}
               {result.assetCode && (
                 <div className="flex justify-between">
                   <span className="text-white/40">Asset</span>
-                  <span className="font-semibold">{result.assetCode}</span>
+                  <span className="font-semibold">{result.assetCode === 'USDC' ? 'USD' : 'Coins'}</span>
                 </div>
               )}
               {result.memo && (

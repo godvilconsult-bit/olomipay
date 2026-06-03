@@ -73,7 +73,7 @@ export default function ChamaPage() {
           <p className="text-sm font-semibold mb-1">What is a Chama?</p>
           <p className="text-xs text-white/80">
             A rotating savings group where members contribute each month and take turns receiving the full pot.
-            All funds secured by Soroban smart contracts.
+            All funds secured by smart contracts · settled on-chain.
           </p>
         </div>
 

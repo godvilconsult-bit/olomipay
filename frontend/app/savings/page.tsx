@@ -114,7 +114,7 @@ export default function SavingsPage() {
                   ['🌱', 'Deposit USDC into your savings vault'],
                   ['📈', `Earn ${APY}% APY — accrues every second`],
                   ['💸', 'Withdraw anytime (best after 30 days)'],
-                  ['🔒', 'Secured by Soroban smart contract on Stellar'],
+                  ['🔒', 'Secured by smart contract · settled on-chain'],
                 ].map(([icon, text]) => (
                   <div key={text as string} className="flex items-start gap-3">
                     <span className="text-lg">{icon}</span>

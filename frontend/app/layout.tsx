@@ -23,7 +23,7 @@ export const metadata: Metadata = {
   openGraph: {
     type:        'website',
     title:       'OlomiPay',
-    description: 'Mobile Money ↔ Stellar bridge for Tanzania',
+    description: 'Send money, chat, and earn — settled on-chain in seconds. Built for Africa.',
     siteName:    'OlomiPay',
   },
 };
