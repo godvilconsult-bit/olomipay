@@ -54,10 +54,10 @@ export default function LandingPage() {
           <span className="text-slate-200">Money + Messaging + Earning — one super app</span>
         </div>
 
-        <h1 className="hero-rise hd3 max-w-3xl text-5xl font-extrabold leading-[1.05] tracking-tight sm:text-6xl md:text-7xl">
+        <h1 className="hero-rise hd3 ds-display max-w-3xl">
           Send money the way
           <br />
-          you <span className="text-gradient-anim">chat</span>.
+          you <span className="ds-text-gradient">chat</span>.
         </h1>
 
         <p className="hero-rise hd4 mt-6 max-w-xl text-lg text-slate-300/90">
@@ -295,10 +295,40 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ── Security you can verify ──────────────────────────────────────────── */}
+      <section className="relative z-10 mx-auto max-w-6xl px-5 py-24">
+        <Reveal className="mx-auto mb-12 max-w-2xl text-center">
+          <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-xs text-slate-300">
+            <Lock size={13} className="text-emerald-300" /> Security you can verify
+          </p>
+          <h2 className="ds-h2">Bank-grade protection, <span className="ds-text-gradient">on every payment</span></h2>
+          <p className="mx-auto mt-4 max-w-xl text-slate-400">
+            Trust isn&apos;t a slogan — it&apos;s engineered in. Here&apos;s what guards every shilling you move.
+          </p>
+        </Reveal>
+
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            { icon: Zap,         c: 'from-blue-500 to-cyan-500',    t: 'Real-time fraud screening', d: 'Every transfer is checked in under 50 milliseconds before it leaves your wallet.' },
+            { icon: ShieldCheck, c: 'from-emerald-500 to-teal-500', t: 'Settled & reconciled',      d: 'Funds settle on a public ledger and are auto-reconciled — your balance always matches the chain.' },
+            { icon: Lock,        c: 'from-indigo-500 to-blue-500',  t: 'End-to-end encrypted',      d: 'Your chats are encrypted on your device. Even we cannot read them.' },
+            { icon: Eye,         c: 'from-cyan-500 to-emerald-500', t: 'A flat 1% — shown upfront', d: 'See the exact fee and what your recipient gets before you confirm. No surprises.' },
+          ].map((f, i) => (
+            <Reveal key={f.t} delay={(i + 1) as 1 | 2 | 3 | 4} className="glass rounded-3xl p-6">
+              <div className={`mb-4 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br ${f.c}`}>
+                <f.icon size={20} />
+              </div>
+              <h3 className="mb-1.5 text-base font-semibold leading-snug">{f.t}</h3>
+              <p className="text-sm leading-relaxed text-slate-400">{f.d}</p>
+            </Reveal>
+          ))}
+        </div>
+      </section>
+
       {/* ── How it works ─────────────────────────────────────────────────────── */}
       <section className="relative z-10 mx-auto max-w-4xl px-5 py-24">
         <Reveal className="mb-12 text-center">
-          <h2 className="text-3xl font-bold sm:text-4xl">Three taps to send</h2>
+          <h2 className="ds-h2">Three taps to send</h2>
         </Reveal>
         <div className="grid gap-6 md:grid-cols-3">
           {[
