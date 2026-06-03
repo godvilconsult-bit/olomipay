@@ -124,12 +124,21 @@ export function generateKeypair(): { publicKey: string; secretKey: string } {
   return { publicKey: kp.publicKey(), secretKey: kp.secret() };
 }
 
-/** Return the user's Keypair after decrypting their stored secret with their PIN. */
+/** Return the user's Keypair after decrypting their stored secret with their PIN.
+ *
+ * The owner/admin account is linked directly to the platform wallet, whose secret
+ * is stored RAW (an "S…" key) rather than as an encrypted iv:tag:data blob. Detect
+ * that case and use it directly so admin swaps/sends work. Callers MUST verify the
+ * PIN (verifyPin) before signing — this helper does not re-check it for raw keys. */
 export function getUserKeypair(
   encryptedSecret: string,
   pin: string,
   phone: string,
 ): StellarSdk.Keypair {
+  // Platform/admin raw secret key (not an encrypted blob).
+  if (typeof encryptedSecret === 'string' && /^S[A-Z2-7]{55}$/.test(encryptedSecret.trim())) {
+    return StellarSdk.Keypair.fromSecret(encryptedSecret.trim());
+  }
   const secret = decryptSecret(encryptedSecret, pin, phone);
   return StellarSdk.Keypair.fromSecret(secret);
 }

@@ -5,7 +5,7 @@ import * as StellarSdk from '@stellar/stellar-sdk';
 import { PrismaClient } from '@prisma/client';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 import { verifyPin } from '../services/crypto';
-import { decryptSecret } from '../services/crypto';
+import { getUserKeypair } from '../services/stellar';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -124,8 +124,7 @@ router.post('/execute', requireAuth, limiter, async (req: AuthRequest, res) => {
   if (!validPin) return res.status(403).json(fail('Incorrect PIN'));
 
   try {
-    const secret  = decryptSecret(user.stellarSecret, pin, user.phone);
-    const keypair = StellarSdk.Keypair.fromSecret(secret);
+    const keypair = getUserKeypair(user.stellarSecret, pin, user.phone);
     const account = await server.loadAccount(user.stellarPubKey);
 
     const tx = new StellarSdk.TransactionBuilder(account, {
