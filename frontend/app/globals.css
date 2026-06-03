@@ -114,9 +114,26 @@
     @apply btn-primary bg-none bg-danger text-white shadow-none;
   }
 
-  /* Full-width mobile card */
+  /* Full-width mobile card — soft branded shadow + hairline border (UI-kit polish) */
   .card {
-    @apply bg-white dark:bg-slate-800 rounded-3xl shadow-sm p-5;
+    @apply bg-white dark:bg-slate-800 rounded-3xl p-5
+           border border-slate-100 dark:border-white/5
+           shadow-[0_8px_30px_-12px_rgba(30,58,138,0.18)];
+  }
+
+  /* Frosted glass card (dashboard surfaces) — opt-in */
+  .card-glass {
+    @apply rounded-3xl p-5
+           border border-white/60 dark:border-white/10
+           bg-white/70 dark:bg-white/[0.06] backdrop-blur-xl
+           shadow-[0_8px_30px_-12px_rgba(30,58,138,0.18)];
+  }
+
+  /* Opaque in-screen panel (sub-screens) — opt-in */
+  .panel {
+    @apply rounded-3xl p-4 bg-white dark:bg-slate-800
+           border border-slate-100 dark:border-white/5
+           shadow-[0_1px_2px_rgba(15,23,42,0.04)];
   }
 
   /* Input fields */
