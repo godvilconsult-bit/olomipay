@@ -10,10 +10,12 @@ import { ApprovalsList } from './resources/approvals';
 import { OpsList } from './resources/ops';
 import { SupportList } from './resources/support';
 import { TicketsList } from './resources/tickets';
+import { SecurityList } from './resources/security';
+import LoginPage from './LoginPage';
 
 export default function App() {
   return (
-    <Admin dataProvider={dataProvider} authProvider={authProvider} dashboard={Dashboard} title="OlomiPay Admin">
+    <Admin dataProvider={dataProvider} authProvider={authProvider} dashboard={Dashboard} loginPage={LoginPage} title="OlomiPay Admin">
       <Resource name="support"      list={SupportList}   options={{ label: 'Support console' }} />
       <Resource name="tickets"      list={TicketsList}   options={{ label: 'Support tickets' }} />
       <Resource name="users"        list={UserList} show={UserShow} />
@@ -22,6 +24,7 @@ export default function App() {
       <Resource name="approvals"    list={ApprovalsList} options={{ label: 'Approvals' }} />
       <Resource name="ops"          list={OpsList}       options={{ label: 'Operations' }} />
       <Resource name="audit"        list={AuditList}     options={{ label: 'Audit log' }} />
+      <Resource name="security"     list={SecurityList}  options={{ label: 'Security (2FA)' }} />
     </Admin>
   );
 }
