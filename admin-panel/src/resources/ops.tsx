@@ -11,16 +11,43 @@ export const OpsList = () => {
   const [t, setT] = useState<any>(null);
   const [risk, setRisk] = useState<any>(null);
   const [an, setAn] = useState<any>(null);
+  const [cfg, setCfg] = useState<any>(null);
   useEffect(() => {
     get('/treasury').then(r => r.success && setT(r.data));
     get('/risk/alerts').then(r => r.success && setRisk(r.data));
     get('/analytics').then(r => r.success && setAn(r.data));
+    get('/support/config-health').then(r => r.success && setCfg(r.data));
   }, []);
 
   return (
     <div style={{ padding: 16, display: 'grid', gap: 16 }}>
       <Title title="Operations" />
       <h2 style={{ margin: 0 }}>Operations</h2>
+
+      {/* Config / secret health */}
+      <Box>
+        <h3 style={{ marginTop: 0 }}>Config health {cfg && <span style={{ fontSize: 13, fontWeight: 400, color: '#64748b' }}>· {cfg.mode}</span>}</h3>
+        {!cfg ? 'Loading…' : (
+          <>
+            <div style={{ fontWeight: 700, color: cfg.ok ? '#16a34a' : '#dc2626', marginBottom: 8 }}>
+              {cfg.ok ? '✓ No critical config problems' : `✖ ${cfg.critical.length} critical problem(s)`}
+            </div>
+            {[...cfg.critical, ...cfg.warnings].length > 0 && (
+              <ul style={{ margin: '0 0 10px', paddingLeft: 18, fontSize: 13 }}>
+                {cfg.critical.map((c: any, i: number) => <li key={'c' + i} style={{ color: '#dc2626' }}><b>{c.key}:</b> {c.message}</li>)}
+                {cfg.warnings.map((c: any, i: number) => <li key={'w' + i} style={{ color: '#d97706' }}><b>{c.key}:</b> {c.message}</li>)}
+              </ul>
+            )}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {Object.entries(cfg.secrets).map(([k, v]: any) => (
+                <span key={k} style={{ fontSize: 12, padding: '2px 8px', borderRadius: 10, background: v.healthy ? '#dcfce7' : v.set ? '#fef3c7' : '#fee2e2', color: v.healthy ? '#166534' : v.set ? '#b45309' : '#991b1b' }}>
+                  {v.healthy ? '✓' : v.set ? '!' : '✗'} {k}
+                </span>
+              ))}
+            </div>
+          </>
+        )}
+      </Box>
 
       {/* Treasury / reconciliation */}
       <Box>

@@ -4,6 +4,7 @@ import { requireAuth, AuthRequest } from '../middleware/auth';
 import { deriveKeypairFromPhone, getAccountInfo } from '../services/stellar';
 import { isEncryptedKeyValid } from '../services/crypto';
 import { runReconciler, getReconcilerStatus } from '../services/reconciler';
+import { validateEnv } from '../services/envCheck';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -83,6 +84,15 @@ router.get('/support/metrics', requireAuth, requireAdmin, async (_req, res) => {
     prisma.$queryRawUnsafe<any[]>(`SELECT COUNT(*)::int AS c FROM "AdminApproval" WHERE "status"='PENDING'`).then(r => r[0]?.c ?? 0).catch(() => 0),
   ]);
   return res.json(ok({ stuck, failed24, pendingKyc: kyc, openApprovals: approvals }));
+});
+
+// Config health — redacted secret/config status (never returns secret values).
+router.get('/support/config-health', requireAuth, requireAdmin, async (_req, res) => {
+  const r = validateEnv();
+  return res.json(ok({
+    ok: r.ok, mode: r.isMainnet ? 'mainnet' : 'testnet',
+    critical: r.critical, warnings: r.warnings, secrets: r.redacted,
+  }));
 });
 
 // Auto-reconciler — status, recent actions, and a manual "run now" trigger.

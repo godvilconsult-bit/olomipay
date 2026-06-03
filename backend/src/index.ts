@@ -133,6 +133,16 @@ const httpServer = createServer(app);
 
 httpServer.listen(PORT, async () => {
   console.log(`Tuma API v4.2.0 on :${PORT}`);
+
+  // Validate critical secrets/config before doing anything. Fails closed on mainnet.
+  try {
+    const { assertEnvOrWarn } = await import('./services/envCheck');
+    assertEnvOrWarn();
+  } catch (e: any) {
+    console.error('[boot]', e.message);
+    process.exit(1);
+  }
+
   await loadRoutes();
 
   // Socket.io
