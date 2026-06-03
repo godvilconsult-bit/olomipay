@@ -2,6 +2,55 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ════════════════════════════════════════════════════════════════════════════
+   OLOMIPAY · DESIGN TOKENS  (wired from the uploaded colors_and_type.css)
+   Single source of truth for colour, gradients, surfaces, radii, shadows, motion.
+   Inter is already loaded in layout.tsx — no @import needed here.
+   ════════════════════════════════════════════════════════════════════════════ */
+:root {
+  --primary: #1a56db; --primary-light: #3b82f6; --primary-dark: #1e40af;
+  --success: #16a34a; --warning: #d97706; --danger: #dc2626;
+  --emerald: #10b981; --cyan: #22d3ee; --teal: #14b8a6;
+
+  --grad-brand:   linear-gradient(to right, #3b82f6, #22c55e);
+  --grad-balance: linear-gradient(to bottom right, #1a3a6b, #1a56db);
+  --grad-text:    linear-gradient(110deg, #3b82f6, #22d3ee, #22c55e, #3b82f6);
+
+  --bg: #f8fafc; --surface: #ffffff; --surface-2: #f1f5f9;
+  --night: #060b18; --night-2: #0a1120; --night-3: #0b1426;
+  --fg1: #0f172a; --fg2: #334155; --fg3: #64748b; --fg4: #94a3b8;
+  --fg-invert: #f1f5f9; --fg-invert-2: #cbd5e1;
+  --line: #e2e8f0; --line-soft: #f1f5f9;
+  --glass-light: rgba(255,255,255,0.72); --glass-dark: rgba(255,255,255,0.06);
+  --glass-blur: 14px;
+
+  --r-sm: .5rem; --r-md: .75rem; --r-lg: 1rem; --r-xl: 1.5rem; --r-2xl: 2rem; --r-full: 9999px;
+  --shadow-card: 0 8px 30px -12px rgba(30,58,138,.18);
+  --shadow-btn:  0 10px 25px -5px rgba(26,86,219,.25);
+  --shadow-nav:  0 8px 30px -8px rgba(0,0,0,.25);
+  --ease-out: cubic-bezier(.22,1,.36,1); --ease-press: cubic-bezier(.4,0,.2,1);
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --tracking-tight: -0.02em; --tracking-wide: 0.2em;
+}
+
+/* ── Semantic type classes (use directly: className="ds-h1") ──────────────── */
+.ds-display { font-family: var(--font-sans); font-weight: 800; font-size: clamp(2.75rem,8vw,4.5rem); line-height: 1.05; letter-spacing: var(--tracking-tight); }
+.ds-h1      { font-family: var(--font-sans); font-weight: 700; font-size: clamp(1.75rem,6vw,3rem);   line-height: 1.2;  letter-spacing: var(--tracking-tight); }
+.ds-h2      { font-family: var(--font-sans); font-weight: 700; font-size: clamp(1.5rem,5vw,1.875rem); line-height: 1.2; }
+.ds-h3      { font-family: var(--font-sans); font-weight: 600; font-size: 1.125rem; line-height: 1.2; }
+.ds-balance { font-family: var(--font-sans); font-weight: 700; font-size: 2.25rem; letter-spacing: var(--tracking-tight); font-variant-numeric: tabular-nums; }
+.ds-body    { font-family: var(--font-sans); font-weight: 400; font-size: 1rem; line-height: 1.5; color: var(--fg2); }
+.ds-small   { font-family: var(--font-sans); font-size: .875rem; line-height: 1.5; color: var(--fg3); }
+.ds-meta    { font-family: var(--font-sans); font-size: .75rem; color: var(--fg4); }
+.ds-eyebrow { font-family: var(--font-sans); font-weight: 700; font-size: .75rem; text-transform: uppercase; letter-spacing: var(--tracking-wide); color: var(--fg4); }
+.ds-text-gradient {
+  background: var(--grad-text); background-size: 250% 250%;
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  animation: dsGradientShift 6s ease infinite;
+}
+@keyframes dsGradientShift { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+@media (prefers-reduced-motion: reduce) { .ds-text-gradient { animation: none; } }
+
 @layer base {
   /* Minimum 16px body text to prevent iOS auto-zoom on inputs */
   body { font-size: 16px; line-height: 1.5; }
