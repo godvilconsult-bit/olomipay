@@ -7,8 +7,8 @@ import BalanceCard from '../../components/BalanceCard';
 import QuickActions from '../../components/QuickActions';
 import TransactionItem from '../../components/TransactionItem';
 import BottomNav from '../../components/BottomNav';
+import UserAvatar from '../../components/UserAvatar';
 import { auth, wallet } from '../../lib/api';
-import { formatPhone } from '../../lib/utils';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -38,13 +38,22 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="sticky top-0 z-40 bg-slate-50 dark:bg-slate-900 px-5 pt-safe-top pt-4 pb-2">
         <div className="flex items-center justify-between max-w-md mx-auto">
-          <div>
-            <p className="text-xs text-slate-400">Good day,</p>
-            <p className="font-semibold text-slate-800 dark:text-slate-200">
-              {loading ? '…' : formatPhone(user?.phone ?? '')}
-            </p>
+          <div className="flex items-center gap-3 min-w-0">
+            <UserAvatar
+              name={user?.kycName}
+              profilePicUrl={user?.profilePicUrl}
+              size="md"
+              onClick={() => router.push('/profile')}
+            />
+            <div className="min-w-0">
+              <p className="text-xs text-slate-400">Good day,</p>
+              <p className="font-semibold text-slate-800 dark:text-slate-200 truncate">
+                {loading ? '…' : (user?.kycName || user?.userTag || 'OlomiPay User')}
+              </p>
+            </div>
           </div>
-          <button className="p-2 rounded-full bg-white dark:bg-slate-800 shadow-sm min-h-[44px] min-w-[44px] flex items-center justify-center">
+          <button onClick={() => router.push('/notifications')}
+            className="p-2 rounded-full bg-white dark:bg-slate-800 shadow-sm min-h-[44px] min-w-[44px] flex items-center justify-center">
             <Bell size={20} className="text-slate-600 dark:text-slate-300" />
           </button>
         </div>
@@ -66,7 +75,12 @@ export default function DashboardPage() {
         )}
 
         {/* Balance */}
-        <BalanceCard publicKey={user?.stellarPubKey} />
+        <BalanceCard
+          publicKey={user?.stellarPubKey}
+          name={user?.kycName}
+          profilePicUrl={user?.profilePicUrl}
+          userTag={user?.userTag}
+        />
 
         {/* Quick actions */}
         <section>

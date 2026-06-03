@@ -2,6 +2,7 @@ import { Router }      from 'express';
 import { PrismaClient } from '@prisma/client';
 import PDFDocument      from 'pdfkit';
 import { requireAuth, AuthRequest } from '../middleware/auth';
+import { requireStepUp } from '../services/stepUp';
 import {
   getFeeWalletPublic,
   getAccountInfo,
@@ -504,8 +505,10 @@ router.get('/report/pdf-data', requireAuth, requireAdmin, async (req: AuthReques
 
 // ── POST /api/admin/send-stellar ──────────────────────────────────────────────
 // Admin sends XLM or USDC from the platform wallet to any Stellar address.
-// Body: { toAddress, amount, asset ('XLM'|'USDC'), memo }
-router.post('/send-stellar', requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+// HIGH-RISK → step-up: if the admin has 2FA enabled, a fresh totpCode is required
+// (admins without 2FA are unaffected — backward compatible).
+// Body: { toAddress, amount, asset ('XLM'|'USDC'), memo, totpCode? }
+router.post('/send-stellar', requireAuth, requireAdmin, requireStepUp(), async (req: AuthRequest, res) => {
   const { toAddress, amount, asset = 'XLM', memo } = req.body;
   if (!toAddress || !amount) return res.status(400).json(fail('toAddress and amount required'));
   const numAmount = Number(amount);

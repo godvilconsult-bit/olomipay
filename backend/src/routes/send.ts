@@ -7,6 +7,7 @@ import { contractTransfer, userSendXlm, userSendUsdcWithFee, getFeeWalletPublic,
 import { notify } from '../services/notifications';
 import { emitToUser } from '../socket';
 import { verifyPin } from '../services/crypto';
+import { evaluateSend, logRiskReview } from '../services/riskGate';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -88,6 +89,16 @@ router.post('/stellar', requireAuth, sendLimiter, async (req: AuthRequest, res) 
 
   const validPin = await verifyPin(pin, user.pinHash);
   if (!validPin) return res.status(403).json({ error: 'Incorrect PIN' });
+
+  // ── Fraud pre-flight (fail-open; only BLOCKs frozen/over-hard-cap) ────────
+  const risk = await evaluateSend({ userId: user.id, amountUsdc: amount, toAddress });
+  if (risk.decision === 'BLOCK') {
+    await logRiskReview(user.id, amount, risk);
+    return res.status(403).json({ error: 'This transaction was blocked for security. Contact support.', code: 'RISK_BLOCK' });
+  }
+  if (risk.decision === 'REVIEW') {
+    logRiskReview(user.id, amount, risk).catch(() => {}); // flag but allow through
+  }
 
   const dbTx = await prisma.transaction.create({
     data: {
@@ -215,6 +226,9 @@ router.post('/phone', requireAuth, sendLimiter, async (req: AuthRequest, res) =>
       if (!user) return fail('User not found');
       const validPin = await verifyPin(parse.data.pin, user.pinHash);
       if (!validPin) return fail('Incorrect PIN');
+      const risk = await evaluateSend({ userId: user.id, amountUsdc: parse.data.amount, toAddress: recipient.stellarPubKey });
+      if (risk.decision === 'BLOCK') { await logRiskReview(user.id, parse.data.amount, risk); return fail('Transaction blocked for security. Contact support.'); }
+      if (risk.decision === 'REVIEW') logRiskReview(user.id, parse.data.amount, risk).catch(() => {});
       const memo = `To ${parse.data.toPhone}`;
       const hash = await contractTransfer({
         fromEncryptedSecret: user.stellarSecret,
@@ -255,6 +269,14 @@ router.post('/xlm', requireAuth, sendLimiter, async (req: AuthRequest, res) => {
 
   const validPin = await verifyPin(pin, user.pinHash);
   if (!validPin) return res.status(403).json({ error: 'Incorrect PIN' });
+
+  // Fraud pre-flight (fail-open)
+  const risk = await evaluateSend({ userId: user.id, amountUsdc: amount, toAddress });
+  if (risk.decision === 'BLOCK') {
+    await logRiskReview(user.id, amount, risk);
+    return res.status(403).json({ error: 'Transaction blocked for security. Contact support.', code: 'RISK_BLOCK' });
+  }
+  if (risk.decision === 'REVIEW') logRiskReview(user.id, amount, risk).catch(() => {});
 
   const dbTx = await prisma.transaction.create({
     data: { userId: user.id, type: 'SEND', status: 'PENDING', amountXlm: amount, toAddress, memo: memo || undefined },

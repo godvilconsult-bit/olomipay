@@ -582,6 +582,22 @@ export async function setupDatabase(): Promise<void> {
     `);
     await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "AutoReconcileLog_created_idx" ON "AutoReconcileLog" ("createdAt")`).catch(() => {});
 
+    // Risk/fraud review log — flagged transactions for the async FinCrime agent
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "RiskReview" (
+        "id"         TEXT NOT NULL PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        "userId"     TEXT NOT NULL,
+        "amountUsdc" DOUBLE PRECISION,
+        "decision"   TEXT NOT NULL,
+        "score"      INTEGER NOT NULL DEFAULT 0,
+        "reasons"    TEXT,
+        "resolved"   BOOLEAN NOT NULL DEFAULT false,
+        "createdAt"  TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+    `);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "RiskReview_user_idx" ON "RiskReview" ("userId")`).catch(() => {});
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "RiskReview_created_idx" ON "RiskReview" ("createdAt")`).catch(() => {});
+
     // In-app support tickets — customer opens a ticket that lands in the admin console
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "SupportTicket" (

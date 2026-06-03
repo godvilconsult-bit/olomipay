@@ -1,15 +1,20 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Eye, EyeOff, RefreshCw } from 'lucide-react';
+import { Eye, EyeOff, RefreshCw, Copy } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { formatUsdc, formatTzs } from '../lib/utils';
 import { wallet, mobile_money } from '../lib/api';
+import UserAvatar from './UserAvatar';
 
 interface Props {
-  publicKey?: string;
+  publicKey?:     string;
+  name?:          string;
+  profilePicUrl?: string | null;
+  userTag?:       string;
 }
 
-export default function BalanceCard({ publicKey }: Props) {
+export default function BalanceCard({ publicKey, name, profilePicUrl, userTag }: Props) {
   const [usdc,      setUsdc]      = useState<string | null>(null);
   const [xlm,       setXlm]       = useState<string | null>(null);
   const [tzsRate,   setTzsRate]   = useState<number>(2600);
@@ -61,11 +66,25 @@ export default function BalanceCard({ publicKey }: Props) {
 
       <div className="relative z-10">
         <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <img src="/logo.svg" alt="OlomiPay" className="w-5 h-5" />
-            <span className="text-sm font-medium text-white/80">Olomi Wallet</span>
+          {/* Identity: avatar + name + unique tag (NO phone number exposed) */}
+          <div className="flex items-center gap-2.5 min-w-0">
+            <UserAvatar name={name} profilePicUrl={profilePicUrl} size="md"
+              className="ring-2 ring-white/30" />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-white truncate">
+                {name || 'OlomiPay Wallet'}
+              </p>
+              {userTag && (
+                <button
+                  onClick={() => { navigator.clipboard.writeText(userTag); toast.success('Wallet ID copied'); }}
+                  className="flex items-center gap-1 text-[11px] text-white/70 hover:text-white font-mono"
+                >
+                  {userTag} <Copy size={10} />
+                </button>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <button onClick={() => load(true)}
               className="p-1.5 rounded-full hover:bg-white/10 min-h-[32px] min-w-[32px] flex items-center justify-center">
               <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />

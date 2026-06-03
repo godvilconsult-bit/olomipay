@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 import { deriveKeypairFromPhone, activateUserWallet, getBalance, platformSendUsdc } from '../services/stellar';
 import { encryptSecret, hashPin } from '../services/crypto';
+import { roleSatisfies } from '../services/roles';
 
 const router  = Router();
 const prisma  = new PrismaClient();
@@ -17,14 +18,16 @@ async function requireAdmin(req: AuthRequest, res: any, next: any) {
   next();
 }
 
-// ── RBAC — gate by admin role (SUPER_ADMIN bypasses everything) ─────────────────
-// Roles: SUPPORT · COMPLIANCE · FINANCE · SUPER_ADMIN
+// ── RBAC — gate by admin role (OWNER/SUPER_ADMIN bypasses everything) ───────────
+// Accepts BOTH naming systems via roles.ts alias map:
+//   Legacy: SUPPORT · COMPLIANCE · FINANCE · SUPER_ADMIN
+//   New:    VIEWER  · DEVELOPER  · FINANCIAL_CONTROLLER · OWNER
 function requireRole(...roles: string[]) {
   return async (req: AuthRequest, res: any, next: any) => {
-    const u = await prisma.user.findUnique({ where: { id: req.userId! }, select: { isAdmin: true, adminRole: true } as any });
-    const role = (u as any)?.adminRole;
+    const u = await prisma.user.findUnique({ where: { id: req.userId! }, select: { isAdmin: true, adminRole: true } });
     if (!u?.isAdmin) return res.status(403).json(fail('Admin access required'));
-    if (role === 'SUPER_ADMIN' || roles.includes(role)) return next();
+    // roleSatisfies normalizes both stored role and required roles, OWNER bypasses
+    if (roleSatisfies(u.adminRole, roles)) return next();
     return res.status(403).json(fail(`Requires role: ${roles.join(' or ')}`));
   };
 }
