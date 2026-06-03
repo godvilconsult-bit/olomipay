@@ -202,27 +202,32 @@ function SendPageInner() {
               )}
             </div>
 
-            {/* Amount + asset */}
-            <div className="card space-y-3">
-              <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Amount</label>
-              <div className="flex gap-2">
+            {/* Amount + asset — premium centered amount display */}
+            <div className="card flex flex-col items-center gap-3 py-6">
+              <span className="ds-eyebrow">Amount</span>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-semibold text-slate-400">{asset === 'USDC' ? '$' : ''}</span>
                 <input
                   type="number"
                   inputMode="decimal"
-                  placeholder="0.00"
+                  placeholder="0"
                   value={amount}
                   onChange={e => setAmount(e.target.value)}
-                  className="input flex-1 text-2xl font-bold"
+                  className="ds-balance !text-5xl bg-transparent text-center outline-none border-none w-44 text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-slate-600"
                   min="0"
+                  autoFocus
                 />
-                <select
-                  value={asset}
-                  onChange={e => setAsset(e.target.value as 'USDC' | 'XLM')}
-                  className="input w-28 font-semibold"
-                >
-                  <option value="USDC">USDC</option>
-                  <option value="XLM">XLM</option>
-                </select>
+              </div>
+              {/* Asset pills */}
+              <div className="flex gap-2 bg-slate-100 dark:bg-white/5 rounded-full p-1">
+                {(['USDC', 'XLM'] as const).map(a => (
+                  <button key={a} type="button" onClick={() => setAsset(a)}
+                    className={`px-5 py-1.5 rounded-full text-sm font-semibold transition-all ${
+                      asset === a ? 'bg-grad-brand text-white shadow-ds-btn' : 'text-slate-500 dark:text-slate-400'
+                    }`}>
+                    {a}
+                  </button>
+                ))}
               </div>
             </div>
 
