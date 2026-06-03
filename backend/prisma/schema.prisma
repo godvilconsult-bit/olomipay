@@ -159,6 +159,13 @@ model User {
   isAdmin            Boolean   @default(false)
   isFeeCollector     Boolean   @default(false)
   activationFeePaid  Boolean   @default(false)
+  // ── Admin RBAC + 2FA (columns already exist in DB via dbSetup;
+  //    declared here so Prisma is type-aware and code drops the `as any` casts).
+  //    adminRole values in use: FINANCE | COMPLIANCE | SUPER_ADMIN (null = not staff)
+  adminRole          String?
+  isFrozen           Boolean   @default(false)
+  adminTotpSecret    String?
+  adminTotpEnabled   Boolean   @default(false)
   chatSecretKeyEnc   String?
   isOnline           Boolean           @default(false)
   lastSeenAt         DateTime?
