@@ -59,11 +59,11 @@ export default function CardPage() {
               <div className="text-5xl mb-4">💳</div>
               <h2 className="text-xl font-bold mb-2">Get a Virtual Card</h2>
               <p className="text-sm text-slate-500 mb-4">
-                Spend your USDC anywhere Visa is accepted online. Linked to your wallet balance.
+                Spend your balance anywhere Visa is accepted online. Linked to your wallet balance.
               </p>
               <div className="text-left space-y-2 text-sm text-slate-500 mb-6">
                 <p>✅ Instant issuance</p>
-                <p>✅ Spend USDC globally</p>
+                <p>✅ Spend globally</p>
                 <p>✅ Freeze/unfreeze anytime</p>
                 <p>✅ KYC required</p>
               </div>
@@ -119,7 +119,7 @@ export default function CardPage() {
             <div className="card bg-blue-50 dark:bg-blue-900/20 text-sm text-blue-700 dark:text-blue-400">
               <p className="font-medium mb-1">How to use your card</p>
               <p className="text-xs text-blue-600/80">
-                Use your card number and expiry for online purchases. Your USDC balance is automatically debited.
+                Use your card number and expiry for online purchases. Your balance is automatically debited.
                 Card details are never stored — they appeared only once at issuance.
               </p>
             </div>

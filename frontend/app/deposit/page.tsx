@@ -52,7 +52,7 @@ export default function DepositPage() {
   // Receive / QR state
   const [receiveData, setReceiveData] = useState<any>(null);
   const [rcvLoading,  setRcvLoading]  = useState(true);
-  const [qrAsset,     setQrAsset]     = useState<'XLM' | 'USDC'>('XLM');
+  const [qrAsset,     setQrAsset]     = useState<'XLM' | 'USDC'>('USDC');
   const [fundLoading, setFundLoading] = useState(false);
   const [accountInfo, setAccountInfo] = useState<any>(null);
 
@@ -241,12 +241,12 @@ export default function DepositPage() {
                   {accountInfo?.funded ? (
                     <>
                       <p className="text-sm font-semibold text-green-700 dark:text-green-400">Wallet Active ✓</p>
-                      <p className="text-xs text-green-600">{parseFloat(accountInfo.xlm).toFixed(4)} coins · ${parseFloat(accountInfo.usdc).toFixed(2)}</p>
+                      <p className="text-xs text-green-600">Balance ${parseFloat(accountInfo.usdc).toFixed(2)}</p>
                     </>
                   ) : (
                     <>
-                      <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Wallet Not Yet Funded</p>
-                      <p className="text-xs text-amber-600">Get free test coins to activate</p>
+                      <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Activate your wallet</p>
+                      <p className="text-xs text-amber-600">One tap to get your wallet ready</p>
                     </>
                   )}
                 </div>
@@ -254,31 +254,19 @@ export default function DepositPage() {
                   <button onClick={triggerFriendbot} disabled={fundLoading}
                     className="bg-amber-500 text-white text-xs font-bold px-3 py-1.5 rounded-xl disabled:opacity-60 flex items-center gap-1">
                     {fundLoading ? <RefreshCw size={12} className="animate-spin" /> : <Zap size={12} />}
-                    Get coins
+                    Activate
                   </button>
                 )}
               </div>
 
-              {/* Asset toggle */}
-              <div className="flex gap-2 bg-slate-100 dark:bg-slate-800 rounded-2xl p-1">
-                <button onClick={() => setQrAsset('XLM')}
-                  className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all ${
-                    qrAsset === 'XLM' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-400'
-                  }`}>Receive Coins</button>
-                <button onClick={() => setQrAsset('USDC')}
-                  className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all ${
-                    qrAsset === 'USDC' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-400'
-                  }`}>Receive USD</button>
-              </div>
-
-              {/* QR Code */}
+              {/* QR Code — single 'receive money' code */}
               <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 flex flex-col items-center gap-5">
                 <div>
                   <p className="text-center text-sm font-semibold mb-1">
-                    Scan to send {qrAsset === 'XLM' ? 'coins' : 'USD'} · settled on-chain {receiveData?.network === 'testnet' ? '(Test)' : ''}
+                    Scan to receive money
                   </p>
                   <p className="text-center text-xs text-slate-400 mb-4">
-                    Opens automatically in any compatible wallet app
+                    Share this code to get paid instantly
                   </p>
                 </div>
 
@@ -346,7 +334,7 @@ export default function DepositPage() {
                   <li>1. Share your QR code or address with the sender</li>
                   <li>2. The sender scans the QR with their wallet app</li>
                   <li>3. It auto-fills your address — they just enter amount and send</li>
-                  <li>4. Funds arrive in seconds, settled on-chain</li>
+                  <li>4. Funds arrive in seconds</li>
                 </ol>
                 <p className="text-xs text-blue-500 mt-2">
                   Works with any compatible wallet app that reads payment QR codes
@@ -421,23 +409,18 @@ export default function DepositPage() {
                 <div className="px-4 py-3 space-y-2 text-sm">
                   {/* Exchange */}
                   <div className="flex justify-between"><span className="text-slate-500">You pay (M-Pesa)</span><span className="font-semibold">TZS {amountNum.toLocaleString()}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-500">Mid-market rate</span><span>1 USD = TZS {Math.round(feePreview.midRate).toLocaleString()}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-500">Yellow Card rate</span><span>1 USD = TZS {Math.round(feePreview.ycBuyRate).toLocaleString()}</span></div>
-                  <div className="flex justify-between text-slate-500"><span className="flex items-center gap-1">YC spread ({feePreview.ycSpreadPct}%)<span className="text-[9px] bg-blue-100 text-blue-600 px-1 rounded">liquidity provider</span></span><span>− ${(feePreview.ycSpreadUsdc ?? 0).toFixed(4)}</span></div>
-                  <div className="border-t border-slate-100 dark:border-slate-800 pt-2">
-                    <div className="flex justify-between"><span className="text-slate-500">Gross USDC</span><span>${feePreview.grossUsdc.toFixed(4)}</span></div>
-                  </div>
+                  <div className="flex justify-between"><span className="text-slate-500">Exchange rate</span><span>1 USD = TZS {Math.round(feePreview.ycBuyRate).toLocaleString()}</span></div>
+                  <div className="border-t border-slate-100 dark:border-slate-800 pt-2" />
                   {/* Platform fee */}
                   <div className="flex justify-between text-amber-600">
-                    <span className="flex items-center gap-1">OlomiPay fee (1%)<span className="text-[9px] bg-amber-100 text-amber-700 px-1 rounded">to fee wallet</span></span>
-                    <span>− ${feePreview.platformFeeUsdc.toFixed(4)}</span>
+                    <span>OlomiPay fee (1%)</span>
+                    <span>− ${feePreview.platformFeeUsdc.toFixed(2)}</span>
                   </div>
                   {/* Network fee */}
                   <div className="flex justify-between text-slate-400 text-xs">
-                    <span className="flex items-center gap-1">Network fee<span className="text-[9px] bg-purple-100 text-purple-600 px-1 rounded">{feePreview.stellarOps} op</span></span>
-                    <span>{feePreview.stellarFeeXlm} coins ≈ ${feePreview.stellarFeeUsd.toFixed(5)}</span>
+                    <span>Network fee</span>
+                    <span className="text-green-600 font-medium">Free</span>
                   </div>
-                  <div className="text-[10px] text-slate-400 -mt-1 pl-2">paid by platform · settled on-chain</div>
 
                   {/* One-time wallet activation (mainnet first deposit only) */}
                   {feePreview.isFirstDeposit && feePreview.activationFeeUsdc > 0 && (
@@ -454,7 +437,7 @@ export default function DepositPage() {
                   <div className="border-t border-slate-200 dark:border-slate-700 pt-2 flex justify-between font-bold text-base">
                     <span>You receive</span>
                     <span className="text-green-600">
-                      ${(feePreview.netUsdcAfterActivation ?? feePreview.netUsdc).toFixed(4)} USDC
+                      ${(feePreview.netUsdcAfterActivation ?? feePreview.netUsdc).toFixed(2)}
                     </span>
                   </div>
 
@@ -464,8 +447,7 @@ export default function DepositPage() {
                     </p>
                   )}
                   <div className="text-xs text-slate-400 text-center">
-                    Settlement: ~{feePreview.estimatedMins === 0 ? 'instant (testnet)' : `${feePreview.estimatedMins} min`}
-                    {' · '}via {feePreview.provider}
+                    Arrives instantly in your wallet
                   </div>
                 </div>
               ) : (
@@ -473,7 +455,7 @@ export default function DepositPage() {
                   <div className="flex justify-between"><span className="text-slate-500">You pay</span><span className="font-semibold">TZS {amountNum.toLocaleString()}</span></div>
                   <div className="flex justify-between"><span className="text-slate-500">Rate (YC)</span><span>1 USD ≈ TZS {Math.round(rate).toLocaleString()}</span></div>
                   <div className="flex justify-between text-amber-600"><span>OlomiPay fee (1%)</span><span>− {formatUsdc(fee)}</span></div>
-                  <div className="flex justify-between font-bold border-t pt-2"><span>~You receive</span><span className="text-green-600">{formatUsdc(netUsdc)} USDC</span></div>
+                  <div className="flex justify-between font-bold border-t pt-2"><span>~You receive</span><span className="text-green-600">{formatUsdc(netUsdc)}</span></div>
                   {feeLoading && <p className="text-xs text-slate-400 text-center animate-pulse">Fetching exact fees...</p>}
                 </div>
               )}

@@ -117,7 +117,7 @@ function OurTimer({ run }: { run: boolean }) {
           style={{ width: `${pct}%` }} />
       </div>
       <p className="mt-1.5 text-[10px] font-semibold text-emerald-300">
-        {done ? '✓ Settled on-chain' : 'settling…'}
+        {done ? '✓ Settled instantly' : 'settling…'}
       </p>
     </div>
   );

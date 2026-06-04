@@ -75,7 +75,7 @@ export default function MerchantPage() {
           <form onSubmit={handleRegister} className="space-y-4">
             <div className="card text-center py-6">
               <div className="text-5xl mb-3">🏪</div>
-              <h2 className="text-xl font-bold mb-2">Accept USDC Payments</h2>
+              <h2 className="text-xl font-bold mb-2">Accept Payments</h2>
               <p className="text-sm text-slate-500">
                 Get a QR code. Customers scan and pay instantly. No card machine needed.
               </p>
@@ -143,7 +143,7 @@ export default function MerchantPage() {
             <div className="card">
               <p className="text-sm font-medium mb-2 flex items-center gap-2">
                 <TrendingUp size={14} className="text-success" />
-                Total Sales: {formatUsdc(merchant.totalSales)} USDC
+                Total Sales: {formatUsdc(merchant.totalSales)}
               </p>
               <button className="btn-primary w-full text-sm" onClick={async () => {
                 const r = await merchantApi('/cashout', 'POST', { amountUsdc: merchant.totalSales });

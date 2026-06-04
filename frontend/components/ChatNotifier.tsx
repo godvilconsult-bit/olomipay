@@ -155,8 +155,8 @@ export default function ChatNotifier() {
       // Determine message preview text
       const senderName = msg.sender?.kycName ?? msg.sender?.phoneMasked ?? 'Someone';
       const preview =
-        msg.type === 'PAYMENT'         ? `💸 Sent you $${(msg.amountUsdc ?? 0).toFixed(2)} USDC`
-        : msg.type === 'PAYMENT_REQUEST' ? `💛 Requesting $${(msg.amountUsdc ?? 0).toFixed(2)} USDC`
+        msg.type === 'PAYMENT'         ? `💸 Sent you $${(msg.amountUsdc ?? 0).toFixed(2)}`
+        : msg.type === 'PAYMENT_REQUEST' ? `💛 Requesting $${(msg.amountUsdc ?? 0).toFixed(2)}`
         : msg.type === 'IMAGE'           ? '🖼 Sent an image'
         : msg.plainContent ?? msg.encryptedContent
           ? '🔒 New message'
@@ -174,7 +174,7 @@ export default function ChatNotifier() {
             <PaymentToast
               t={t}
               senderName={senderName}
-              amount={`$${(msg.amountUsdc ?? 0).toFixed(2)} USDC`}
+              amount={`$${(msg.amountUsdc ?? 0).toFixed(2)}`}
               isRequest={msg.type === 'PAYMENT_REQUEST'}
               onOpen={() => router.push(`/chat/${msg.conversationId}`)}
             />
@@ -217,9 +217,7 @@ export default function ChatNotifier() {
     // ── Money received (from send page, not chat) ─────────────────────────
     const u3 = on('money_received', ({ amount, from, asset, conversationId }: any) => {
       playSound('payment');
-      const amtStr = asset === 'XLM'
-        ? `${Number(amount).toFixed(4)} coins`
-        : `$${Number(amount).toFixed(2)} USDC`;
+      const amtStr = `$${Number(amount).toFixed(2)}`;
       toast.custom(
         t => (
           <PaymentToast
@@ -242,7 +240,7 @@ export default function ChatNotifier() {
           <PaymentToast
             t={t}
             senderName="OlomiPay"
-            amount={`$${Number(amountUsdc).toFixed(2)} USDC`}
+            amount={`$${Number(amountUsdc).toFixed(2)}`}
             isRequest={false}
             onOpen={() => router.push('/history')}
           />

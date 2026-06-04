@@ -89,7 +89,7 @@ export default function WithdrawPage() {
 
             {/* Amount */}
             <div className="card space-y-3">
-              <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Withdraw (USDC)</label>
+              <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Withdraw (USD)</label>
               <div className="flex items-center gap-3 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 min-h-[64px]">
                 <span className="text-slate-400 font-medium">$</span>
                 <input
@@ -116,7 +116,7 @@ export default function WithdrawPage() {
             {amountUsdc > 0 && (
               <div className="bg-slate-50 dark:bg-slate-800/60 rounded-2xl p-4 space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-slate-500">USDC deducted</span>
+                  <span className="text-slate-500">Amount deducted</span>
                   <span className="font-semibold text-danger">−{formatUsdc(amountUsdc)}</span>
                 </div>
                 <div className="border-t border-slate-200 dark:border-slate-700 pt-2 flex justify-between font-semibold">

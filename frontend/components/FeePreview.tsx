@@ -9,9 +9,9 @@ interface Props {
 export default function FeePreview({ grossAmount, asset, fee, net, tzsRate = 2600 }: Props) {
   if (!grossAmount) return null;
 
-  const dp  = asset === 'XLM' ? 4 : 2;
+  // Single-balance model — always present money as USD ($). Asset code never shown.
   const tzs = (n: number) => (n * tzsRate).toLocaleString('en-US', { maximumFractionDigits: 0 });
-  const isUsdc = asset === 'USDC';
+  const usd = (n: number) => '$' + n.toFixed(2);
 
   return (
     <div className="rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden text-sm">
@@ -25,8 +25,8 @@ export default function FeePreview({ grossAmount, asset, fee, net, tzsRate = 260
         <div className="flex justify-between">
           <span className="text-slate-500">Amount you send</span>
           <div className="text-right">
-            <p className="font-semibold">{grossAmount.toFixed(dp)} {asset}</p>
-            {isUsdc && <p className="text-xs text-slate-400">≈ TZS {tzs(grossAmount)}</p>}
+            <p className="font-semibold">{usd(grossAmount)}</p>
+            <p className="text-xs text-slate-400">≈ TZS {tzs(grossAmount)}</p>
           </div>
         </div>
 
@@ -37,8 +37,8 @@ export default function FeePreview({ grossAmount, asset, fee, net, tzsRate = 260
             <span className="ml-1.5 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-medium">1%</span>
           </div>
           <div className="text-right">
-            <p className="font-semibold text-amber-600">− {fee.toFixed(dp)} {asset}</p>
-            {isUsdc && <p className="text-xs text-slate-400">≈ TZS {tzs(fee)}</p>}
+            <p className="font-semibold text-amber-600">− {usd(fee)}</p>
+            <p className="text-xs text-slate-400">≈ TZS {tzs(fee)}</p>
           </div>
         </div>
 
@@ -57,8 +57,8 @@ export default function FeePreview({ grossAmount, asset, fee, net, tzsRate = 260
         <div className="flex justify-between">
           <span className="font-semibold">Recipient gets</span>
           <div className="text-right">
-            <p className="font-bold text-green-600 text-base">{net.toFixed(dp)} {asset}</p>
-            {isUsdc && <p className="text-xs text-slate-400">≈ TZS {tzs(net)}</p>}
+            <p className="font-bold text-green-600 text-base">{usd(net)}</p>
+            <p className="text-xs text-slate-400">≈ TZS {tzs(net)}</p>
           </div>
         </div>
       </div>

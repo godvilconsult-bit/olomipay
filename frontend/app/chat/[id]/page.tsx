@@ -92,11 +92,9 @@ function PaymentBubble({
               {confirmed ? '✓ Confirmed' : failed ? '✕ Declined' : '○ Pending…'}
             </span>
             {msg.stellarTxId && (
-              <a href={`https://stellar.expert/explorer/testnet/tx/${msg.stellarTxId}`}
-                target="_blank" rel="noopener noreferrer"
-                className="text-xs text-primary underline">
-                Receipt ↗
-              </a>
+              <span className="text-[10px] text-slate-400 font-mono">
+                Ref {String(msg.stellarTxId).slice(0, 8).toUpperCase()}
+              </span>
             )}
           </div>
         </div>
@@ -466,15 +464,15 @@ export default function ChatThread() {
     });
 
     // Money received from REST API (e.g. from /send page) — real-time toast
-    const u9 = on('money_received', ({ amount, from, asset }: any) => {
+    const u9 = on('money_received', ({ amount, from }: any) => {
       sounds.moneyIn();
-      toast.success(`💚 Umepokea ${asset === 'XLM' ? `${amount} XLM` : `$${Number(amount).toFixed(2)} USDC`} kutoka ${from}`);
+      toast.success(`💚 Umepokea $${Number(amount).toFixed(2)} kutoka ${from}`);
     });
 
     // Deposit confirmed
-    const u10 = on('deposit_confirmed', ({ amountUsdc, currency, amountLocal }: any) => {
+    const u10 = on('deposit_confirmed', ({ amountUsdc }: any) => {
       sounds.moneyIn();
-      toast.success(`💚 Amana imefanikiwa! $${Number(amountUsdc).toFixed(2)} USDC`);
+      toast.success(`💚 Amana imefanikiwa! $${Number(amountUsdc).toFixed(2)}`);
     });
 
     return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); u11(); };
@@ -845,9 +843,9 @@ function MoneySheet({ name, recipientId, convId, onClose, onSent, emit }: any) {
   );
 
   const amt = parseFloat(amount) || 0;
-  const fmt = (n: number) =>
-    asset === 'XLM' ? `${n.toFixed(n < 1 ? 4 : 2)} XLM` : `$${n.toFixed(2)}`;
-  const quick = asset === 'XLM' ? [5, 10, 25, 50] : [1, 5, 10, 20];
+  // Single-balance model — money is always shown as USD ($). No asset choice.
+  const fmt = (n: number) => `$${n.toFixed(2)}`;
+  const quick = [1, 5, 10, 20];
 
   function doSend() {
     if (req) {
@@ -892,25 +890,13 @@ function MoneySheet({ name, recipientId, convId, onClose, onSent, emit }: any) {
               {req ? `Request from ${name}` : `Send to ${name}`}
             </p>
 
-            {/* Big amount */}
-            <div className="mb-3 flex items-center justify-center gap-2">
+            {/* Big amount — money is always USD */}
+            <div className="mb-4 flex items-baseline justify-center gap-1">
+              <span className="text-3xl font-bold text-white/40">$</span>
               <input
                 type="number" inputMode="decimal" placeholder="0" value={amount}
                 onChange={e => setAmount(e.target.value)} autoFocus
                 className="w-40 bg-transparent text-center text-5xl font-extrabold outline-none placeholder:text-white/20" />
-            </div>
-
-            {/* Asset selector */}
-            <div className="mb-4 flex justify-center gap-2">
-              {(['USDC', 'XLM'] as const).map(a => (
-                <button key={a} onClick={() => setAsset(a)}
-                  className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-semibold transition-all ${
-                    asset === a ? 'bg-gradient-to-r from-blue-500 to-emerald-500 text-white shadow-lg shadow-blue-500/25' : 'bg-white/5 text-slate-400'
-                  }`}>
-                  <span className={`h-2 w-2 rounded-full ${a === 'USDC' ? 'bg-emerald-400' : 'bg-cyan-400'}`} />
-                  {a}
-                </button>
-              ))}
             </div>
 
             {/* Quick chips */}
@@ -920,7 +906,7 @@ function MoneySheet({ name, recipientId, convId, onClose, onSent, emit }: any) {
                   className={`rounded-xl py-2 text-sm font-semibold transition-colors ${
                     amt === q ? 'bg-white/15 text-white' : 'bg-white/5 text-slate-400 hover:bg-white/10'
                   }`}>
-                  {asset === 'XLM' ? q : `$${q}`}
+                  ${q}
                 </button>
               ))}
             </div>

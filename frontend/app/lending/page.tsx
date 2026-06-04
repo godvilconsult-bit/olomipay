@@ -121,7 +121,7 @@ export default function LendingPage() {
                   </div>
                 </div>
                 <div className="text-xs text-slate-500">
-                  Collateral required: {formatUsdc(loan.amountUsdc * 0.1)} USDC (10%)
+                  Collateral required: {formatUsdc(loan.amountUsdc * 0.1)} (10%)
                 </div>
                 <button onClick={() => handleRequest(loan.id)} className="btn-primary w-full text-sm">
                   Request Loan
@@ -142,7 +142,7 @@ export default function LendingPage() {
               <form onSubmit={handleListLoan} className="card space-y-3">
                 <h3 className="font-semibold">List a Loan</h3>
                 <div>
-                  <label className="text-xs text-slate-500 block mb-1">Amount (USDC)</label>
+                  <label className="text-xs text-slate-500 block mb-1">Amount (USD)</label>
                   <input type="number" value={form.amountUsdc} onChange={e => setForm(f => ({ ...f, amountUsdc: e.target.value }))} className="input" required />
                 </div>
                 <div>

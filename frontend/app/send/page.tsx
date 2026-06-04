@@ -23,7 +23,7 @@ function SendPageInner() {
   const [step,      setStep]      = useState<Step>('form');
   const [recipient, setRecipient] = useState('');
   const [amount,    setAmount]    = useState('');
-  const [asset,     setAsset]     = useState<'USDC' | 'XLM'>('XLM');
+  const [asset,     setAsset]     = useState<'USDC' | 'XLM'>('USDC');
   const [memo,      setMemo]      = useState('');
   const [pin,       setPin]       = useState('');
   const [loading,   setLoading]   = useState(false);
@@ -110,19 +110,14 @@ function SendPageInner() {
           </div>
           <h2 className="text-2xl font-bold">Sent!</h2>
           <p className="text-slate-500 text-sm">
-            {net.toFixed(2)} {asset} sent to {recipient.length > 20
+            ${net.toFixed(2)} sent to {recipient.length > 20
               ? recipient.slice(0, 8) + '...' + recipient.slice(-4)
               : recipient}
           </p>
           {txHash && (
-            <div className="bg-slate-100 dark:bg-slate-800 rounded-xl p-3 space-y-2">
-              <p className="text-xs text-slate-400 font-mono break-all">{txHash}</p>
-              <a
-                href={`https://stellar.expert/explorer/testnet/tx/${txHash}`}
-                target="_blank" rel="noopener noreferrer"
-                className="flex items-center justify-center gap-1.5 text-xs text-primary font-semibold">
-                <ExternalLink size={12} /> View on-chain receipt
-              </a>
+            <div className="bg-slate-100 dark:bg-slate-800 rounded-xl p-3">
+              <p className="text-[10px] uppercase tracking-wide text-slate-400 mb-0.5">Reference no.</p>
+              <p className="text-xs text-slate-500 font-mono break-all">{txHash.slice(0, 18).toUpperCase()}</p>
             </div>
           )}
           <div className="flex flex-col gap-3">
@@ -202,11 +197,11 @@ function SendPageInner() {
               )}
             </div>
 
-            {/* Amount + asset — premium centered amount display */}
-            <div className="card flex flex-col items-center gap-3 py-6">
+            {/* Amount — single money balance, always USD ($). No asset choice. */}
+            <div className="card flex flex-col items-center gap-2 py-6">
               <span className="ds-eyebrow">Amount</span>
               <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-semibold text-slate-400">{asset === 'USDC' ? '$' : ''}</span>
+                <span className="text-2xl font-semibold text-slate-400">$</span>
                 <input
                   type="number"
                   inputMode="decimal"
@@ -218,17 +213,7 @@ function SendPageInner() {
                   autoFocus
                 />
               </div>
-              {/* Asset pills — friendly labels (USDC→USD, XLM→Coins); value stays the asset code */}
-              <div className="flex gap-2 bg-slate-100 dark:bg-white/5 rounded-full p-1">
-                {([['USDC', 'USD'], ['XLM', 'Coins']] as const).map(([a, lbl]) => (
-                  <button key={a} type="button" onClick={() => setAsset(a)}
-                    className={`px-5 py-1.5 rounded-full text-sm font-semibold transition-all ${
-                      asset === a ? 'bg-grad-brand text-white shadow-ds-btn' : 'text-slate-500 dark:text-slate-400'
-                    }`}>
-                    {lbl}
-                  </button>
-                ))}
-              </div>
+              <span className="text-xs text-slate-400">USD · sent instantly</span>
             </div>
 
             {/* Memo */}
@@ -267,7 +252,7 @@ function SendPageInner() {
             <div className="card w-full text-center">
               <p className="text-sm text-slate-500 mb-1">Sending</p>
               <p className="text-3xl font-bold text-slate-900 dark:text-white">
-                {net.toFixed(2)} {asset}
+                ${net.toFixed(2)}
               </p>
               <p className="text-sm text-slate-400 mt-1">
                 to <span className="font-semibold text-slate-700 dark:text-slate-200">{resolved?.found ? resolved.name : (recipient.length > 20
@@ -279,7 +264,7 @@ function SendPageInner() {
                 <p className="text-xs text-amber-600 mt-1">⚠ External wallet — irreversible</p>
               )}
               <p className="text-xs text-slate-400 mt-3">
-                Fee: {fee.toFixed(4)} {asset} (1%)
+                Fee: ${fee.toFixed(2)} (1%)
               </p>
             </div>
 
@@ -291,7 +276,7 @@ function SendPageInner() {
               disabled={pin.length < 6 || loading}
               className="btn-primary w-full text-base"
             >
-              {loading ? 'Sending…' : `Send ${net.toFixed(2)} ${asset}`}
+              {loading ? 'Sending…' : `Send $${net.toFixed(2)}`}
             </button>
           </div>
         )}

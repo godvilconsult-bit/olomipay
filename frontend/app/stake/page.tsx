@@ -67,7 +67,7 @@ export default function StakePage() {
           <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center mx-auto text-4xl">🔒</div>
           <h2 className="text-2xl font-bold">Staked! Earning {selected?.apy} APY</h2>
           <p className="text-slate-500 text-sm">
-            Your {formatUsdc(parseFloat(amount))} USDC is locked for {selected?.days} days.
+            Your {formatUsdc(parseFloat(amount))} is locked for {selected?.days} days.
             Yield accrues every second.
           </p>
           <button onClick={() => { setStep('select'); setAmount(''); setSelected(null); }} className="btn-primary w-full">
@@ -86,7 +86,7 @@ export default function StakePage() {
           className="p-2 -ml-2 rounded-full hover:bg-slate-100 min-h-[44px] min-w-[44px] flex items-center justify-center">
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-lg font-semibold">USDC Staking</h1>
+        <h1 className="text-lg font-semibold">Staking</h1>
       </div>
 
       <div className="px-5 max-w-md mx-auto mt-4 space-y-4">
@@ -140,7 +140,7 @@ export default function StakePage() {
                     <div key={amt} className="flex justify-between">
                       <span>Stake ${amt}</span>
                       <span className="text-success font-medium">
-                        +{formatUsdc(amt * (pool.apyBps / 10000) * pool.days / 365)} USDC
+                        +{formatUsdc(amt * (pool.apyBps / 10000) * pool.days / 365)}
                       </span>
                     </div>
                   ))}
@@ -176,12 +176,12 @@ export default function StakePage() {
               <p className="text-xs text-white/50 mt-1">Early exit: 1% penalty</p>
             </div>
             <div className="card space-y-3">
-              <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Stake amount (USDC)</label>
+              <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Stake amount (USD)</label>
               <input type="number" placeholder="0.00" value={amount}
                 onChange={e => setAmount(e.target.value)} className="input text-2xl font-bold" autoFocus />
               {parseFloat(amount) > 0 && (
                 <p className="text-xs text-success">
-                  You'll earn ~{formatUsdc(parseFloat(amount) * (selected.apyBps / 10000) * selected.days / 365)} USDC
+                  You'll earn ~{formatUsdc(parseFloat(amount) * (selected.apyBps / 10000) * selected.days / 365)}
                 </p>
               )}
             </div>

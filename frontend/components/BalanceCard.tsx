@@ -109,11 +109,11 @@ export default function BalanceCard({ publicKey, name, profilePicUrl, userTag }:
           ≈ {hidden ? '•••' : formatTzs(tzsEquiv)} TZS
         </div>
 
-        {/* Coins balance — no Stellar mention */}
+        {/* Single-balance model — no second asset shown */}
         <div className="flex items-center gap-2 text-xs text-white/50">
-          <span>{hidden ? '••' : `${parseFloat(xlm ?? '0').toFixed(2)} coins`}</span>
+          <span>Olomi Wallet</span>
           <span>·</span>
-          <span>OlomiPay · Building Trust Through Blockchain</span>
+          <span>Building Trust Through Blockchain</span>
         </div>
       </div>
     </div>

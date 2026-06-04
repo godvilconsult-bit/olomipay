@@ -60,9 +60,9 @@ export default function InvestPage() {
             <CheckCircle2 size={40} className="text-success" />
           </div>
           <h2 className="text-2xl font-bold">Investment Confirmed! 📈</h2>
-          <p className="text-slate-500">${amount} USDC invested in {selected?.name}</p>
+          <p className="text-slate-500">${amount} invested in {selected?.name}</p>
           <p className="text-xs text-slate-400">
-            Projected annual return: {formatUsdc(parseFloat(amount) * (selected?.couponRateBps / 10000))} USDC
+            Projected annual return: {formatUsdc(parseFloat(amount) * (selected?.couponRateBps / 10000))}
           </p>
           <button onClick={() => { setStep('list'); setAmount(''); setSelected(null); }} className="btn-primary w-full">
             View Portfolio
@@ -191,7 +191,7 @@ export default function InvestPage() {
               <p className="text-xs text-white/60 mt-1">Matures in {selected.daysToMaturity} days</p>
             </div>
             <div className="card space-y-3">
-              <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Investment amount (USDC)</label>
+              <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Investment amount (USD)</label>
               <input type="number" placeholder={`Min ${selected.minInvestment}`}
                 value={amount} onChange={e => setAmount(e.target.value)}
                 className="input text-2xl font-bold" autoFocus />
@@ -200,13 +200,13 @@ export default function InvestPage() {
                   <div className="flex justify-between">
                     <span className="text-slate-500">Annual return</span>
                     <span className="font-bold text-success">
-                      +{formatUsdc(parseFloat(amount) * (selected.couponRateBps / 10000))} USDC
+                      +{formatUsdc(parseFloat(amount) * (selected.couponRateBps / 10000))}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">At maturity ({selected.daysToMaturity}d)</span>
                     <span className="font-semibold text-success">
-                      +{formatUsdc(parseFloat(amount) * (selected.couponRateBps / 10000) * selected.daysToMaturity / 365)} USDC
+                      +{formatUsdc(parseFloat(amount) * (selected.couponRateBps / 10000) * selected.daysToMaturity / 365)}
                     </span>
                   </div>
                 </div>

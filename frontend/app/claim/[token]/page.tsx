@@ -36,7 +36,7 @@ export default function ClaimPage() {
             <CheckCircle2 size={40} className="text-success" />
           </div>
           <h1 className="text-2xl font-bold">Funds Claimed! 🎉</h1>
-          <p className="text-slate-500">${amount?.toFixed(2)} USDC has been added to your wallet.</p>
+          <p className="text-slate-500">${amount?.toFixed(2)} has been added to your wallet.</p>
           <button onClick={() => router.push('/dashboard')} className="btn-primary w-full">Go to Wallet</button>
         </div>
       </div>

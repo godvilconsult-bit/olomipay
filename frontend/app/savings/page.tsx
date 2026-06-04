@@ -111,10 +111,10 @@ export default function SavingsPage() {
               <h3 className="font-semibold mb-3">How it works</h3>
               <div className="space-y-3 text-sm text-slate-600 dark:text-slate-400">
                 {[
-                  ['🌱', 'Deposit USDC into your savings vault'],
+                  ['🌱', 'Deposit into your savings vault'],
                   ['📈', `Earn ${APY}% APY — accrues every second`],
                   ['💸', 'Withdraw anytime (best after 30 days)'],
-                  ['🔒', 'Secured by smart contract · settled on-chain'],
+                  ['🔒', 'Bank-grade security — your funds, always yours'],
                 ].map(([icon, text]) => (
                   <div key={text as string} className="flex items-start gap-3">
                     <span className="text-lg">{icon}</span>
@@ -146,7 +146,7 @@ export default function SavingsPage() {
                       <div key={period} className="flex justify-between">
                         <span className="text-slate-500">{period}</span>
                         <span className="font-semibold text-green-700 dark:text-green-400">
-                          +{formatUsdc(yield_)} USDC
+                          +{formatUsdc(yield_)}
                         </span>
                       </div>
                     ))}
@@ -165,12 +165,12 @@ export default function SavingsPage() {
               <p className="text-lg font-semibold">{formatUsdc(balance)}</p>
             </div>
             <div className="card space-y-3">
-              <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Deposit amount (USDC)</label>
+              <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Deposit amount (USD)</label>
               <input type="number" placeholder="0.00" value={amount}
                 onChange={e => setAmount(e.target.value)} className="input text-2xl font-bold" autoFocus />
               {amountNum > 0 && (
                 <p className="text-xs text-green-600">
-                  You'll earn ~{formatUsdc(projectedMonthly)} USDC per month
+                  You'll earn ~{formatUsdc(projectedMonthly)} per month
                 </p>
               )}
             </div>
@@ -230,7 +230,7 @@ export default function SavingsPage() {
               })()
             )}
             <div className="card space-y-3">
-              <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Withdraw amount (USDC)</label>
+              <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Withdraw amount (USD)</label>
               <input type="number" placeholder="0.00" value={amount}
                 onChange={e => setAmount(e.target.value)} className="input text-2xl font-bold" autoFocus />
               <p className="text-xs text-slate-500">

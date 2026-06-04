@@ -76,7 +76,7 @@ export default function ProtectPage() {
             <span className="font-semibold">Your savings are USD-protected</span>
           </div>
           <p className="text-sm text-white/80">
-            While TZS loses value every year, your USDC maintains its USD value.
+            While TZS loses value every year, your balance maintains its USD value.
             See the difference below.
           </p>
         </div>
@@ -127,7 +127,7 @@ export default function ProtectPage() {
               <div className="bg-green-50 dark:bg-green-900/20 rounded-2xl p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <TrendingUp size={16} className="text-success" />
-                  <span className="text-sm font-semibold text-success">OlomiPay USDC (1 year)</span>
+                  <span className="text-sm font-semibold text-success">OlomiPay (1 year)</span>
                 </div>
                 <p className="text-lg font-bold text-slate-800 dark:text-slate-200">
                   {formatUsdc(comparison.tumaUsdc.usdcHeld)} = {formatTzs(comparison.tumaUsdc.valueNowTzs)}

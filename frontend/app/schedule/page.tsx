@@ -101,7 +101,6 @@ export default function SchedulePage() {
                 <label className="text-xs text-slate-500 block mb-1">Asset</label>
                 <select value={form.asset} onChange={e => setForm(f => ({ ...f, asset: e.target.value }))} className="input w-24">
                   <option value="USDC">USD</option>
-                  <option value="XLM">Coins</option>
                 </select>
               </div>
             </div>
@@ -152,7 +151,7 @@ export default function SchedulePage() {
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-sm">{s.toName ?? s.toPhone ?? s.toAddress?.slice(0,8)+'...'}</p>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    {formatUsdc(s.amount)} {s.asset} · {FREQ_LABELS[s.frequency]}
+                    {formatUsdc(s.amount)} · {FREQ_LABELS[s.frequency]}
                   </p>
                   <p className="text-xs text-slate-400 mt-1">
                     Next: {new Date(s.nextRunAt).toLocaleDateString('en-TZ')}

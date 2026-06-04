@@ -89,7 +89,7 @@ export default function ProfilePage() {
     toast.loading('Funding wallet from testnet...', { id: 'fund' });
     try {
       await fetch(`https://friendbot.stellar.org?addr=${wallet.address}`);
-      toast.success('Wallet funded with test coins!', { id: 'fund' });
+      toast.success('Wallet activated!', { id: 'fund' });
       // Refresh wallet
       const r = await fetch(`${API}/api/swap/wallet`, { headers: { Authorization: `Bearer ${getToken()}` } }).then(r => r.json());
       if (r.success) setWallet(r.data);
@@ -239,7 +239,7 @@ export default function ProfilePage() {
               {wallet?.network === 'testnet' && user?.walletKeyValid !== false && (
                 <button onClick={fundWallet}
                   className="flex items-center gap-1.5 text-xs text-amber-600 font-semibold bg-amber-50 px-3 py-1.5 rounded-xl ml-auto">
-                  <RefreshCw size={12} /> Get test coins
+                  <RefreshCw size={12} /> Activate wallet
                 </button>
               )}
             </div>

@@ -73,7 +73,7 @@ export default function ChamaPage() {
           <p className="text-sm font-semibold mb-1">What is a Chama?</p>
           <p className="text-xs text-white/80">
             A rotating savings group where members contribute each month and take turns receiving the full pot.
-            All funds secured by smart contracts · settled on-chain.
+            All funds are secured and protected.
           </p>
         </div>
 
@@ -87,7 +87,7 @@ export default function ChamaPage() {
                 onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="input" required />
             </div>
             <div>
-              <label className="text-xs text-slate-500 block mb-1">Monthly contribution (USDC)</label>
+              <label className="text-xs text-slate-500 block mb-1">Monthly contribution (USD)</label>
               <input type="number" placeholder="50" value={form.contributionUsdc}
                 onChange={e => setForm(f => ({ ...f, contributionUsdc: e.target.value }))} className="input" required />
             </div>
