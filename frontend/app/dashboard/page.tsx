@@ -2,11 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bell, Repeat, Receipt, TrendingUp, Briefcase, History, LifeBuoy, ChevronRight, AlertTriangle } from 'lucide-react';
+import { Bell, Repeat, Receipt, TrendingUp, Briefcase, History, LifeBuoy, AlertTriangle } from 'lucide-react';
 import BalanceCard from '../../components/BalanceCard';
 import BottomNav from '../../components/BottomNav';
 import UserAvatar from '../../components/UserAvatar';
-import ThemeToggle from '../../components/ThemeToggle';
 import { auth } from '../../lib/api';
 
 /** Time-aware greeting for the header eyebrow. */
@@ -78,6 +77,8 @@ export default function DashboardPage() {
             { label: 'Bills',    icon: Receipt,    href: '/bills',    tint: 'text-violet-600 dark:text-violet-400'},
             { label: 'Grow',     icon: TrendingUp, href: '/grow',     tint: 'text-emerald-600 dark:text-emerald-400'},
             { label: 'Business', icon: Briefcase,  href: '/business', tint: 'text-blue-600 dark:text-blue-400'   },
+            { label: 'Activity', icon: History,    href: '/history',  tint: 'text-primary dark:text-blue-400'    },
+            { label: 'Support',  icon: LifeBuoy,   href: '/support',  tint: 'text-rose-600 dark:text-rose-400'   },
           ].map(({ label, icon: Icon, href, tint }) => (
             <button key={href} onClick={() => router.push(href)}
               className="flex flex-col items-center gap-2 active:scale-95 transition-transform">
@@ -100,39 +101,6 @@ export default function DashboardPage() {
               <span className="text-[11px] font-medium text-amber-600 dark:text-amber-400 text-center leading-tight">Activate wallet</span>
             </button>
           )}
-        </section>
-
-        {/* Quick links — activity & support */}
-        <div className="card divide-y divide-slate-100 dark:divide-white/10 p-0 overflow-hidden">
-          <button onClick={() => router.push('/history')}
-            className="w-full flex items-center gap-3 px-4 py-4 hover:bg-slate-50 dark:hover:bg-white/5 active:scale-[0.99] transition-all">
-            <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center text-primary flex-shrink-0">
-              <History size={18} />
-            </div>
-            <div className="flex-1 text-left">
-              <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">View activity</p>
-              <p className="text-xs text-slate-400">All your payments &amp; transfers</p>
-            </div>
-            <ChevronRight size={18} className="text-slate-400 flex-shrink-0" />
-          </button>
-
-          <button onClick={() => router.push('/support')}
-            className="w-full flex items-center gap-3 px-4 py-4 hover:bg-slate-50 dark:hover:bg-white/5 active:scale-[0.99] transition-all">
-            <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400 flex-shrink-0">
-              <LifeBuoy size={18} />
-            </div>
-            <div className="flex-1 text-left">
-              <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Support</p>
-              <p className="text-xs text-slate-400">Report a problem — we’ll help you</p>
-            </div>
-            <ChevronRight size={18} className="text-slate-400 flex-shrink-0" />
-          </button>
-        </div>
-
-        {/* Appearance — light / dark / system */}
-        <section>
-          <h2 className="ds-eyebrow mb-2">Appearance</h2>
-          <ThemeToggle />
         </section>
 
         {/* KYC banner */}
