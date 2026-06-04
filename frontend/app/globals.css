@@ -435,12 +435,16 @@
    screen, the canvas scrolls (and the sticky header stays pinned to the top).
    This removes the document-level scroll/bounce that used to hide top content. */
 .app-canvas {
-  height: 100dvh;
+  height: var(--app-vh, 100dvh);    /* shrinks when the keyboard opens (iOS too) */
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior-y: contain;   /* no rubber-band chaining to the page */
   -webkit-overflow-scrolling: touch;
 }
+
+/* Full-height pages (chat, etc.) and bottom-sheet modals follow the visible
+   viewport so their content / composer stays above the on-screen keyboard. */
+.h-app-vh { height: var(--app-vh, 100dvh) !important; }
 /* Page roots fill the canvas exactly (not 100vh) so short pages don't scroll. */
 .app-canvas .min-h-screen,
 .app-canvas [class*="min-h-screen"] {

@@ -233,9 +233,9 @@ function AcceptPayModal({
   const [pin, setPin] = useState('');
   const fmtAmt = (n: number) => formatUsdc(n);  // single-balance: always $
   return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end">
+    <div className="fixed inset-x-0 top-0 z-50 flex flex-col justify-end h-app-vh">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative bg-white dark:bg-slate-900 rounded-t-3xl px-5 pt-5 pb-10 space-y-5">
+      <div className="relative max-h-full overflow-y-auto bg-white dark:bg-slate-900 rounded-t-3xl px-5 pt-5 pb-10 space-y-5">
         <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto" />
         <div className="text-center">
           <div className="w-16 h-16 bg-green-50 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -553,7 +553,7 @@ export default function ChatThread() {
   const name = other?.kycName ?? other?.displayName ?? other?.phoneMasked ?? '...';
 
   return (
-    <div className="h-[100dvh] flex flex-col bg-slate-50 dark:bg-[#0a1120] chat-bg">
+    <div className="h-app-vh flex flex-col bg-slate-50 dark:bg-[#0a1120] chat-bg">
 
       {/* Selection action bar — replaces header in select mode */}
       {selectMode ? (
@@ -861,10 +861,10 @@ function MoneySheet({ name, recipientId, convId, onClose, onSent, emit }: any) {
   const accent = req ? 'amber' : 'blue';
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end">
+    <div className="fixed inset-x-0 top-0 z-50 flex flex-col justify-end h-app-vh">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm anim-pop" onClick={onClose} />
 
-      <div className="relative anim-pop rounded-t-[2rem] border-t border-white/10 bg-[#0b1426] text-white px-5 pt-3 pb-9 shadow-2xl overflow-hidden">
+      <div className="relative anim-pop max-h-full overflow-y-auto rounded-t-[2rem] border-t border-white/10 bg-[#0b1426] text-white px-5 pt-3 pb-9 shadow-2xl">
         {/* glow */}
         <div className={`anim-glow pointer-events-none absolute -top-16 left-1/2 -translate-x-1/2 h-40 w-40 rounded-full blur-3xl ${req ? 'bg-amber-500/20' : 'bg-blue-500/25'}`} />
 

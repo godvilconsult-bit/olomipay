@@ -17,25 +17,37 @@ import { useEffect } from 'react';
  */
 export default function KeyboardAware() {
   useEffect(() => {
-    // 1) Scroll the focused field into view (after the keyboard settles)
+    const vv: VisualViewport | undefined = (window as any).visualViewport;
+
+    // 1) Expose the visible viewport height (--app-vh) and keyboard inset
+    //    (--kb-inset). Driving layout off the VisualViewport works even on
+    //    iOS Safari, where the keyboard OVERLAYS content (innerHeight/dvh do
+    //    not shrink) and fixed bottom bars would otherwise hide behind it.
+    const root = document.documentElement;
+    const applyInset = () => {
+      if (!vv) return;
+      const inset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      root.style.setProperty('--kb-inset', `${inset}px`);
+      root.style.setProperty('--app-vh',  `${Math.round(vv.height)}px`);
+    };
+
+    // 2) Only scroll a focused field into view when it is ACTUALLY hidden
+    //    behind the keyboard (or above the top). Use an instant, nearest
+    //    scroll so PIN entry (which refocuses on every digit) never bounces.
     const onFocusIn = (e: FocusEvent) => {
       const t = e.target as HTMLElement | null;
       if (!t) return;
       if (!/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
-      // Don't fight inputs inside already-fixed bottom bars (chat composer)
-      const fixedAncestor = t.closest('.fixed, [data-no-kb-scroll]');
-      if (fixedAncestor) return;
+      if (t.closest('[data-no-kb-scroll]')) return;
       setTimeout(() => {
-        try { t.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch {}
-      }, 280);
-    };
-
-    // 2) Expose keyboard inset as --kb-inset for sticky bottom bars
-    const vv: VisualViewport | undefined = (window as any).visualViewport;
-    const applyInset = () => {
-      if (!vv) return;
-      const inset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-      document.documentElement.style.setProperty('--kb-inset', `${inset}px`);
+        if (!vv) return;
+        const r = t.getBoundingClientRect();
+        const top    = vv.offsetTop + 8;
+        const bottom = vv.offsetTop + vv.height - 8;
+        if (r.bottom > bottom || r.top < top) {
+          try { t.scrollIntoView({ block: 'center', behavior: 'auto' }); } catch {}
+        }
+      }, 300);
     };
 
     document.addEventListener('focusin', onFocusIn);
