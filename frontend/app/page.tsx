@@ -1,458 +1,186 @@
+'use client';
+
+/* ════════════════════════════════════════════════════════════════════════════
+   OlomiPay — Landing (dark "2030" skin)
+   Ported faithfully from the UI kit (ui_kits/app/marketing.jsx → Landing).
+   Single immersive hero: aurora orbs + drifting world-currency activity stream
+   + "Send money like you chat." Nothing from the old marketing page is reused.
+   ════════════════════════════════════════════════════════════════════════════ */
+
 import Link from 'next/link';
-import {
-  ArrowRight, MessageCircle, TrendingUp, ShieldCheck, Globe2,
-  Zap, Send, PiggyBank, Sparkles, Check, Clock, Eye, Lock, X,
-} from 'lucide-react';
-import Reveal from '../components/Reveal';
-import CountUp from '../components/CountUp';
-import SpeedRace from '../components/SpeedRace';
+import { ArrowRight } from 'lucide-react';
+import AlreadyAuthed from '../components/AlreadyAuthed';
 
-/* Pan-African rails — every MNO + bank OlomiPay connects to */
-const RAILS = [
-  'Airtel Money', 'MTN MoMo', 'Tigo Pesa', 'Orange Money',
-  'Vodafone Cash', 'EcoCash', 'Zamtel', 'HaloPesa',
-  'CRDB Bank', 'NMB Bank', 'KCB', 'Equity Bank', 'USDC',
-];
-
-/* ── Drifting world-activity stream (both sides of the hero) ──────────────── */
-type FeedCard =
-  | { kind: 'currency'; flag: string; country: string; code: string; rate: string; accent: string }
-  | { kind: 'transfer'; f1: string; f2: string; amt: string; label: string };
-
-const FEED_LEFT: FeedCard[] = [
-  { kind: 'currency', flag: '🇹🇿', country: 'Tanzania',     code: 'TZS', rate: '2,600',  accent: '#1a56db' },
-  { kind: 'transfer', f1: '🇰🇪', f2: '🇺🇸', amt: '$24.00',  label: 'Kenya → USA'         },
-  { kind: 'currency', flag: '🇳🇬', country: 'Nigeria',      code: 'NGN', rate: '1,580',  accent: '#16a34a' },
-  { kind: 'currency', flag: '🇯🇵', country: 'Japan',        code: 'JPY', rate: '157',    accent: '#dc2626' },
-  { kind: 'transfer', f1: '🇬🇭', f2: '🇬🇧', amt: '$50.00',  label: 'Ghana → UK'          },
-  { kind: 'currency', flag: '🇿🇦', country: 'South Africa', code: 'ZAR', rate: '18.4',   accent: '#d97706' },
-  { kind: 'currency', flag: '🇮🇳', country: 'India',        code: 'INR', rate: '83.5',   accent: '#a855f7' },
-  { kind: 'transfer', f1: '🇺🇬', f2: '🇸🇦', amt: '$35.00',  label: 'Uganda → Saudi'      },
-];
-const FEED_RIGHT: FeedCard[] = [
+// ── Ambient feed — world flags + currencies drifting behind the hero ──────────
+const FEED_A = [
+  { kind: 'currency', flag: '🇹🇿', country: 'Tanzania',     code: 'TZS', rate: '2,600', accent: '#1a56db' },
+  { kind: 'transfer', f1: '🇰🇪', f2: '🇺🇸', amt: '$24.00', label: 'Kenya → USA' },
+  { kind: 'currency', flag: '🇳🇬', country: 'Nigeria',      code: 'NGN', rate: '1,580', accent: '#16a34a' },
+  { kind: 'currency', flag: '🇯🇵', country: 'Japan',        code: 'JPY', rate: '157',   accent: '#dc2626' },
+  { kind: 'transfer', f1: '🇬🇭', f2: '🇬🇧', amt: '$50.00', label: 'Ghana → UK' },
+  { kind: 'currency', flag: '🇿🇦', country: 'South Africa', code: 'ZAR', rate: '18.4',  accent: '#d97706' },
+  { kind: 'currency', flag: '🇮🇳', country: 'India',        code: 'INR', rate: '83.5',  accent: '#a855f7' },
+  { kind: 'transfer', f1: '🇺🇬', f2: '🇸🇦', amt: '$35.00', label: 'Uganda → Saudi' },
+] as const;
+const FEED_B = [
   { kind: 'currency', flag: '🇬🇧', country: 'United Kingdom', code: 'GBP', rate: '0.79', accent: '#2563eb' },
   { kind: 'currency', flag: '🇩🇪', country: 'Germany',        code: 'EUR', rate: '0.93', accent: '#1e40af' },
-  { kind: 'transfer', f1: '🇷🇼', f2: '🇦🇪', amt: '$30.00',    label: 'Rwanda → UAE'        },
-  { kind: 'currency', flag: '🇨🇳', country: 'China',          code: 'CNY', rate: '7.24',  accent: '#dc2626' },
-  { kind: 'currency', flag: '🇧🇷', country: 'Brazil',         code: 'BRL', rate: '4.97',  accent: '#16a34a' },
-  { kind: 'transfer', f1: '🇿🇲', f2: '🇨🇦', amt: '$60.00',    label: 'Zambia → Canada'     },
-  { kind: 'currency', flag: '🇦🇺', country: 'Australia',      code: 'AUD', rate: '1.53',  accent: '#0891b2' },
-  { kind: 'currency', flag: '🇦🇪', country: 'UAE',            code: 'AED', rate: '3.67',  accent: '#f59e0b' },
-];
+  { kind: 'transfer', f1: '🇷🇼', f2: '🇦🇪', amt: '$30.00',   label: 'Rwanda → UAE' },
+  { kind: 'currency', flag: '🇨🇳', country: 'China',          code: 'CNY', rate: '7.24', accent: '#dc2626' },
+  { kind: 'currency', flag: '🇧🇷', country: 'Brazil',         code: 'BRL', rate: '4.97', accent: '#16a34a' },
+  { kind: 'transfer', f1: '🇿🇲', f2: '🇨🇦', amt: '$60.00',   label: 'Zambia → Canada' },
+  { kind: 'currency', flag: '🇦🇺', country: 'Australia',      code: 'AUD', rate: '1.53', accent: '#0891b2' },
+  { kind: 'currency', flag: '🇦🇪', country: 'UAE',            code: 'AED', rate: '3.67', accent: '#f59e0b' },
+] as const;
 
-function ActivityCard({ c }: { c: FeedCard }) {
-  const base = 'mb-2.5 rounded-2xl p-2.5 text-left backdrop-blur-md border border-white/10 bg-white/[0.06] shadow-[0_8px_24px_-14px_rgba(0,0,0,.8)] flex items-center gap-2.5';
-  if (c.kind === 'currency') return (
-    <div className={base} style={{ borderLeft: `3px solid ${c.accent}` }}>
-      <span className="text-2xl leading-none flex-shrink-0">{c.flag}</span>
-      <div className="min-w-0">
-        <p className="text-[12px] font-bold text-slate-100 leading-tight">{c.country}</p>
-        <p className="text-[11px] text-slate-400 mt-0.5">
-          <span className="font-semibold" style={{ color: c.accent }}>{c.code}</span>
-          <span className="text-slate-600"> · 1 USD = {c.rate}</span>
-        </p>
+function ActCard(c: any, key: number) {
+  const base: React.CSSProperties = {
+    marginBottom: 12, borderRadius: 16, padding: '10px 13px',
+    background: 'rgba(255,255,255,.07)', border: '1px solid rgba(255,255,255,.11)',
+    backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
+    display: 'flex', alignItems: 'center', gap: 10,
+    boxShadow: '0 8px 24px -14px rgba(0,0,0,.8)',
+  };
+  if (c.kind === 'currency') {
+    return (
+      <div key={key} style={{ ...base, borderLeft: `3px solid ${c.accent}` }}>
+        <span style={{ fontSize: 26, lineHeight: 1, flexShrink: 0 }}>{c.flag}</span>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: '#f1f5f9', lineHeight: 1.2 }}>{c.country}</div>
+          <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
+            <span style={{ fontWeight: 600, color: c.accent }}>{c.code}</span>
+            <span style={{ color: '#475569' }}> · 1 USD = {c.rate}</span>
+          </div>
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
   return (
-    <div className={base}>
-      <span className="text-xl flex-shrink-0">{c.f1}</span>
-      <div className="w-4 h-[1.5px] bg-emerald-400/60 rounded-full flex-shrink-0" />
-      <span className="text-xl flex-shrink-0">{c.f2}</span>
-      <div className="flex-1 min-w-0 ml-1">
-        <p className="text-[13px] font-bold text-white">{c.amt}</p>
-        <p className="text-[10px] text-slate-400">{c.label} · ✓ settled</p>
+    <div key={key} style={base}>
+      <span style={{ fontSize: 20, flexShrink: 0 }}>{c.f1}</span>
+      <div style={{ width: 18, height: 1.5, background: 'rgba(52,211,153,.6)', borderRadius: 999, flexShrink: 0 }} />
+      <span style={{ fontSize: 20, flexShrink: 0 }}>{c.f2}</span>
+      <div style={{ flex: 1, minWidth: 0, marginLeft: 2 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{c.amt}</div>
+        <div style={{ fontSize: 10.5, color: '#94a3b8' }}>{c.label} · ✓ settled</div>
       </div>
     </div>
   );
 }
 
 function ActivityStream() {
+  const col = (items: readonly any[], dur: string, side: 'left' | 'right', offset: number) => (
+    <div style={{ position: 'absolute', top: 0, [side]: -6, width: 192, height: '100%', overflow: 'hidden' } as React.CSSProperties}>
+      <div className="olo-rise" style={{ position: 'absolute', top: offset, left: 0, right: 0, animationDuration: dur }}>
+        {[...items, ...items].map((c, i) => ActCard(c, i))}
+      </div>
+    </div>
+  );
   return (
-    <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden opacity-75">
-      {/* Left column */}
-      <div className="absolute top-0 left-0 w-44 h-full overflow-hidden">
-        <div className="anim-rise" style={{ '--rise-dur': '42s' } as React.CSSProperties}>
-          {[...FEED_LEFT, ...FEED_LEFT].map((c, i) => <ActivityCard key={i} c={c} />)}
-        </div>
-      </div>
-      {/* Right column — offset + different speed */}
-      <div className="absolute top-0 right-0 w-44 h-full overflow-hidden">
-        <div className="anim-rise" style={{ '--rise-dur': '56s', marginTop: '-120px' } as React.CSSProperties}>
-          {[...FEED_RIGHT, ...FEED_RIGHT].map((c, i) => <ActivityCard key={i} c={c} />)}
-        </div>
-      </div>
+    <div style={{ position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none', opacity: 0.88 }}>
+      {col(FEED_A, '40s', 'left', 0)}
+      {col(FEED_B, '54s', 'right', -100)}
+    </div>
+  );
+}
+
+function Aurora() {
+  return (
+    <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 0 }}>
+      <div className="olo-aurora" style={{ position: 'absolute', top: '-22%', left: '-22%', width: '62vmax', height: '62vmax', borderRadius: '50%', background: 'rgba(37,99,235,.45)', filter: 'blur(110px)' }} />
+      <div className="olo-aurora" style={{ position: 'absolute', bottom: '-25%', right: '-20%', width: '58vmax', height: '58vmax', borderRadius: '50%', background: 'rgba(16,185,129,.40)', filter: 'blur(110px)', animationDelay: '-7s' }} />
+      <div className="olo-aurora" style={{ position: 'absolute', top: '28%', right: '-18%', width: '46vmax', height: '46vmax', borderRadius: '50%', background: 'rgba(34,211,238,.34)', filter: 'blur(110px)', animationDelay: '-13s' }} />
+      <div className="olo-aurora" style={{ position: 'absolute', bottom: '8%', left: '-18%', width: '44vmax', height: '44vmax', borderRadius: '50%', background: 'rgba(99,102,241,.30)', filter: 'blur(110px)', animationDelay: '-18s' }} />
     </div>
   );
 }
 
 export default function LandingPage() {
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#060b18] text-white">
+    <main
+      style={{
+        position: 'relative', minHeight: '100vh', overflow: 'hidden', color: '#fff',
+        background: 'radial-gradient(125% 95% at 50% 0%, #0b1c44 0%, #060f29 55%, #04081a 100%)',
+      }}
+    >
+      {/* Scoped animations for this landing (olo-* — not used anywhere else) */}
+      <style>{`
+        @keyframes olo-aurora { 0%,100%{transform:translate(0,0) scale(1)} 33%{transform:translate(6%,-4%) scale(1.1)} 66%{transform:translate(-5%,5%) scale(.95)} }
+        @keyframes olo-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-14px)} }
+        @keyframes olo-gradient { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
+        @keyframes olo-rise { from{transform:translateY(0)} to{transform:translateY(-50%)} }
+        @keyframes olo-pulse { 0%{box-shadow:0 0 0 0 rgba(52,211,153,.55)} 70%{box-shadow:0 0 0 7px rgba(52,211,153,0)} 100%{box-shadow:0 0 0 0 rgba(52,211,153,0)} }
+        .olo-aurora { animation: olo-aurora 20s ease-in-out infinite; }
+        .olo-float  { animation: olo-float 6s ease-in-out infinite; }
+        .olo-rise   { animation: olo-rise linear infinite; }
+        .olo-pulse-dot { animation: olo-pulse 2s ease-out infinite; }
+        .olo-gradient-text {
+          background: linear-gradient(110deg,#3b82f6,#22d3ee,#22c55e,#3b82f6);
+          background-size: 250% 250%;
+          -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+          animation: olo-gradient 6s ease infinite;
+        }
+        .olo-glow { position: relative; }
+        .olo-glow::before {
+          content:''; position:absolute; inset:-2px; border-radius:inherit;
+          background:linear-gradient(110deg,#3b82f6,#22c55e,#22d3ee); filter:blur(14px); opacity:.5; z-index:-1;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .olo-aurora, .olo-float, .olo-rise, .olo-pulse-dot, .olo-gradient-text { animation: none; }
+        }
+      `}</style>
 
-      {/* ── Animated aurora background ───────────────────────────────────────── */}
-      <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-        <div className="anim-aurora absolute -top-1/4 -left-1/4 h-[60vmax] w-[60vmax] rounded-full bg-blue-600/30 blur-[120px]" />
-        <div className="anim-aurora absolute top-1/3 -right-1/4 h-[55vmax] w-[55vmax] rounded-full bg-emerald-500/25 blur-[120px]" style={{ animationDelay: '-6s' }} />
-        <div className="anim-aurora absolute bottom-0 left-1/4 h-[50vmax] w-[50vmax] rounded-full bg-cyan-500/20 blur-[120px]" style={{ animationDelay: '-12s' }} />
-        <div className="anim-aurora absolute top-1/2 left-1/3 h-[40vmax] w-[40vmax] rounded-full bg-indigo-500/15 blur-[140px]" style={{ animationDelay: '-18s' }} />
-        {/* subtle grid */}
-        <div className="absolute inset-0 opacity-[0.04]"
-          style={{ backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)', backgroundSize: '48px 48px' }} />
-      </div>
+      {/* Redirect already-logged-in users straight to the dashboard */}
+      <AlreadyAuthed />
 
-      {/* ── Nav ──────────────────────────────────────────────────────────────── */}
-      <nav className="relative z-20 mx-auto flex w-full max-w-6xl items-center justify-between px-5 py-5">
-        <div className="hero-rise hd1 flex items-center gap-2.5">
-          <img src="/logo.svg" alt="OlomiPay" className="h-9 w-9 anim-float" />
-          <div>
-            <p className="text-lg font-bold leading-tight">OlomiPay</p>
-            <p className="text-[8px] uppercase tracking-[0.2em] text-blue-300/80">Building Trust Through Blockchain</p>
+      <Aurora />
+      <ActivityStream />
+
+      {/* Readability scrim: dark center + anchored bottom */}
+      <div style={{
+        position: 'absolute', inset: 0, zIndex: 1, pointerEvents: 'none',
+        background: 'radial-gradient(74% 52% at 50% 44%, rgba(4,8,26,.96) 30%, rgba(4,8,26,.7) 55%, transparent 84%), linear-gradient(to top, #04081a 5%, transparent 30%)',
+      }} />
+
+      {/* Content column — mobile-first, centered on larger screens */}
+      <div style={{
+        position: 'relative', zIndex: 2, minHeight: '100vh',
+        maxWidth: 440, margin: '0 auto',
+        display: 'flex', flexDirection: 'column', padding: '18px 22px 34px',
+      }}>
+        {/* Top bar */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+            <img src="/logo.svg" alt="OlomiPay" width={30} height={30} className="olo-float" />
+            <span style={{ fontSize: 16, fontWeight: 700 }}>OlomiPay</span>
           </div>
-        </div>
-        <div className="hero-rise hd2 flex items-center gap-2">
-          <Link href="/auth/login" className="px-4 py-2 text-sm text-slate-300 transition-colors hover:text-white">
+          <Link href="/auth/login" style={{ fontSize: 13, fontWeight: 500, color: '#e2e8f0', background: 'rgba(255,255,255,.07)', border: '1px solid rgba(255,255,255,.14)', padding: '8px 16px', borderRadius: 999, textDecoration: 'none' }}>
             Sign in
           </Link>
-          <Link href="/auth/register"
-            className="cta-glow rounded-full bg-white px-5 py-2 text-sm font-semibold text-slate-900 transition-transform hover:scale-105">
-            Get started
-          </Link>
         </div>
-      </nav>
 
-      {/* ── Hero ─────────────────────────────────────────────────────────────── */}
-      <section className="relative z-10 mx-auto flex max-w-6xl flex-col items-center px-5 pt-12 pb-20 text-center md:pt-20 overflow-hidden">
-        <ActivityStream />
-
-        {/* Dark centre scrim so hero text stays readable over the stream */}
-        <div className="pointer-events-none absolute inset-0 z-[1]"
-          style={{ background: 'radial-gradient(74% 52% at 50% 44%, rgba(6,11,24,.96) 30%, rgba(6,11,24,.72) 55%, transparent 85%), linear-gradient(to top, #060b18 4%, transparent 28%)' }} />
-
-        <div className="relative z-[2] flex flex-col items-center">
-          <div className="hero-rise hd2 mb-6 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-xs backdrop-blur">
-            <span className="anim-live-pulse h-1.5 w-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
-            <span className="text-slate-200"><b className="text-white font-bold">$1.2M</b> moving today · Money + Chat + Earn</span>
+        {/* Hero */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 9, borderRadius: 999, border: '1px solid rgba(255,255,255,.14)', background: 'rgba(255,255,255,.07)', padding: '7px 15px', fontSize: 12.5, color: '#e2e8f0' }}>
+            <span className="olo-pulse-dot" style={{ width: 7, height: 7, borderRadius: 999, background: '#34d399', flexShrink: 0 }} />
+            <span><b style={{ color: '#fff', fontWeight: 700 }}>$1.2M</b> moving today</span>
           </div>
-
-          <h1 className="hero-rise hd3 ds-display max-w-3xl">
-            Send money the way
-            <br />
-            you <span className="ds-text-gradient">chat</span>.
+          <h1 style={{ fontSize: 47, fontWeight: 800, lineHeight: 1.02, letterSpacing: '-0.035em', margin: '20px 0 0' }}>
+            Send money<br />like you <span className="olo-gradient-text">chat</span>.
           </h1>
-
-          <p className="hero-rise hd4 mt-6 max-w-xl text-lg text-slate-300/90">
-            Others take up to 10 minutes. We settle <span className="font-semibold text-white">100% in seconds</span> —
-            every time, around the clock. Deposit from any mobile money network or bank,
-            then send right inside the conversation.
+          <p style={{ fontSize: 15.5, color: 'rgba(203,213,225,.85)', maxWidth: 290, margin: '16px 0 0', lineHeight: 1.5 }}>
+            Deposit, send and cash out in seconds — right inside the conversation.
           </p>
-
-          <div className="hero-rise hd5 mt-9 flex flex-col items-center gap-3 sm:flex-row">
-            <Link href="/auth/register"
-              className="cta-glow group inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-blue-500 to-emerald-500 px-8 py-4 text-base font-semibold shadow-2xl transition-transform hover:scale-105">
-              Create free account
-              <ArrowRight size={18} className="transition-transform group-hover:translate-x-1" />
-            </Link>
-            <Link href="/auth/login"
-              className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-8 py-4 text-base font-semibold backdrop-blur transition-colors hover:bg-white/10">
-              I have an account
-            </Link>
-          </div>
-
-          {/* Floating hero mock — a live "money in chat" card */}
-          <div className="hero-rise hd5 relative mt-16 w-full max-w-sm">
-            <div className="anim-glow absolute -inset-6 -z-10 rounded-[2.5rem] bg-gradient-to-tr from-blue-500/40 to-emerald-500/40 blur-2xl" />
-
-            <div className="glass anim-float rounded-[2rem] p-5 text-left shadow-2xl">
-              {/* chat header */}
-              <div className="mb-4 flex items-center gap-3 border-b border-white/10 pb-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-emerald-500 font-bold">A</div>
-                <div className="flex-1">
-                  <p className="text-sm font-semibold">Amina</p>
-                  <p className="text-[11px] text-emerald-300">● online</p>
-                </div>
-                <MessageCircle size={16} className="text-slate-400" />
-              </div>
-
-              {/* incoming bubble */}
-              <div className="mb-2 max-w-[75%] rounded-2xl rounded-bl-sm bg-white/10 px-3.5 py-2 text-sm">
-                Lunch was 8 bucks 😄
-              </div>
-
-              {/* money card bubble */}
-              <div className="ml-auto max-w-[82%] rounded-2xl rounded-br-sm bg-gradient-to-br from-blue-500 to-emerald-500 p-0.5">
-                <div className="rounded-[15px] bg-[#0b1426] px-4 py-3">
-                  <p className="text-[11px] text-emerald-300">💸 You sent</p>
-                  <p className="text-2xl font-bold">$8.00</p>
-                  <div className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-400">
-                    <Check size={12} className="text-emerald-400" />
-                    Settled instantly · 0.8s
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-3 flex items-center gap-2 rounded-full bg-white/5 px-3 py-2 text-xs text-slate-400">
-                <span className="flex-1">Type a message…</span>
-                <Send size={14} className="text-blue-400" />
-              </div>
-            </div>
-
-            {/* floating side chips */}
-            <div className="anim-float-slow glass absolute -left-10 top-10 hidden rounded-2xl px-3 py-2 text-xs sm:block">
-              <p className="text-emerald-300">+ 6.5% APY</p>
-              <p className="text-slate-400">on savings</p>
-            </div>
-            <div className="anim-float-slow glass absolute -right-8 bottom-16 hidden rounded-2xl px-3 py-2 text-xs sm:block" style={{ animationDelay: '-4s' }}>
-              <p className="text-cyan-300">1% flat</p>
-              <p className="text-slate-400">no hidden fees</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Rails marquee ────────────────────────────────────────────────────── */}
-      <section className="relative z-10 border-y border-white/10 bg-white/[0.02] py-5">
-        <p className="mb-3 text-center text-[11px] uppercase tracking-[0.25em] text-slate-500">
-          One wallet · every rail in Africa
-        </p>
-        <div className="relative overflow-hidden">
-          <div className="anim-marquee flex w-max gap-4">
-            {[...RAILS, ...RAILS].map((rail, i) => (
-              <span key={i} className="flex items-center gap-2 whitespace-nowrap rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-300">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                {rail}
-              </span>
-            ))}
-          </div>
-          <div className="pointer-events-none absolute inset-y-0 left-0 w-20 bg-gradient-to-r from-[#060b18] to-transparent" />
-          <div className="pointer-events-none absolute inset-y-0 right-0 w-20 bg-gradient-to-l from-[#060b18] to-transparent" />
-        </div>
-      </section>
-
-      {/* ── The fundamental difference: Speed · Security · Social ────────────── */}
-      <section className="relative z-10 mx-auto max-w-6xl px-5 py-24">
-        <Reveal className="mx-auto mb-4 max-w-3xl text-center">
-          <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-xs text-slate-300">
-            <Sparkles size={13} className="text-cyan-300" /> The fundamental difference
-          </p>
-          <h2 className="text-3xl font-bold sm:text-5xl">
-            Built different at the <span className="text-gradient-anim">core</span>
-          </h2>
-          <p className="mx-auto mt-4 max-w-xl text-slate-400">
-            Other apps move money through slow, opaque pipes. OlomiPay rewires
-            the rails themselves — so speed, security and connection are the foundation, not features.
-          </p>
-        </Reveal>
-
-        <div className="mt-12 grid gap-5 lg:grid-cols-3">
-          {[
-            {
-              icon: Clock,
-              tag: 'SPEED',
-              color: 'from-blue-500 to-cyan-500',
-              headline: 'Seconds — guaranteed, every time',
-              them: 'Most apps promise quick transfers. But money hops through partner banks and payout networks — it slows at night, on weekends, on holidays. You wait and wonder.',
-              us: 'Every transfer settles in 3–5 seconds, 100% of the time — even at 3AM on a Sunday. Finality is mathematics, not a promise. No waiting, no wondering.',
-            },
-            {
-              icon: Eye,
-              tag: 'SECURITY',
-              color: 'from-indigo-500 to-blue-500',
-              headline: 'Verify it yourself — don\'t just trust us',
-              them: 'Your money sits inside a company\'s custody pipeline. Your messages live on their servers. Security is a promise you\'re asked to believe.',
-              us: 'Every shilling is settled with a receipt you can verify yourself. Chats are end-to-end encrypted — even we can\'t read them. Your wallet is keyed to your phone. Provable, not promised.',
-            },
-            {
-              icon: MessageCircle,
-              tag: 'SOCIAL',
-              color: 'from-emerald-500 to-teal-500',
-              headline: 'Send money while you talk',
-              them: 'You open the app, type an account number, send, and leave. The money is a transaction. The relationship ends at "sent."',
-              us: 'Money lives inside the conversation. Split a bill, request from a friend, pay as you chat — all in the same thread. The transaction becomes part of the relationship.',
-            },
-          ].map((p, i) => (
-            <Reveal key={p.tag} delay={(i + 1) as 1 | 2 | 3} className="glass flex flex-col rounded-3xl p-6">
-              <div className="mb-4 flex items-center gap-3">
-                <div className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br ${p.color}`}>
-                  <p.icon size={20} />
-                </div>
-                <span className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">{p.tag}</span>
-              </div>
-
-              <h3 className="mb-4 text-lg font-semibold leading-snug">{p.headline}</h3>
-
-              {p.tag === 'SPEED' && <SpeedRace />}
-
-              {/* Others */}
-              <div className="mb-3 rounded-2xl border border-white/5 bg-white/[0.02] p-3">
-                <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                  <X size={12} className="text-red-400/80" /> Others
-                </div>
-                <p className="text-sm leading-relaxed text-slate-400">{p.them}</p>
-              </div>
-
-              {/* OlomiPay */}
-              <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.06] p-3">
-                <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-emerald-300">
-                  <Check size={12} /> OlomiPay
-                </div>
-                <p className="text-sm leading-relaxed text-slate-200">{p.us}</p>
-              </div>
-            </Reveal>
-          ))}
         </div>
 
-        {/* Punch line */}
-        <Reveal delay={2} className="mx-auto mt-12 max-w-3xl text-center">
-          <p className="text-xl font-semibold leading-relaxed text-slate-200 sm:text-2xl">
-            A transfer is an <span className="text-slate-500">event</span>.
-            A conversation is a <span className="text-gradient-anim">relationship</span>.
-            <br className="hidden sm:block" />
-            People don&apos;t want to send money and leave — they want to send money while they talk.
-          </p>
-        </Reveal>
-      </section>
-
-      {/* ── More than a transfer app ──────────────────────────────────────────── */}
-      <section className="relative z-10 mx-auto max-w-6xl px-5 py-24">
-        <Reveal className="mx-auto mb-14 max-w-2xl text-center">
-          <h2 className="text-3xl font-bold sm:text-4xl">More than a transfer app</h2>
-          <p className="mt-3 text-slate-400">
-            Most apps stop at "send". OlomiPay lets your money chat, grow, and work for you.
-          </p>
-        </Reveal>
-
-        <div className="grid gap-5 md:grid-cols-3">
-          {[
-            { icon: MessageCircle, c: 'from-blue-500 to-cyan-500',    t: 'Chat & Pay',        d: 'Send money inside a conversation — encrypted end-to-end. No account numbers, just a message.' },
-            { icon: TrendingUp,    c: 'from-emerald-500 to-teal-500', t: 'Earn while you hold', d: 'Your balance earns interest automatically. Stake, save in a goal, or join a group Chama.' },
-            { icon: ShieldCheck,   c: 'from-indigo-500 to-blue-500',  t: 'Instant & transparent', d: 'Every transfer settles in seconds with a full fee receipt — a flat 1%, shown before you confirm.' },
-          ].map((f, i) => (
-            <Reveal key={f.t} delay={(i + 1) as 1 | 2 | 3} className="glass group rounded-3xl p-6">
-              <div className={`mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br ${f.c}`}>
-                <f.icon size={22} />
-              </div>
-              <h3 className="mb-1.5 text-lg font-semibold">{f.t}</h3>
-              <p className="text-sm leading-relaxed text-slate-400">{f.d}</p>
-            </Reveal>
-          ))}
-        </div>
-
-        {/* Secondary feature row */}
-        <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            { icon: Globe2,    t: 'Pan-African',   d: 'Every major MNO + bank' },
-            { icon: Zap,       t: 'Instant',       d: 'Seconds, not days' },
-            { icon: PiggyBank, t: 'Goals & Chama', d: 'Save together' },
-            { icon: Send,      t: 'Payroll',       d: 'Pay teams in bulk' },
-          ].map((f, i) => (
-            <Reveal key={f.t} delay={(i + 1) as 1 | 2 | 3 | 4} className="glass rounded-2xl p-5">
-              <f.icon size={20} className="mb-3 text-blue-300" />
-              <p className="font-semibold">{f.t}</p>
-              <p className="text-sm text-slate-400">{f.d}</p>
-            </Reveal>
-          ))}
-        </div>
-      </section>
-
-      {/* ── Stats ────────────────────────────────────────────────────────────── */}
-      <section className="relative z-10 border-y border-white/10 bg-gradient-to-b from-white/[0.03] to-transparent py-16">
-        <div className="mx-auto grid max-w-4xl grid-cols-2 gap-8 px-5 text-center md:grid-cols-4">
-          {[
-            { v: 1,   s: '%',    p: '', label: 'Flat fee, always'  },
-            { v: 0.8, s: 's',    p: '', label: 'Avg settlement', dec: 1 },
-            { v: 13,  s: '+',    p: '', label: 'Payment rails'    },
-            { v: 256, s: '-bit', p: '', label: 'Encryption'       },
-          ].map((st) => (
-            <div key={st.label} className="anim-pop">
-              <p className="text-4xl font-extrabold text-gradient-anim">
-                <CountUp to={st.v} suffix={st.s} prefix={st.p} decimals={st.dec ?? 0} />
-              </p>
-              <p className="mt-1 text-sm text-slate-400">{st.label}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── Security you can trust ───────────────────────────────────────────── */}
-      <section className="relative z-10 mx-auto max-w-6xl px-5 py-24">
-        <Reveal className="mx-auto mb-12 max-w-2xl text-center">
-          <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-xs text-slate-300">
-            <Lock size={13} className="text-emerald-300" /> Security you can trust
-          </p>
-          <h2 className="ds-h2">Bank-grade protection, <span className="ds-text-gradient">on every payment</span></h2>
-          <p className="mx-auto mt-4 max-w-xl text-slate-400">
-            Trust isn&apos;t a slogan — it&apos;s built in. Here&apos;s what guards every shilling you move.
-          </p>
-        </Reveal>
-
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            { icon: Zap,         c: 'from-blue-500 to-cyan-500',    t: 'Real-time screening',   d: 'Every transfer is checked in under 50 milliseconds before it leaves your wallet.' },
-            { icon: ShieldCheck, c: 'from-emerald-500 to-teal-500', t: 'Verified & reconciled', d: 'Every transfer is settled and auto-reconciled in real time — your balance is always accurate.' },
-            { icon: Lock,        c: 'from-indigo-500 to-blue-500',  t: 'End-to-end encrypted',  d: 'Your chats are encrypted on your device. Even we cannot read them.' },
-            { icon: Eye,         c: 'from-cyan-500 to-emerald-500', t: '1% flat — shown upfront', d: 'See the exact fee and what your recipient gets before you confirm. No surprises, ever.' },
-          ].map((f, i) => (
-            <Reveal key={f.t} delay={(i + 1) as 1 | 2 | 3 | 4} className="glass rounded-3xl p-6">
-              <div className={`mb-4 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br ${f.c}`}>
-                <f.icon size={20} />
-              </div>
-              <h3 className="mb-1.5 text-base font-semibold leading-snug">{f.t}</h3>
-              <p className="text-sm leading-relaxed text-slate-400">{f.d}</p>
-            </Reveal>
-          ))}
-        </div>
-      </section>
-
-      {/* ── How it works ─────────────────────────────────────────────────────── */}
-      <section className="relative z-10 mx-auto max-w-4xl px-5 py-24">
-        <Reveal className="mb-12 text-center">
-          <h2 className="ds-h2">Three taps to send</h2>
-        </Reveal>
-        <div className="grid gap-6 md:grid-cols-3">
-          {[
-            { n: '01', t: 'Top up',  d: 'Deposit from any mobile money network or your bank — money lands in your Olomi Wallet instantly.' },
-            { n: '02', t: 'Chat',    d: 'Open a conversation with anyone on OlomiPay, or invite them with a link.' },
-            { n: '03', t: 'Send',    d: 'Drop an amount in the chat, confirm with your PIN — done. They get it in seconds.' },
-          ].map((s, i) => (
-            <Reveal key={s.n} delay={(i + 1) as 1 | 2 | 3} className="relative">
-              <div className="glass rounded-3xl p-6">
-                <p className="text-5xl font-extrabold text-white/10">{s.n}</p>
-                <h3 className="-mt-4 mb-1.5 text-lg font-semibold">{s.t}</h3>
-                <p className="text-sm leading-relaxed text-slate-400">{s.d}</p>
-              </div>
-            </Reveal>
-          ))}
-        </div>
-      </section>
-
-      {/* ── Final CTA ────────────────────────────────────────────────────────── */}
-      <section className="relative z-10 mx-auto max-w-4xl px-5 pb-28">
-        <Reveal className="relative overflow-hidden rounded-[2.5rem] border border-white/10 p-10 text-center md:p-16">
-          <div className="anim-aurora absolute -top-1/2 left-1/4 -z-10 h-[40vmax] w-[40vmax] rounded-full bg-blue-600/40 blur-[100px]" />
-          <img src="/logo.svg" alt="" className="anim-float mx-auto mb-6 h-16 w-16" />
-          <h2 className="mx-auto max-w-xl text-3xl font-bold sm:text-5xl">
-            The future of money is a <span className="text-gradient-anim">conversation</span>
-          </h2>
-          <p className="mx-auto mt-4 max-w-md text-slate-300">
-            Join the wallet that talks, pays, and grows your money — built for Africa, delivered in seconds.
-          </p>
-          <Link href="/auth/register"
-            className="cta-glow mt-8 inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-blue-500 to-emerald-500 px-10 py-4 text-base font-semibold shadow-2xl transition-transform hover:scale-105">
-            Start free — it takes 60 seconds
-            <ArrowRight size={18} />
+        {/* CTA */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+          <Link href="/auth/register" className="olo-glow" style={{ width: '100%', maxWidth: 340, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 999, border: 0, background: 'linear-gradient(to right,#3b82f6,#22c55e)', color: '#fff', fontSize: 16, fontWeight: 700, padding: '17px 30px', textDecoration: 'none' }}>
+            Get started — it&apos;s free <ArrowRight size={18} strokeWidth={2.4} />
           </Link>
-        </Reveal>
-      </section>
-
-      {/* ── Footer ───────────────────────────────────────────────────────────── */}
-      <footer className="relative z-10 border-t border-white/10 py-8 text-center">
-        <div className="mb-2 flex items-center justify-center gap-2">
-          <img src="/logo.svg" alt="" className="h-6 w-6" />
-          <span className="font-semibold">OlomiPay</span>
+          <p style={{ fontSize: 12, color: 'rgba(148,163,184,.9)', margin: 0 }}>1% flat · settles in seconds · end-to-end encrypted</p>
         </div>
-        <p className="text-xs text-slate-500">© 2026 OlomiPay · Building Trust Through Blockchain</p>
-      </footer>
+      </div>
     </main>
   );
 }
