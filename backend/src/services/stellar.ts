@@ -708,6 +708,26 @@ export async function platformSendUsdc(
   return hash;
 }
 
+/** Send native XLM from the platform wallet to any address. */
+export async function platformSendXlm(
+  toAddress: string,
+  amount:    number,
+  memo?:     string,
+): Promise<string> {
+  const keypair = getPlatformKeypair();
+  const account = await server.loadAccount(keypair.publicKey());
+  const builder = new StellarSdk.TransactionBuilder(account, {
+    fee: StellarSdk.BASE_FEE, networkPassphrase: NETWORK_PASSPHRASE,
+  }).addOperation(StellarSdk.Operation.payment({
+    destination: toAddress, asset: XLM_ASSET, amount: amount.toFixed(7),
+  }));
+  if (memo) builder.addMemo(StellarSdk.Memo.text(String(memo).slice(0, 28)));
+  const tx = builder.setTimeout(60).build();
+  tx.sign(keypair);
+  const result = await server.submitTransaction(tx);
+  return result.hash;
+}
+
 export async function platformSendUsdcWithFee(
   toPublicKey: string,
   grossUsdc:   number,

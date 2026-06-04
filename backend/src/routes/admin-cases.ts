@@ -6,6 +6,7 @@ import { deriveKeypairFromPhone, getAccountInfo } from '../services/stellar';
 import { isEncryptedKeyValid } from '../services/crypto';
 import { runReconciler, getReconcilerStatus } from '../services/reconciler';
 import { validateEnv } from '../services/envCheck';
+import { queueApproval } from '../services/approvals';
 
 const router = Router();
 const ok   = (data: any) => ({ success: true,  data });
@@ -269,15 +270,21 @@ router.post('/transactions/:id/refund', requireAuth, requireAdmin, async (req: A
   if (!tx) return res.status(404).json(fail('Transaction not found'));
   if (!['PENDING', 'FAILED'].includes(tx.status)) return res.status(400).json(fail('Only PENDING/FAILED transactions can be refunded.'));
 
-  await prisma.transaction.update({
-    where: { id: tx.id },
-    data:  { status: 'FAILED', errorMsg: `Refunded by admin: ${reason}` },
-  });
-  // The refund itself is recorded in the immutable audit log (with amount + reason).
-  await audit(req, 'refund_transaction', tx.id, 'transaction', {
-    reason, type: tx.type, amountUsdc: tx.amountUsdc, amountTzs: tx.amountTzs,
-  });
-  return res.json(ok({ message: 'Refund recorded. Process the off-chain payout reversal in your provider dashboard.' }));
+  // Refunds move money → multi-step approval. SUPER_ADMIN overrides; otherwise
+  // it queues for 3 distinct admin sign-offs before the reversal is recorded.
+  try {
+    const r = await queueApproval({
+      action:  'refund',
+      payload: { txId: tx.id, reason, type: tx.type, amountUsdc: tx.amountUsdc, amountTzs: tx.amountTzs },
+      actorId: req.userId!, actorPhone: (req as any).adminPhone ?? null,
+    });
+    await audit(req, r.executed ? 'refund_transaction' : 'propose_refund', tx.id, 'transaction', { reason, ...r });
+    return res.json(ok(r.executed
+      ? { ...r, message: 'Refund recorded. Process the off-chain payout reversal in your provider dashboard.' }
+      : r));
+  } catch (e: any) {
+    return res.status(502).json(fail(e.message ?? 'Refund failed'));
+  }
 });
 
 export { router as adminCasesRouter };

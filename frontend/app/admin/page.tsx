@@ -183,7 +183,9 @@ export default function AdminPage() {
       const data = await r.json();
       if (!data.success) throw new Error(data.error);
       setSendResult(data.data);
-      toast.success(`Sent ${sendAmt} ${sendAsset} successfully!`);
+      toast.success(data.data.executed
+        ? `Sent ${sendAmt} ${sendAsset} successfully!`
+        : (data.data.message ?? 'Queued for approval'));
       setSendTo(''); setSendAmt(''); setSendMemo('');
       loadAll();
     } catch (e: any) {
@@ -778,10 +780,14 @@ export default function AdminPage() {
               </form>
 
               {sendResult && (
-                <div className="mt-4 bg-green-50 dark:bg-green-900/20 rounded-xl p-4 space-y-1">
-                  <p className="text-sm font-bold text-green-700 dark:text-green-400">✓ Sent successfully</p>
-                  <p className="text-xs text-slate-500">Amount: {sendResult.amount} {sendResult.asset}</p>
-                  <p className="text-xs text-slate-500 font-mono break-all">TX: {sendResult.txHash}</p>
+                <div className={`mt-4 rounded-xl p-4 space-y-1 ${sendResult.executed ? 'bg-green-50 dark:bg-green-900/20' : 'bg-amber-50 dark:bg-amber-900/20'}`}>
+                  <p className={`text-sm font-bold ${sendResult.executed ? 'text-green-700 dark:text-green-400' : 'text-amber-700 dark:text-amber-400'}`}>
+                    {sendResult.executed ? '✓ Sent successfully' : '⏳ Queued for approval'}
+                  </p>
+                  <p className="text-xs text-slate-500">{sendResult.message}</p>
+                  {sendResult.executed && sendResult.result && (
+                    <p className="text-xs text-slate-500 font-mono break-all">TX: {sendResult.result}</p>
+                  )}
                 </div>
               )}
             </div>

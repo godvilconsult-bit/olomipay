@@ -15,6 +15,7 @@ import {
   getGasWalletPublic,
   PLATFORM_FEE_PCT,
 } from '../services/stellar';
+import { queueApproval } from '../services/approvals';
 
 const router = Router();
 const ok   = (data: any) => ({ success: true,  data });
@@ -589,63 +590,20 @@ router.post('/send-stellar', requireAuth, requireAdmin, requireStepUp(), async (
   const numAmount = Number(amount);
   if (isNaN(numAmount) || numAmount <= 0) return res.status(400).json(fail('Invalid amount'));
 
-  const platformSecret = process.env.STELLAR_SECRET_KEY;
-  if (!platformSecret) return res.status(500).json(fail('STELLAR_SECRET_KEY not set in environment variables'));
+  if (!['XLM', 'USDC'].includes(asset)) return res.status(400).json(fail('asset must be XLM or USDC'));
+  if (!process.env.STELLAR_SECRET_KEY)  return res.status(500).json(fail('STELLAR_SECRET_KEY not set in environment variables'));
 
+  // HIGH-RISK payout → multi-step approval. SUPER_ADMIN executes immediately
+  // (override); everyone else queues it for 3 distinct admin sign-offs.
   try {
-    const stellar = await import('../services/stellar');
-    let txHash: string;
-
-    if (asset === 'USDC') {
-      txHash = await stellar.platformSendUsdc(toAddress, numAmount, memo);
-    } else if (asset === 'XLM') {
-      // Build XLM payment from platform wallet
-      const StellarSdk = (await import('@stellar/stellar-sdk')) as any;
-      const platformSecret = process.env.STELLAR_SECRET_KEY;
-      if (!platformSecret) return res.status(500).json(fail('Platform Stellar key not configured'));
-
-      const horizon    = new StellarSdk.Horizon.Server(process.env.STELLAR_HORIZON_URL ?? 'https://horizon-testnet.stellar.org');
-      const network    = process.env.STELLAR_NETWORK === 'mainnet'
-        ? StellarSdk.Networks.PUBLIC
-        : StellarSdk.Networks.TESTNET;
-      const keypair    = StellarSdk.Keypair.fromSecret(platformSecret);
-      const account    = await horizon.loadAccount(keypair.publicKey());
-      const tx         = new StellarSdk.TransactionBuilder(account, {
-        fee:               StellarSdk.BASE_FEE,
-        networkPassphrase: network,
-      })
-        .addOperation(StellarSdk.Operation.payment({
-          destination: toAddress,
-          asset:       StellarSdk.Asset.native(),
-          amount:      numAmount.toFixed(7),
-        }))
-        .setTimeout(30);
-      if (memo) tx.addMemo(StellarSdk.Memo.text(String(memo).slice(0, 28)));
-      const built = tx.build();
-      built.sign(keypair);
-      const result = await horizon.submitTransaction(built);
-      txHash = result.hash;
-    } else {
-      return res.status(400).json(fail('asset must be XLM or USDC'));
-    }
-
-    // Record in DB
-    await prisma.transaction.create({
-      data: {
-        userId:     req.userId!,
-        type:       'SEND',
-        status:     'CONFIRMED',
-        amountUsdc: asset === 'USDC' ? numAmount : undefined,
-        amountXlm:  asset === 'XLM'  ? numAmount : undefined,
-        toAddress,
-        memo:        memo ?? null,
-        stellarTxId: txHash,
-      },
+    const r = await queueApproval({
+      action:  'admin_send',
+      payload: { toAddress, amount: numAmount, asset, memo: memo ?? '' },
+      actorId: req.userId!, actorPhone: (req as any).adminPhone ?? null,
     });
-
-    return res.json(ok({ message: 'Sent successfully', txHash, asset, amount: numAmount, toAddress }));
+    return res.json(ok(r));
   } catch (e: any) {
-    return res.status(500).json(fail(e.message));
+    return res.status(502).json(fail(e.message ?? 'Send failed'));
   }
 });
 
