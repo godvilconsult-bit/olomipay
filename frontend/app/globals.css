@@ -428,6 +428,25 @@
   }
 }
 
+/* ── Fixed app shell: one internal scroll region ───────────────────────────────
+   The authenticated canvas fills the viewport exactly and becomes the ONLY
+   scroll container. When a page's content fits, there is no scroll at all, so
+   the top contents stay locked in place. When content is taller than the
+   screen, the canvas scrolls (and the sticky header stays pinned to the top).
+   This removes the document-level scroll/bounce that used to hide top content. */
+.app-canvas {
+  height: 100dvh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior-y: contain;   /* no rubber-band chaining to the page */
+  -webkit-overflow-scrolling: touch;
+}
+/* Page roots fill the canvas exactly (not 100vh) so short pages don't scroll. */
+.app-canvas .min-h-screen,
+.app-canvas [class*="min-h-screen"] {
+  min-height: 100%;
+}
+
 /* Make authenticated page roots transparent so the mesh shows through.
    Targets .min-h-screen AND the common Tailwind bg-* combos pages use.
    Cards / sticky headers / sheets keep their own bg — they aren't page roots. */
