@@ -7,10 +7,11 @@ import Reveal from '../components/Reveal';
 import CountUp from '../components/CountUp';
 import SpeedRace from '../components/SpeedRace';
 
-/* Pan-African rails we ride — proof of reach (scrolling ticker) */
+/* Pan-African rails — every MNO + bank OlomiPay connects to */
 const RAILS = [
-  'M-Pesa', 'Airtel Money', 'MTN MoMo', 'Tigo Pesa', 'Orange Money',
-  'Vodafone Cash', 'EcoCash', 'Zamtel', 'USDC', 'XLM', 'Bank Wire',
+  'Airtel Money', 'MTN MoMo', 'Tigo Pesa', 'Orange Money',
+  'Vodafone Cash', 'EcoCash', 'Zamtel', 'HaloPesa',
+  'CRDB Bank', 'NMB Bank', 'KCB', 'Equity Bank', 'USDC',
 ];
 
 /* ── Drifting world-activity stream (both sides of the hero) ──────────────── */
@@ -75,7 +76,7 @@ function ActivityStream() {
           {[...FEED_LEFT, ...FEED_LEFT].map((c, i) => <ActivityCard key={i} c={c} />)}
         </div>
       </div>
-      {/* Right column — offset start + different speed */}
+      {/* Right column — offset + different speed */}
       <div className="absolute top-0 right-0 w-44 h-full overflow-hidden">
         <div className="anim-rise" style={{ '--rise-dur': '56s', marginTop: '-120px' } as React.CSSProperties}>
           {[...FEED_RIGHT, ...FEED_RIGHT].map((c, i) => <ActivityCard key={i} c={c} />)}
@@ -94,7 +95,6 @@ export default function LandingPage() {
         <div className="anim-aurora absolute -top-1/4 -left-1/4 h-[60vmax] w-[60vmax] rounded-full bg-blue-600/30 blur-[120px]" />
         <div className="anim-aurora absolute top-1/3 -right-1/4 h-[55vmax] w-[55vmax] rounded-full bg-emerald-500/25 blur-[120px]" style={{ animationDelay: '-6s' }} />
         <div className="anim-aurora absolute bottom-0 left-1/4 h-[50vmax] w-[50vmax] rounded-full bg-cyan-500/20 blur-[120px]" style={{ animationDelay: '-12s' }} />
-        {/* Violet tint for depth */}
         <div className="anim-aurora absolute top-1/2 left-1/3 h-[40vmax] w-[40vmax] rounded-full bg-indigo-500/15 blur-[140px]" style={{ animationDelay: '-18s' }} />
         {/* subtle grid */}
         <div className="absolute inset-0 opacity-[0.04]"
@@ -123,7 +123,6 @@ export default function LandingPage() {
 
       {/* ── Hero ─────────────────────────────────────────────────────────────── */}
       <section className="relative z-10 mx-auto flex max-w-6xl flex-col items-center px-5 pt-12 pb-20 text-center md:pt-20 overflow-hidden">
-        {/* Drifting world-activity stream — left and right of hero content */}
         <ActivityStream />
 
         {/* Dark centre scrim so hero text stays readable over the stream */}
@@ -131,86 +130,84 @@ export default function LandingPage() {
           style={{ background: 'radial-gradient(74% 52% at 50% 44%, rgba(6,11,24,.96) 30%, rgba(6,11,24,.72) 55%, transparent 85%), linear-gradient(to top, #060b18 4%, transparent 28%)' }} />
 
         <div className="relative z-[2] flex flex-col items-center">
-        <div className="hero-rise hd2 mb-6 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-xs backdrop-blur">
-          {/* Live pulse dot */}
-          <span className="anim-live-pulse h-1.5 w-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
-          <span className="text-slate-200"><b className="text-white font-bold">$1.2M</b> moving today · Money + Chat + Earn</span>
-        </div>
+          <div className="hero-rise hd2 mb-6 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-xs backdrop-blur">
+            <span className="anim-live-pulse h-1.5 w-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
+            <span className="text-slate-200"><b className="text-white font-bold">$1.2M</b> moving today · Money + Chat + Earn</span>
+          </div>
 
-        <h1 className="hero-rise hd3 ds-display max-w-3xl">
-          Send money the way
-          <br />
-          you <span className="ds-text-gradient">chat</span>.
-        </h1>
+          <h1 className="hero-rise hd3 ds-display max-w-3xl">
+            Send money the way
+            <br />
+            you <span className="ds-text-gradient">chat</span>.
+          </h1>
 
-        <p className="hero-rise hd4 mt-6 max-w-xl text-lg text-slate-300/90">
-          Others promise "98% within 10 minutes." We settle <span className="font-semibold text-white">100% in seconds</span> —
-          on-chain, around the clock. Deposit from any mobile money or bank, then send cash
-          right inside the conversation.
-        </p>
+          <p className="hero-rise hd4 mt-6 max-w-xl text-lg text-slate-300/90">
+            Others take up to 10 minutes. We settle <span className="font-semibold text-white">100% in seconds</span> —
+            every time, around the clock. Deposit from any mobile money network or bank,
+            then send right inside the conversation.
+          </p>
 
-        <div className="hero-rise hd5 mt-9 flex flex-col items-center gap-3 sm:flex-row">
-          <Link href="/auth/register"
-            className="cta-glow group inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-blue-500 to-emerald-500 px-8 py-4 text-base font-semibold shadow-2xl transition-transform hover:scale-105">
-            Create free account
-            <ArrowRight size={18} className="transition-transform group-hover:translate-x-1" />
-          </Link>
-          <Link href="/auth/login"
-            className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-8 py-4 text-base font-semibold backdrop-blur transition-colors hover:bg-white/10">
-            I have an account
-          </Link>
-        </div>
+          <div className="hero-rise hd5 mt-9 flex flex-col items-center gap-3 sm:flex-row">
+            <Link href="/auth/register"
+              className="cta-glow group inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-blue-500 to-emerald-500 px-8 py-4 text-base font-semibold shadow-2xl transition-transform hover:scale-105">
+              Create free account
+              <ArrowRight size={18} className="transition-transform group-hover:translate-x-1" />
+            </Link>
+            <Link href="/auth/login"
+              className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-8 py-4 text-base font-semibold backdrop-blur transition-colors hover:bg-white/10">
+              I have an account
+            </Link>
+          </div>
 
-        {/* Floating hero mock — a live "money in chat" card */}
-        <div className="hero-rise hd5 relative mt-16 w-full max-w-sm">
-          {/* glow ring */}
-          <div className="anim-glow absolute -inset-6 -z-10 rounded-[2.5rem] bg-gradient-to-tr from-blue-500/40 to-emerald-500/40 blur-2xl" />
+          {/* Floating hero mock — a live "money in chat" card */}
+          <div className="hero-rise hd5 relative mt-16 w-full max-w-sm">
+            <div className="anim-glow absolute -inset-6 -z-10 rounded-[2.5rem] bg-gradient-to-tr from-blue-500/40 to-emerald-500/40 blur-2xl" />
 
-          <div className="glass anim-float rounded-[2rem] p-5 text-left shadow-2xl">
-            {/* chat header */}
-            <div className="mb-4 flex items-center gap-3 border-b border-white/10 pb-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-emerald-500 font-bold">A</div>
-              <div className="flex-1">
-                <p className="text-sm font-semibold">Amina</p>
-                <p className="text-[11px] text-emerald-300">● online</p>
+            <div className="glass anim-float rounded-[2rem] p-5 text-left shadow-2xl">
+              {/* chat header */}
+              <div className="mb-4 flex items-center gap-3 border-b border-white/10 pb-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-emerald-500 font-bold">A</div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold">Amina</p>
+                  <p className="text-[11px] text-emerald-300">● online</p>
+                </div>
+                <MessageCircle size={16} className="text-slate-400" />
               </div>
-              <MessageCircle size={16} className="text-slate-400" />
-            </div>
 
-            {/* incoming bubble */}
-            <div className="mb-2 max-w-[75%] rounded-2xl rounded-bl-sm bg-white/10 px-3.5 py-2 text-sm">
-              Lunch was 8 bucks 😄
-            </div>
+              {/* incoming bubble */}
+              <div className="mb-2 max-w-[75%] rounded-2xl rounded-bl-sm bg-white/10 px-3.5 py-2 text-sm">
+                Lunch was 8 bucks 😄
+              </div>
 
-            {/* money card bubble */}
-            <div className="ml-auto max-w-[82%] rounded-2xl rounded-br-sm bg-gradient-to-br from-blue-500 to-emerald-500 p-0.5">
-              <div className="rounded-[15px] bg-[#0b1426] px-4 py-3">
-                <p className="text-[11px] text-emerald-300">💸 You sent</p>
-                <p className="text-2xl font-bold">$8.00</p>
-                <div className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-400">
-                  <Check size={12} className="text-emerald-400" />
-                  Settled on-chain · 0.8s
+              {/* money card bubble */}
+              <div className="ml-auto max-w-[82%] rounded-2xl rounded-br-sm bg-gradient-to-br from-blue-500 to-emerald-500 p-0.5">
+                <div className="rounded-[15px] bg-[#0b1426] px-4 py-3">
+                  <p className="text-[11px] text-emerald-300">💸 You sent</p>
+                  <p className="text-2xl font-bold">$8.00</p>
+                  <div className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-400">
+                    <Check size={12} className="text-emerald-400" />
+                    Settled instantly · 0.8s
+                  </div>
                 </div>
               </div>
+
+              <div className="mt-3 flex items-center gap-2 rounded-full bg-white/5 px-3 py-2 text-xs text-slate-400">
+                <span className="flex-1">Type a message…</span>
+                <Send size={14} className="text-blue-400" />
+              </div>
             </div>
 
-            <div className="mt-3 flex items-center gap-2 rounded-full bg-white/5 px-3 py-2 text-xs text-slate-400">
-              <span className="flex-1">Type a message…</span>
-              <Send size={14} className="text-blue-400" />
+            {/* floating side chips */}
+            <div className="anim-float-slow glass absolute -left-10 top-10 hidden rounded-2xl px-3 py-2 text-xs sm:block">
+              <p className="text-emerald-300">+ 6.5% APY</p>
+              <p className="text-slate-400">on savings</p>
             </div>
-          </div>
-
-          {/* floating side chips */}
-          <div className="anim-float-slow glass absolute -left-10 top-10 hidden rounded-2xl px-3 py-2 text-xs sm:block">
-            <p className="text-emerald-300">+ 6.5% APY</p>
-            <p className="text-slate-400">on savings</p>
-          </div>
-          <div className="anim-float-slow glass absolute -right-8 bottom-16 hidden rounded-2xl px-3 py-2 text-xs sm:block" style={{ animationDelay: '-4s' }}>
-            <p className="text-cyan-300">1% flat</p>
-            <p className="text-slate-400">no hidden fees</p>
+            <div className="anim-float-slow glass absolute -right-8 bottom-16 hidden rounded-2xl px-3 py-2 text-xs sm:block" style={{ animationDelay: '-4s' }}>
+              <p className="text-cyan-300">1% flat</p>
+              <p className="text-slate-400">no hidden fees</p>
+            </div>
           </div>
         </div>
-        </div>{/* /relative z-[2] */}
       </section>
 
       {/* ── Rails marquee ────────────────────────────────────────────────────── */}
@@ -227,7 +224,6 @@ export default function LandingPage() {
               </span>
             ))}
           </div>
-          {/* edge fades */}
           <div className="pointer-events-none absolute inset-y-0 left-0 w-20 bg-gradient-to-r from-[#060b18] to-transparent" />
           <div className="pointer-events-none absolute inset-y-0 right-0 w-20 bg-gradient-to-l from-[#060b18] to-transparent" />
         </div>
@@ -243,8 +239,8 @@ export default function LandingPage() {
             Built different at the <span className="text-gradient-anim">core</span>
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-slate-400">
-            Transfer apps move money between strangers' bank pipes. OlomiPay rewires
-            the rails themselves — so speed, security and connection aren't features, they're the foundation.
+            Other apps move money through slow, opaque pipes. OlomiPay rewires
+            the rails themselves — so speed, security and connection are the foundation, not features.
           </p>
         </Reveal>
 
@@ -254,9 +250,9 @@ export default function LandingPage() {
               icon: Clock,
               tag: 'SPEED',
               color: 'from-blue-500 to-cyan-500',
-              headline: 'Seconds — guaranteed, not 98% of the time',
-              them: '“98% arrive within 10 minutes.” The other 2% wait. It crawls at night, on weekends, on holidays — because the money hops through partner banks and payout networks.',
-              us: 'Every transfer settles on-chain in 3–5 seconds. No intermediaries, no banking hours, no liquidity gaps. 100% of the time — even at 3AM on a Sunday. Finality is mathematics, not a promise.',
+              headline: 'Seconds — guaranteed, every time',
+              them: 'Most apps promise quick transfers. But money hops through partner banks and payout networks — it slows at night, on weekends, on holidays. You wait and wonder.',
+              us: 'Every transfer settles in 3–5 seconds, 100% of the time — even at 3AM on a Sunday. Finality is mathematics, not a promise. No waiting, no wondering.',
             },
             {
               icon: Eye,
@@ -264,15 +260,15 @@ export default function LandingPage() {
               color: 'from-indigo-500 to-blue-500',
               headline: 'Verify it yourself — don\'t just trust us',
               them: 'Your money sits inside a company\'s custody pipeline. Your messages live on their servers. Security is a promise you\'re asked to believe.',
-              us: 'Every shilling settles on a public ledger with a receipt you can check yourself. Chats are end-to-end encrypted — even we can\'t read them. Your wallet is keyed to your phone. Provable, not promised.',
+              us: 'Every shilling is settled with a receipt you can verify yourself. Chats are end-to-end encrypted — even we can\'t read them. Your wallet is keyed to your phone. Provable, not promised.',
             },
             {
               icon: MessageCircle,
               tag: 'SOCIAL',
               color: 'from-emerald-500 to-teal-500',
               headline: 'Send money while you talk',
-              them: 'You open the app, type an account number, send, and leave. The money is a transaction. The relationship ends at “sent.”',
-              us: 'Money lives inside the conversation. Split a bill, request a loan from mum, pay a friend — all in the same thread you\'re chatting in. The transaction becomes part of the relationship.',
+              them: 'You open the app, type an account number, send, and leave. The money is a transaction. The relationship ends at "sent."',
+              us: 'Money lives inside the conversation. Split a bill, request from a friend, pay as you chat — all in the same thread. The transaction becomes part of the relationship.',
             },
           ].map((p, i) => (
             <Reveal key={p.tag} delay={(i + 1) as 1 | 2 | 3} className="glass flex flex-col rounded-3xl p-6">
@@ -285,18 +281,17 @@ export default function LandingPage() {
 
               <h3 className="mb-4 text-lg font-semibold leading-snug">{p.headline}</h3>
 
-              {/* Animated speed race — only on the SPEED pillar */}
               {p.tag === 'SPEED' && <SpeedRace />}
 
-              {/* Them */}
+              {/* Others */}
               <div className="mb-3 rounded-2xl border border-white/5 bg-white/[0.02] p-3">
                 <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                  <X size={12} className="text-red-400/80" /> Transfer apps
+                  <X size={12} className="text-red-400/80" /> Others
                 </div>
                 <p className="text-sm leading-relaxed text-slate-400">{p.them}</p>
               </div>
 
-              {/* Us */}
+              {/* OlomiPay */}
               <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.06] p-3">
                 <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-emerald-300">
                   <Check size={12} /> OlomiPay
@@ -318,20 +313,20 @@ export default function LandingPage() {
         </Reveal>
       </section>
 
-      {/* ── Differentiators (what we have that Nala doesn't) ─────────────────── */}
+      {/* ── More than a transfer app ──────────────────────────────────────────── */}
       <section className="relative z-10 mx-auto max-w-6xl px-5 py-24">
         <Reveal className="mx-auto mb-14 max-w-2xl text-center">
           <h2 className="text-3xl font-bold sm:text-4xl">More than a transfer app</h2>
           <p className="mt-3 text-slate-400">
-            Remittance apps stop at "send". OlomiPay lets your money chat, grow, and work for you.
+            Most apps stop at "send". OlomiPay lets your money chat, grow, and work for you.
           </p>
         </Reveal>
 
         <div className="grid gap-5 md:grid-cols-3">
           {[
-            { icon: MessageCircle, c: 'from-blue-500 to-cyan-500',  t: 'Chat & Pay', d: 'Send money inside a conversation — encrypted end-to-end. No account numbers, just a message.' },
+            { icon: MessageCircle, c: 'from-blue-500 to-cyan-500',    t: 'Chat & Pay',        d: 'Send money inside a conversation — encrypted end-to-end. No account numbers, just a message.' },
             { icon: TrendingUp,    c: 'from-emerald-500 to-teal-500', t: 'Earn while you hold', d: 'Your balance earns interest automatically. Stake, save in a goal, or join a group Chama.' },
-            { icon: ShieldCheck,   c: 'from-indigo-500 to-blue-500', t: 'On-chain trust', d: 'Every transfer settles transparently on blockchain. A flat 1% — see the exact fee before you confirm.' },
+            { icon: ShieldCheck,   c: 'from-indigo-500 to-blue-500',  t: 'Instant & transparent', d: 'Every transfer settles in seconds with a full fee receipt — a flat 1%, shown before you confirm.' },
           ].map((f, i) => (
             <Reveal key={f.t} delay={(i + 1) as 1 | 2 | 3} className="glass group rounded-3xl p-6">
               <div className={`mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br ${f.c}`}>
@@ -364,10 +359,10 @@ export default function LandingPage() {
       <section className="relative z-10 border-y border-white/10 bg-gradient-to-b from-white/[0.03] to-transparent py-16">
         <div className="mx-auto grid max-w-4xl grid-cols-2 gap-8 px-5 text-center md:grid-cols-4">
           {[
-            { v: 1,  s: '%', p: '', label: 'Flat fee, always' },
-            { v: 0.8, s: 's', p: '', label: 'Avg settlement', dec: 1 },
-            { v: 11, s: '+', p: '', label: 'Payment rails' },
-            { v: 256, s: '-bit', p: '', label: 'Encryption' },
+            { v: 1,   s: '%',    p: '', label: 'Flat fee, always'  },
+            { v: 0.8, s: 's',    p: '', label: 'Avg settlement', dec: 1 },
+            { v: 13,  s: '+',    p: '', label: 'Payment rails'    },
+            { v: 256, s: '-bit', p: '', label: 'Encryption'       },
           ].map((st) => (
             <div key={st.label} className="anim-pop">
               <p className="text-4xl font-extrabold text-gradient-anim">
@@ -379,24 +374,24 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Security you can verify ──────────────────────────────────────────── */}
+      {/* ── Security you can trust ───────────────────────────────────────────── */}
       <section className="relative z-10 mx-auto max-w-6xl px-5 py-24">
         <Reveal className="mx-auto mb-12 max-w-2xl text-center">
           <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-xs text-slate-300">
-            <Lock size={13} className="text-emerald-300" /> Security you can verify
+            <Lock size={13} className="text-emerald-300" /> Security you can trust
           </p>
           <h2 className="ds-h2">Bank-grade protection, <span className="ds-text-gradient">on every payment</span></h2>
           <p className="mx-auto mt-4 max-w-xl text-slate-400">
-            Trust isn&apos;t a slogan — it&apos;s engineered in. Here&apos;s what guards every shilling you move.
+            Trust isn&apos;t a slogan — it&apos;s built in. Here&apos;s what guards every shilling you move.
           </p>
         </Reveal>
 
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {[
-            { icon: Zap,         c: 'from-blue-500 to-cyan-500',    t: 'Real-time fraud screening', d: 'Every transfer is checked in under 50 milliseconds before it leaves your wallet.' },
-            { icon: ShieldCheck, c: 'from-emerald-500 to-teal-500', t: 'Settled & reconciled',      d: 'Funds settle on a public ledger and are auto-reconciled — your balance always matches the chain.' },
-            { icon: Lock,        c: 'from-indigo-500 to-blue-500',  t: 'End-to-end encrypted',      d: 'Your chats are encrypted on your device. Even we cannot read them.' },
-            { icon: Eye,         c: 'from-cyan-500 to-emerald-500', t: 'A flat 1% — shown upfront', d: 'See the exact fee and what your recipient gets before you confirm. No surprises.' },
+            { icon: Zap,         c: 'from-blue-500 to-cyan-500',    t: 'Real-time screening',   d: 'Every transfer is checked in under 50 milliseconds before it leaves your wallet.' },
+            { icon: ShieldCheck, c: 'from-emerald-500 to-teal-500', t: 'Verified & reconciled', d: 'Every transfer is settled and auto-reconciled in real time — your balance is always accurate.' },
+            { icon: Lock,        c: 'from-indigo-500 to-blue-500',  t: 'End-to-end encrypted',  d: 'Your chats are encrypted on your device. Even we cannot read them.' },
+            { icon: Eye,         c: 'from-cyan-500 to-emerald-500', t: '1% flat — shown upfront', d: 'See the exact fee and what your recipient gets before you confirm. No surprises, ever.' },
           ].map((f, i) => (
             <Reveal key={f.t} delay={(i + 1) as 1 | 2 | 3 | 4} className="glass rounded-3xl p-6">
               <div className={`mb-4 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br ${f.c}`}>
@@ -416,9 +411,9 @@ export default function LandingPage() {
         </Reveal>
         <div className="grid gap-6 md:grid-cols-3">
           {[
-            { n: '01', t: 'Top up', d: 'Deposit from M-Pesa, Airtel, MTN, or your bank — money lands in your Olomi Wallet.' },
-            { n: '02', t: 'Chat', d: 'Open a conversation with anyone on OlomiPay, or invite them with a link.' },
-            { n: '03', t: 'Send', d: 'Drop an amount in the chat, confirm with your PIN — done. They get it instantly.' },
+            { n: '01', t: 'Top up',  d: 'Deposit from any mobile money network or your bank — money lands in your Olomi Wallet instantly.' },
+            { n: '02', t: 'Chat',    d: 'Open a conversation with anyone on OlomiPay, or invite them with a link.' },
+            { n: '03', t: 'Send',    d: 'Drop an amount in the chat, confirm with your PIN — done. They get it in seconds.' },
           ].map((s, i) => (
             <Reveal key={s.n} delay={(i + 1) as 1 | 2 | 3} className="relative">
               <div className="glass rounded-3xl p-6">
@@ -440,7 +435,7 @@ export default function LandingPage() {
             The future of money is a <span className="text-gradient-anim">conversation</span>
           </h2>
           <p className="mx-auto mt-4 max-w-md text-slate-300">
-            Join the wallet that talks, pays, and grows your money — built for Africa, settled on-chain.
+            Join the wallet that talks, pays, and grows your money — built for Africa, delivered in seconds.
           </p>
           <Link href="/auth/register"
             className="cta-glow mt-8 inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-blue-500 to-emerald-500 px-10 py-4 text-base font-semibold shadow-2xl transition-transform hover:scale-105">
