@@ -5,6 +5,7 @@ import AppShell from '../components/AppShell';
 import PushRegistrar from '../components/PushRegistrar';
 import ChatNotifier from '../components/ChatNotifier';
 import KeyboardAware from '../components/KeyboardAware';
+import { themeInitScript } from '../lib/theme';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -44,6 +45,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link

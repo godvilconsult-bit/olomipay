@@ -5,7 +5,7 @@ const config: Config = {
     './app/**/*.{js,ts,jsx,tsx,mdx}',
     './components/**/*.{js,ts,jsx,tsx,mdx}',
   ],
-  darkMode: 'media', // respects system preference
+  darkMode: 'class', // toggled via .dark on <html>; defaults to system on first load
   theme: {
     extend: {
       colors: {

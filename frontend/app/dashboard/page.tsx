@@ -2,12 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bell, Repeat, Receipt, TrendingUp, Briefcase, ArrowRight } from 'lucide-react';
+import { Bell, Repeat, Receipt, TrendingUp, Briefcase, History, LifeBuoy, ChevronRight } from 'lucide-react';
 import BalanceCard from '../../components/BalanceCard';
-import TransactionItem from '../../components/TransactionItem';
 import BottomNav from '../../components/BottomNav';
 import UserAvatar from '../../components/UserAvatar';
-import { auth, wallet } from '../../lib/api';
+import ThemeToggle from '../../components/ThemeToggle';
+import { auth } from '../../lib/api';
 
 /** Time-aware greeting for the header eyebrow. */
 function greeting(): string {
@@ -20,18 +20,13 @@ function greeting(): string {
 export default function DashboardPage() {
   const router = useRouter();
   const [user,   setUser]   = useState<any>(null);
-  const [txs,    setTxs]    = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
       try {
-        const [meRes, histRes] = await Promise.all([
-          auth.me(),
-          wallet.history(5, 0),
-        ]);
+        const meRes = await auth.me();
         setUser(meRes.user);
-        setTxs(histRes.transactions ?? []);
       } catch {
         router.replace('/auth/login');
       } finally {
@@ -109,53 +104,37 @@ export default function DashboardPage() {
           ))}
         </section>
 
-        {/* Grow highlight — surfaces savings/earning */}
-        <button onClick={() => router.push('/grow')}
-          className="w-full flex items-center gap-4 rounded-3xl p-4 text-left text-white
-                     bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg active:scale-[0.99] transition-transform">
-          <div className="w-11 h-11 rounded-2xl bg-white/20 flex items-center justify-center flex-shrink-0">
-            <TrendingUp size={22} />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold text-[15px] leading-tight">Make your money grow</p>
-            <p className="text-xs text-white/80 leading-tight mt-0.5">Earn interest on your balance — start saving today</p>
-          </div>
-          <ArrowRight size={18} className="text-white/70 flex-shrink-0" />
-        </button>
+        {/* Quick links — activity & support */}
+        <div className="card divide-y divide-slate-100 dark:divide-white/10 p-0 overflow-hidden">
+          <button onClick={() => router.push('/history')}
+            className="w-full flex items-center gap-3 px-4 py-4 hover:bg-slate-50 dark:hover:bg-white/5 active:scale-[0.99] transition-all">
+            <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center text-primary flex-shrink-0">
+              <History size={18} />
+            </div>
+            <div className="flex-1 text-left">
+              <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">View activity</p>
+              <p className="text-xs text-slate-400">All your payments &amp; transfers</p>
+            </div>
+            <ChevronRight size={18} className="text-slate-400 flex-shrink-0" />
+          </button>
 
-        {/* Recent transactions */}
+          <button onClick={() => router.push('/support')}
+            className="w-full flex items-center gap-3 px-4 py-4 hover:bg-slate-50 dark:hover:bg-white/5 active:scale-[0.99] transition-all">
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400 flex-shrink-0">
+              <LifeBuoy size={18} />
+            </div>
+            <div className="flex-1 text-left">
+              <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Support</p>
+              <p className="text-xs text-slate-400">Report a problem — we’ll help you</p>
+            </div>
+            <ChevronRight size={18} className="text-slate-400 flex-shrink-0" />
+          </button>
+        </div>
+
+        {/* Appearance — light / dark / system */}
         <section>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="ds-eyebrow">Recent activity</h2>
-            <button onClick={() => router.push('/history')} className="text-xs text-primary font-semibold min-h-[32px] px-2 active:scale-95 transition-transform">
-              View all →
-            </button>
-          </div>
-
-          {loading ? (
-            <div className="card space-y-4">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="flex gap-3 items-center">
-                  <div className="skeleton w-10 h-10 rounded-2xl" />
-                  <div className="flex-1 space-y-2">
-                    <div className="skeleton h-3.5 w-32" />
-                    <div className="skeleton h-3 w-20" />
-                  </div>
-                  <div className="skeleton h-4 w-16" />
-                </div>
-              ))}
-            </div>
-          ) : txs.length === 0 ? (
-            <div className="card text-center py-10 text-slate-400 text-sm">
-              <p className="text-2xl mb-2">📭</p>
-              <p>No transactions yet</p>
-              <p className="text-xs mt-1">Deposit TZS to get started</p>
-            </div>
-          ) : (
-            <div className="card">
-              {txs.map(tx => <TransactionItem key={tx.id} tx={tx} />)}
-            </div>
-          )}
+          <h2 className="ds-eyebrow mb-2">Appearance</h2>
+          <ThemeToggle />
         </section>
 
         {/* KYC banner */}
