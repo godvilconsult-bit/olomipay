@@ -13,6 +13,78 @@ const RAILS = [
   'Vodafone Cash', 'EcoCash', 'Zamtel', 'USDC', 'XLM', 'Bank Wire',
 ];
 
+/* ── Drifting world-activity stream (both sides of the hero) ──────────────── */
+type FeedCard =
+  | { kind: 'currency'; flag: string; country: string; code: string; rate: string; accent: string }
+  | { kind: 'transfer'; f1: string; f2: string; amt: string; label: string };
+
+const FEED_LEFT: FeedCard[] = [
+  { kind: 'currency', flag: '🇹🇿', country: 'Tanzania',     code: 'TZS', rate: '2,600',  accent: '#1a56db' },
+  { kind: 'transfer', f1: '🇰🇪', f2: '🇺🇸', amt: '$24.00',  label: 'Kenya → USA'         },
+  { kind: 'currency', flag: '🇳🇬', country: 'Nigeria',      code: 'NGN', rate: '1,580',  accent: '#16a34a' },
+  { kind: 'currency', flag: '🇯🇵', country: 'Japan',        code: 'JPY', rate: '157',    accent: '#dc2626' },
+  { kind: 'transfer', f1: '🇬🇭', f2: '🇬🇧', amt: '$50.00',  label: 'Ghana → UK'          },
+  { kind: 'currency', flag: '🇿🇦', country: 'South Africa', code: 'ZAR', rate: '18.4',   accent: '#d97706' },
+  { kind: 'currency', flag: '🇮🇳', country: 'India',        code: 'INR', rate: '83.5',   accent: '#a855f7' },
+  { kind: 'transfer', f1: '🇺🇬', f2: '🇸🇦', amt: '$35.00',  label: 'Uganda → Saudi'      },
+];
+const FEED_RIGHT: FeedCard[] = [
+  { kind: 'currency', flag: '🇬🇧', country: 'United Kingdom', code: 'GBP', rate: '0.79', accent: '#2563eb' },
+  { kind: 'currency', flag: '🇩🇪', country: 'Germany',        code: 'EUR', rate: '0.93', accent: '#1e40af' },
+  { kind: 'transfer', f1: '🇷🇼', f2: '🇦🇪', amt: '$30.00',    label: 'Rwanda → UAE'        },
+  { kind: 'currency', flag: '🇨🇳', country: 'China',          code: 'CNY', rate: '7.24',  accent: '#dc2626' },
+  { kind: 'currency', flag: '🇧🇷', country: 'Brazil',         code: 'BRL', rate: '4.97',  accent: '#16a34a' },
+  { kind: 'transfer', f1: '🇿🇲', f2: '🇨🇦', amt: '$60.00',    label: 'Zambia → Canada'     },
+  { kind: 'currency', flag: '🇦🇺', country: 'Australia',      code: 'AUD', rate: '1.53',  accent: '#0891b2' },
+  { kind: 'currency', flag: '🇦🇪', country: 'UAE',            code: 'AED', rate: '3.67',  accent: '#f59e0b' },
+];
+
+function ActivityCard({ c }: { c: FeedCard }) {
+  const base = 'mb-2.5 rounded-2xl p-2.5 text-left backdrop-blur-md border border-white/10 bg-white/[0.06] shadow-[0_8px_24px_-14px_rgba(0,0,0,.8)] flex items-center gap-2.5';
+  if (c.kind === 'currency') return (
+    <div className={base} style={{ borderLeft: `3px solid ${c.accent}` }}>
+      <span className="text-2xl leading-none flex-shrink-0">{c.flag}</span>
+      <div className="min-w-0">
+        <p className="text-[12px] font-bold text-slate-100 leading-tight">{c.country}</p>
+        <p className="text-[11px] text-slate-400 mt-0.5">
+          <span className="font-semibold" style={{ color: c.accent }}>{c.code}</span>
+          <span className="text-slate-600"> · 1 USD = {c.rate}</span>
+        </p>
+      </div>
+    </div>
+  );
+  return (
+    <div className={base}>
+      <span className="text-xl flex-shrink-0">{c.f1}</span>
+      <div className="w-4 h-[1.5px] bg-emerald-400/60 rounded-full flex-shrink-0" />
+      <span className="text-xl flex-shrink-0">{c.f2}</span>
+      <div className="flex-1 min-w-0 ml-1">
+        <p className="text-[13px] font-bold text-white">{c.amt}</p>
+        <p className="text-[10px] text-slate-400">{c.label} · ✓ settled</p>
+      </div>
+    </div>
+  );
+}
+
+function ActivityStream() {
+  return (
+    <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden opacity-75">
+      {/* Left column */}
+      <div className="absolute top-0 left-0 w-44 h-full overflow-hidden">
+        <div className="anim-rise" style={{ '--rise-dur': '42s' } as React.CSSProperties}>
+          {[...FEED_LEFT, ...FEED_LEFT].map((c, i) => <ActivityCard key={i} c={c} />)}
+        </div>
+      </div>
+      {/* Right column — offset start + different speed */}
+      <div className="absolute top-0 right-0 w-44 h-full overflow-hidden">
+        <div className="anim-rise" style={{ '--rise-dur': '56s', marginTop: '-120px' } as React.CSSProperties}>
+          {[...FEED_RIGHT, ...FEED_RIGHT].map((c, i) => <ActivityCard key={i} c={c} />)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function LandingPage() {
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#060b18] text-white">
@@ -22,6 +94,8 @@ export default function LandingPage() {
         <div className="anim-aurora absolute -top-1/4 -left-1/4 h-[60vmax] w-[60vmax] rounded-full bg-blue-600/30 blur-[120px]" />
         <div className="anim-aurora absolute top-1/3 -right-1/4 h-[55vmax] w-[55vmax] rounded-full bg-emerald-500/25 blur-[120px]" style={{ animationDelay: '-6s' }} />
         <div className="anim-aurora absolute bottom-0 left-1/4 h-[50vmax] w-[50vmax] rounded-full bg-cyan-500/20 blur-[120px]" style={{ animationDelay: '-12s' }} />
+        {/* Violet tint for depth */}
+        <div className="anim-aurora absolute top-1/2 left-1/3 h-[40vmax] w-[40vmax] rounded-full bg-indigo-500/15 blur-[140px]" style={{ animationDelay: '-18s' }} />
         {/* subtle grid */}
         <div className="absolute inset-0 opacity-[0.04]"
           style={{ backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)', backgroundSize: '48px 48px' }} />
@@ -48,10 +122,19 @@ export default function LandingPage() {
       </nav>
 
       {/* ── Hero ─────────────────────────────────────────────────────────────── */}
-      <section className="relative z-10 mx-auto flex max-w-6xl flex-col items-center px-5 pt-12 pb-20 text-center md:pt-20">
+      <section className="relative z-10 mx-auto flex max-w-6xl flex-col items-center px-5 pt-12 pb-20 text-center md:pt-20 overflow-hidden">
+        {/* Drifting world-activity stream — left and right of hero content */}
+        <ActivityStream />
+
+        {/* Dark centre scrim so hero text stays readable over the stream */}
+        <div className="pointer-events-none absolute inset-0 z-[1]"
+          style={{ background: 'radial-gradient(74% 52% at 50% 44%, rgba(6,11,24,.96) 30%, rgba(6,11,24,.72) 55%, transparent 85%), linear-gradient(to top, #060b18 4%, transparent 28%)' }} />
+
+        <div className="relative z-[2] flex flex-col items-center">
         <div className="hero-rise hd2 mb-6 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-xs backdrop-blur">
-          <Sparkles size={13} className="text-cyan-300" />
-          <span className="text-slate-200">Money + Messaging + Earning — one super app</span>
+          {/* Live pulse dot */}
+          <span className="anim-live-pulse h-1.5 w-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
+          <span className="text-slate-200"><b className="text-white font-bold">$1.2M</b> moving today · Money + Chat + Earn</span>
         </div>
 
         <h1 className="hero-rise hd3 ds-display max-w-3xl">
@@ -127,6 +210,7 @@ export default function LandingPage() {
             <p className="text-slate-400">no hidden fees</p>
           </div>
         </div>
+        </div>{/* /relative z-[2] */}
       </section>
 
       {/* ── Rails marquee ────────────────────────────────────────────────────── */}

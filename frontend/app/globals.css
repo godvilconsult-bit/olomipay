@@ -294,6 +294,21 @@
 
 /* On-load staggered hero reveal */
 .hero-rise { animation: fadeUp 0.9s cubic-bezier(.22,1,.36,1) both; }
+
+/* Vertical rising columns (activity stream) — duplicate the list so it loops */
+@keyframes riseLoop {
+  from { transform: translateY(0); }
+  to   { transform: translateY(-50%); }
+}
+.anim-rise { animation: riseLoop linear infinite; animation-duration: var(--rise-dur, 40s); }
+
+/* Live pulse dot */
+@keyframes livePulse {
+  0%   { box-shadow: 0 0 0 0 rgba(52,211,153,.55); }
+  70%  { box-shadow: 0 0 0 7px rgba(52,211,153,0); }
+  100% { box-shadow: 0 0 0 0 rgba(52,211,153,0); }
+}
+.anim-live-pulse { animation: livePulse 2s ease-out infinite; }
 .hd1 { animation-delay: 0.05s; }
 .hd2 { animation-delay: 0.18s; }
 .hd3 { animation-delay: 0.31s; }
@@ -475,7 +490,8 @@
   .anim-float, .anim-float-slow, .anim-aurora, .anim-glow, .anim-spin-slow,
   .anim-marquee, .anim-pop, .reveal, .reveal.in-view, .hero-rise,
   .text-gradient-anim, .msg-in-right, .msg-in-left, .presence-ring,
-  .heart-float, .app-bg::before { animation: none !important; opacity: 1 !important; }
+  .heart-float, .anim-rise, .anim-live-pulse,
+  .app-bg::before { animation: none !important; opacity: 1 !important; }
   .reveal { opacity: 1 !important; }
 }
 
