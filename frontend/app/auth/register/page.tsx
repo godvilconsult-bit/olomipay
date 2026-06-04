@@ -15,6 +15,10 @@ import { auth, setTokens } from '../../../lib/api';
 
 type Step = 'phone' | 'name' | 'pin' | 'confirm';
 
+function fmtPhone(d: string): string {
+  return [d.slice(0, 3), d.slice(3, 6), d.slice(6, 9)].filter(Boolean).join(' ');
+}
+
 function PinBoxes({ value }: { value: string }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'center', gap: 10 }}>
@@ -30,7 +34,7 @@ function PinBoxes({ value }: { value: string }) {
 export default function RegisterPage() {
   const router = useRouter();
   const [step,    setStep]    = useState<Step>('phone');
-  const [phone,   setPhone]   = useState('+255 712 345 678');
+  const [digits,  setDigits]  = useState('');           // TZ local digits (max 9)
   const [name,    setName]    = useState('');
   const [pin,     setPin]     = useState('');
   const [confirm, setConfirm] = useState('');
@@ -40,20 +44,15 @@ export default function RegisterPage() {
   const stepIndex = steps.indexOf(step);
   const titles = ['Your number', 'Your name', 'Secure it', 'Confirm PIN'];
 
-  function normalizePhone(raw: string): string {
-    let v = raw.replace(/\s+/g, '');
-    if (v.startsWith('0') && v.length > 1) v = '+255' + v.slice(1);
-    if (!v.startsWith('+') && v.length > 0) v = '+255' + v;
-    return v;
-  }
-  const phoneValid = /^\+\d{10,15}$/.test(normalizePhone(phone));
+  const phoneFull  = '+255' + digits;
+  const phoneValid = digits.length === 9;
 
   async function handleSubmit() {
     if (pin !== confirm) { toast.error('PINs do not match'); return; }
     if (pin.length !== 6) { toast.error('PIN must be 6 digits'); return; }
     setLoading(true);
     try {
-      const data = await auth.register(normalizePhone(phone), pin, name);
+      const data = await auth.register(phoneFull, pin, name);
       setTokens(data.accessToken, data.refreshToken);
       toast.success(`Welcome to OlomiPay, ${name || 'friend'}! 🎉`);
       router.push('/dashboard');
@@ -124,10 +123,16 @@ export default function RegisterPage() {
                 <p style={{ fontSize: 13, color: '#94a3b8', margin: 0 }}>We&apos;ll link your Mobile Money to this number.</p>
                 <div style={field}>
                   <Phone size={18} style={{ color: '#60a5fa' }} />
-                  <input value={phone} onChange={e => setPhone(e.target.value)} inputMode="tel"
-                    style={{ flex: 1, background: 'transparent', border: 0, outline: 0, color: '#fff', fontSize: 16, padding: '13px 0' }} />
+                  <span style={{ color: '#94a3b8', fontSize: 16 }}>+255</span>
+                  <span style={{ flex: 1, color: '#fff', fontSize: 16, padding: '13px 0', letterSpacing: '.02em' }}>
+                    {digits ? fmtPhone(digits) : <span style={{ color: '#475569' }}>7XX XXX XXX</span>}
+                  </span>
                 </div>
-                <button onClick={() => phoneValid ? setStep('name') : toast.error('Enter a valid phone number')} style={{ ...gradBtn, opacity: phoneValid ? 1 : 0.4, cursor: phoneValid ? 'pointer' : 'not-allowed' }}>
+                <Keypad
+                  onDigit={d => setDigits(p => (p.length < 9 ? p + d : p))}
+                  onBackspace={() => setDigits(p => p.slice(0, -1))}
+                />
+                <button onClick={() => phoneValid ? setStep('name') : toast.error('Enter your 9-digit number')} style={{ ...gradBtn, opacity: phoneValid ? 1 : 0.4, cursor: phoneValid ? 'pointer' : 'not-allowed' }}>
                   Continue <ArrowRight size={17} strokeWidth={2.2} />
                 </button>
               </div>
