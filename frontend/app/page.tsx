@@ -7,9 +7,29 @@
    + "Send money like you chat." Nothing from the old marketing page is reused.
    ════════════════════════════════════════════════════════════════════════════ */
 
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import AlreadyAuthed from '../components/AlreadyAuthed';
+
+// ── Live "moving today" counter — ticks up continuously in 1,237,824 format ──
+function MovingToday() {
+  const [value, setValue] = useState(1_237_824);
+  const ref = useRef(1_237_824);
+  useEffect(() => {
+    const id = setInterval(() => {
+      // add a small random increment so it never looks constant
+      ref.current += Math.floor(Math.random() * 400) + 80;
+      setValue(ref.current);
+    }, 1200);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <b style={{ color: '#fff', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+      ${value.toLocaleString('en-US')}
+    </b>
+  );
+}
 
 // ── Ambient feed — world flags + currencies drifting behind the hero ──────────
 const FEED_A = [
@@ -163,7 +183,7 @@ export default function LandingPage() {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 9, borderRadius: 999, border: '1px solid rgba(255,255,255,.14)', background: 'rgba(255,255,255,.07)', padding: '7px 15px', fontSize: 12.5, color: '#e2e8f0' }}>
             <span className="olo-pulse-dot" style={{ width: 7, height: 7, borderRadius: 999, background: '#34d399', flexShrink: 0 }} />
-            <span><b style={{ color: '#fff', fontWeight: 700 }}>$1.2M</b> moving today</span>
+            <span><MovingToday /> moving today</span>
           </div>
           <h1 style={{ fontSize: 47, fontWeight: 800, lineHeight: 1.02, letterSpacing: '-0.035em', margin: '20px 0 0' }}>
             Send money<br />like you <span className="olo-gradient-text">chat</span>.
