@@ -10,6 +10,7 @@ import {
   getAccountInfo,
   setupFeeWallet,
   getTreasuryStatus,
+  topUpTreasuryFromUsdc,
   PLATFORM_FEE_PCT,
 } from '../services/stellar';
 
@@ -197,6 +198,17 @@ router.get('/treasury', requireAuth, requireAdmin, async (_req, res) => {
     res.json(ok(t));
   } catch (e: any) {
     res.status(500).json(fail(e?.message ?? 'Failed to load treasury status'));
+  }
+});
+
+// ── POST /api/admin/treasury/topup ─────────────────────────────────────────────
+// Manually trigger an XLM gas-treasury refill from collected USDC (force).
+router.post('/treasury/topup', requireAuth, requireAdmin, async (_req, res) => {
+  try {
+    const r = await topUpTreasuryFromUsdc({ force: true });
+    res.json(ok(r));
+  } catch (e: any) {
+    res.status(500).json(fail(e?.message ?? 'Treasury top-up failed'));
   }
 });
 

@@ -45,6 +45,7 @@ import {
   getFeeWalletPublic,
   IS_TESTNET_NETWORK,
   ACTIVATION_FEE_USD,
+  topUpTreasuryFromUsdc,
 } from '../services/stellar';
 import { verifyPin }   from '../services/crypto';
 import { notify }      from '../services/notifications';
@@ -280,6 +281,12 @@ router.post('/callback', async (req, res) => {
       memo,
     );
     console.log(`[callback] ✓ Stellar: ${stellarHash} | user=${netUsdc} USDC fee=${feeUsdc} activation=${activationFeeUsdc} -> ${feeWallet.slice(0,8)}...`);
+
+    // Self-sustaining gas: opportunistically refill the XLM treasury from the
+    // USDC just collected (no-op unless the treasury is low). Fire-and-forget.
+    topUpTreasuryFromUsdc().then(r => {
+      if (r.refilled) console.log(`[treasury] refilled gas: +${(r.xlmAfter! - r.xlmBefore).toFixed(2)} XLM for ${r.usdcSpent} USDC`);
+    }).catch(() => {});
 
     // Mark activation paid + record the one-time fee (the USDC stays with the platform)
     if (activationFeeUsdc > 0) {

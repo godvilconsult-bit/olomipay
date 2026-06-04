@@ -218,6 +218,72 @@ export function getUserKeypair(
   return StellarSdk.Keypair.fromSecret(secret);
 }
 
+/**
+ * Auto-refill the XLM gas treasury from the platform's own USDC.
+ *
+ * Closes the loop so the system is self-sustaining: the platform collects USDC
+ * (1% fees + one-time activation reimbursements) in its wallet, and whenever the
+ * gas treasury dips below TREASURY_MIN_XLM this swaps a small, capped amount of
+ * that USDC → XLM on the Stellar DEX (path payment to self). Users never touch
+ * XLM; the treasury tops itself up from revenue automatically.
+ *
+ * Safe by design: operates only on the platform's OWN funds, only when low,
+ * never spends more than TREASURY_MAX_USDC_PER_TOPUP per run, and is a no-op if
+ * the platform key is unset or holds no USDC. Best-effort — callers ignore errors.
+ */
+export async function topUpTreasuryFromUsdc(opts?: { force?: boolean }): Promise<{
+  refilled: boolean; reason: string; xlmBefore: number;
+  xlmAfter?: number; usdcSpent?: number; hash?: string;
+}> {
+  const MIN      = Number(process.env.TREASURY_MIN_XLM ?? '50');
+  const TARGET   = Number(process.env.TREASURY_TARGET_XLM ?? '200');
+  const MAX_USDC = Number(process.env.TREASURY_MAX_USDC_PER_TOPUP ?? '10');
+
+  let platform: StellarSdk.Keypair;
+  try { platform = getPlatformKeypair(); }
+  catch { return { refilled: false, reason: 'platform key not set', xlmBefore: 0 }; }
+
+  const acct   = await server.loadAccount(platform.publicKey());
+  const xlm    = parseFloat(acct.balances.find((b: any) => b.asset_type === 'native')?.balance ?? '0');
+  if (!opts?.force && xlm >= MIN) {
+    return { refilled: false, reason: 'treasury healthy', xlmBefore: xlm };
+  }
+
+  const usdcBal = parseFloat(
+    acct.balances.find((b: any) => b.asset_code === 'USDC' && b.asset_issuer === USDC_ISSUER)?.balance ?? '0',
+  );
+  if (usdcBal <= 0.01) {
+    return { refilled: false, reason: 'platform holds no USDC to convert', xlmBefore: xlm };
+  }
+
+  // Size the swap: enough to reach TARGET, capped by MAX_USDC and available USDC.
+  const needXlm     = Math.max(0, TARGET - xlm);
+  const probe       = await getDexQuote({ fromAsset: 'USDC', toAsset: 'XLM', sendAmount: 1 });
+  const xlmPerUsdc  = probe.rate || 8;
+  const usdcToSpend = Math.min(needXlm / xlmPerUsdc, MAX_USDC, usdcBal);
+  if (usdcToSpend < 0.01) return { refilled: false, reason: 'amount too small', xlmBefore: xlm };
+
+  const quote      = await getDexQuote({ fromAsset: 'USDC', toAsset: 'XLM', sendAmount: usdcToSpend });
+  const minReceive = quote.expectedReceive * 0.98;   // 2% slippage guard
+
+  const tx = new StellarSdk.TransactionBuilder(acct, {
+    fee: StellarSdk.BASE_FEE, networkPassphrase: NETWORK_PASSPHRASE,
+  }).addOperation(StellarSdk.Operation.pathPaymentStrictSend({
+    sendAsset:   USDC_ASSET,
+    sendAmount:  usdcToSpend.toFixed(7),
+    destination: platform.publicKey(),   // swap to self
+    destAsset:   XLM_ASSET,
+    destMin:     minReceive.toFixed(7),
+    path:        [],
+  })).addMemo(StellarSdk.Memo.text('treasury gas refill')).setTimeout(60).build();
+  tx.sign(platform);
+  const r = await server.submitTransaction(tx);
+
+  const after    = await server.loadAccount(platform.publicKey());
+  const xlmAfter = parseFloat(after.balances.find((b: any) => b.asset_type === 'native')?.balance ?? '0');
+  return { refilled: true, reason: 'ok', xlmBefore: xlm, xlmAfter, usdcSpent: usdcToSpend, hash: r.hash };
+}
+
 // ── Account funding ────────────────────────────────────────────────────────────
 
 /**
