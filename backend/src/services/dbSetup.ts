@@ -548,6 +548,19 @@ export async function setupDatabase(): Promise<void> {
     `);
     await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "AdminAuditLog_created_idx" ON "AdminAuditLog" ("createdAt")`).catch(() => {});
 
+    // Immutable public account number (OP-XXXX) — admin/audit source of truth
+    await prisma.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "accountNo" TEXT`).catch(() => {});
+    await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "User_accountNo_key" ON "User" ("accountNo") WHERE "accountNo" IS NOT NULL`).catch(() => {});
+    // Backfill any users missing an accountNo (one-time; cheap on small tables)
+    try {
+      const { makeAccountNo } = await import('./accountNo');
+      const missing = await prisma.user.findMany({ where: { accountNo: null }, select: { id: true } });
+      for (const u of missing) {
+        await prisma.user.update({ where: { id: u.id }, data: { accountNo: makeAccountNo(u.id) } }).catch(() => {});
+      }
+      if (missing.length) console.log(`[db] backfilled accountNo for ${missing.length} users`);
+    } catch (e: any) { console.warn('[db] accountNo backfill skipped:', e.message); }
+
     // RBAC role + 2FA on the admin user
     await prisma.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "adminRole" TEXT`).catch(() => {});
     await prisma.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "isFrozen" BOOLEAN NOT NULL DEFAULT false`).catch(() => {});

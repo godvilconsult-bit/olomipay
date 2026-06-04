@@ -7,6 +7,7 @@ import { PrismaClient } from '@prisma/client';
 import { deriveKeypairFromPhone, activateUserWallet, IS_TESTNET_NETWORK } from '../services/stellar';
 import { encryptSecret, hashPin, verifyPin, isEncryptedKeyValid } from '../services/crypto';
 import { requireAuth, AuthRequest } from '../middleware/auth';
+import { makeAccountNo } from '../services/accountNo';
 
 const router  = Router();
 const prisma  = new PrismaClient();
@@ -140,6 +141,12 @@ router.post('/register', authLimiter, async (req, res) => {
     }
   }
 
+  // Persist the immutable account number (OP-XXXX) for admin/audit + display.
+  try {
+    const { makeAccountNo } = await import('../services/accountNo');
+    await prisma.user.update({ where: { id: user.id }, data: { accountNo: makeAccountNo(user.id) } });
+  } catch (e: any) { console.warn('[register] accountNo set failed:', e.message); }
+
   // Activate the wallet asynchronously (don't block registration):
   // fund the account with min XLM + add the USDC trustline (signed with the
   // user's key — we have the PIN here). This lets the first deposit land and
@@ -251,7 +258,7 @@ router.get('/me', requireAuth, async (req: AuthRequest, res) => {
     where:  { id: req.userId },
     select: {
       id: true, phone: true, stellarPubKey: true, stellarSecret: true,
-      kycStatus: true, kycName: true, profilePicUrl: true,
+      accountNo: true, kycStatus: true, kycName: true, profilePicUrl: true,
       isAdmin: true, isFeeCollector: true, createdAt: true,
     },
   });
@@ -260,20 +267,10 @@ router.get('/me', requireAuth, async (req: AuthRequest, res) => {
   // Proactive health flag — does the stored key have the current iv:tag:data shape?
   const walletKeyValid = isEncryptedKeyValid(user.stellarSecret);
   const { stellarSecret, ...safe } = user; // never return the secret
+  const userTag = user.accountNo ?? makeAccountNo(user.id);
 
-  return res.json({ user: { ...safe, userTag: makeUserTag(user.id), walletKeyValid } });
+  return res.json({ user: { ...safe, userTag, accountNo: userTag, walletKeyValid } });
 });
-
-/** Derive a short unique display tag from the user's DB id.
- *  Format: OP-XXXXXXXX (8 uppercase alphanumeric chars)
- *  Deterministic — same user always gets the same tag, no extra DB column.
- */
-function makeUserTag(id: string): string {
-  // Take chars from positions spread across the cuid
-  const clean = id.replace(/[^a-z0-9]/gi, '').toUpperCase();
-  const tag   = (clean.slice(-8) + clean.slice(0, 4)).slice(0, 8);
-  return `OP-${tag}`;
-}
 
 // ── POST /api/auth/logout ─────────────────────────────────────────────────────
 

@@ -155,8 +155,21 @@ export default function AdminPage() {
   }
 
   const filtered = users.filter(u =>
-    !search || u.phone?.includes(search) || u.kycName?.toLowerCase().includes(search.toLowerCase())
+    !search
+    || u.phone?.includes(search)
+    || u.kycName?.toLowerCase().includes(search.toLowerCase())
+    || u.accountNo?.toLowerCase().includes(search.toLowerCase())
   );
+
+  // Server-side search (covers ALL users, not just the loaded page) — debounced.
+  useEffect(() => {
+    if (!search.trim()) return;
+    const t = setTimeout(async () => {
+      const r = await adminApi('/users', { q: search.trim() });
+      if (r.success) setUsers(r.data.users ?? []);
+    }, 400);
+    return () => clearTimeout(t);
+  }, [search]);
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
@@ -293,7 +306,7 @@ export default function AdminPage() {
           <>
             <div className="flex items-center gap-2 bg-white dark:bg-slate-800 rounded-2xl px-4 py-2.5">
               <Search size={16} className="text-slate-400 flex-shrink-0" />
-              <input type="text" placeholder="Search by phone or name…" value={search}
+              <input type="text" placeholder="Search by name, phone or OP-account no…" value={search}
                 onChange={e => setSearch(e.target.value)} className="bg-transparent flex-1 text-sm outline-none" />
             </div>
             <p className="text-xs text-slate-400">{filtered.length} of {users.length} users</p>
@@ -309,7 +322,12 @@ export default function AdminPage() {
                         <p className="font-semibold text-sm">{u.kycName ?? 'No name'}</p>
                         {u.isAdmin && <span className="text-[10px] bg-primary text-white px-1.5 py-0.5 rounded-full font-bold">ADMIN</span>}
                         {u.isFeeCollector && <span className="text-[10px] bg-amber-500 text-white px-1.5 py-0.5 rounded-full font-bold">FEE OWNER</span>}
+                        {u.isFrozen && <span className="text-[10px] bg-red-500 text-white px-1.5 py-0.5 rounded-full font-bold">FROZEN</span>}
                       </div>
+                      {/* Primary account identifier — the immutable OP-XXXX */}
+                      <button
+                        onClick={() => { navigator.clipboard.writeText(u.accountNo ?? ''); toast.success('Account no. copied'); }}
+                        className="font-mono text-xs font-semibold text-primary">{u.accountNo ?? '—'}</button>
                       <p className="text-xs text-slate-400">{u.phone}</p>
                     </div>
                     <div className="text-right flex-shrink-0">
@@ -317,7 +335,9 @@ export default function AdminPage() {
                       <p className="text-[10px] text-slate-300">{new Date(u.createdAt).toLocaleDateString()}</p>
                     </div>
                   </div>
+                  {/* Wallet address kept for staff (external transfers / on-chain lookup) */}
                   <div className="mt-2 bg-slate-50 dark:bg-slate-700 rounded-xl px-3 py-1.5">
+                    <p className="text-[9px] uppercase tracking-wide text-slate-400">Wallet address</p>
                     <p className="font-mono text-[10px] text-slate-500 break-all">{u.stellarPubKey ?? 'No wallet'}</p>
                   </div>
                 </div>

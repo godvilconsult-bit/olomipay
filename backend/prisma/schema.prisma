@@ -125,6 +125,8 @@ model User {
   pinHash         String
   stellarPubKey   String    @unique
   stellarSecret   String
+  // Immutable public account number (OP-XXXX) — admin/audit source of truth + user-facing ID
+  accountNo       String?   @unique
   kycStatus       KycStatus @default(PENDING)
   kycName         String?
   kycIdType       String?

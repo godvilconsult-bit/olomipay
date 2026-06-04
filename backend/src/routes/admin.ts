@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import PDFDocument      from 'pdfkit';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 import { requireStepUp } from '../services/stepUp';
+import { makeAccountNo } from '../services/accountNo';
 import {
   getFeeWalletPublic,
   getAccountInfo,
@@ -69,16 +70,21 @@ router.get('/users', requireAuth, requireAdmin, async (req: AuthRequest, res) =>
   const page  = parseInt(req.query.page  as string ?? '1');
   const limit = Math.min(parseInt(req.query.limit as string ?? '50'), 500);
   const q     = (req.query.q as string ?? '').trim();
+  // Search matches phone, name, OR the account number (OP-XXXX, case-insensitive)
   const where: any = q
-    ? { OR: [{ phone: { contains: q } }, { kycName: { contains: q, mode: 'insensitive' } }] }
+    ? { OR: [
+        { phone:     { contains: q } },
+        { kycName:   { contains: q, mode: 'insensitive' } },
+        { accountNo: { contains: q.toUpperCase() } },
+      ] }
     : {};
 
   const [users, total] = await Promise.all([
     prisma.user.findMany({
       where,
       select: {
-        id: true, phone: true, kycName: true, kycStatus: true,
-        stellarPubKey: true, isAdmin: true, isFeeCollector: true,
+        id: true, accountNo: true, phone: true, kycName: true, kycStatus: true,
+        stellarPubKey: true, isAdmin: true, isFeeCollector: true, adminRole: true, isFrozen: true,
         isOnline: true, lastSeenAt: true, createdAt: true, country: true,
       },
       orderBy: { createdAt: 'desc' },
@@ -87,7 +93,9 @@ router.get('/users', requireAuth, requireAdmin, async (req: AuthRequest, res) =>
     }),
     prisma.user.count({ where }),
   ]);
-  return res.json(ok({ users, total, page, pages: Math.ceil(total / limit) }));
+  // Ensure every row has an accountNo (derive on the fly for any legacy null)
+  const rows = users.map(u => ({ ...u, accountNo: u.accountNo ?? makeAccountNo(u.id) }));
+  return res.json(ok({ users: rows, total, page, pages: Math.ceil(total / limit) }));
 });
 
 // ── GET /api/admin/transactions ───────────────────────────────────────────────
@@ -107,7 +115,7 @@ router.get('/transactions', requireAuth, requireAdmin, async (req: AuthRequest, 
   const [txs, total, agg] = await Promise.all([
     prisma.transaction.findMany({
       where,
-      include: { user: { select: { phone: true, kycName: true } } },
+      include: { user: { select: { phone: true, kycName: true, accountNo: true } } },
       orderBy: { createdAt: 'desc' },
       skip:    (page - 1) * limit,
       take:    limit,
@@ -258,18 +266,19 @@ router.get('/report/csv', requireAuth, requireAdmin, async (req: AuthRequest, re
 
   const txs = await prisma.transaction.findMany({
     where,
-    include: { user: { select: { phone: true, kycName: true } } },
+    include: { user: { select: { phone: true, kycName: true, accountNo: true } } },
     orderBy: { createdAt: 'desc' },
     take:    50000,
   });
 
   const lines = [
-    'Date,Time,User Phone,User Name,Type,Status,Amount USDC,Amount TZS,Fee USDC,Stellar TX,Memo',
+    'Date,Time,Account No,User Phone,User Name,Type,Status,Amount USDC,Amount TZS,Fee USDC,Reference,Memo',
     ...txs.map(t => {
       const d = new Date(t.createdAt);
       return [
         d.toISOString().slice(0, 10),
         d.toISOString().slice(11, 19),
+        (t.user as any)?.accountNo ?? '',
         t.user?.phone ?? '',
         (t.user?.kycName ?? '').replace(/,/g, ' '),
         t.type,
@@ -304,7 +313,7 @@ router.get('/report/pdf', requireAuth, requireAdmin, async (req: AuthRequest, re
   const [txs, userCount, agg] = await Promise.all([
     prisma.transaction.findMany({
       where,
-      include: { user: { select: { phone: true, kycName: true } } },
+      include: { user: { select: { phone: true, kycName: true, accountNo: true } } },
       orderBy: { createdAt: 'desc' },
       take:    5000,
     }),
@@ -379,13 +388,14 @@ router.get('/report/pdf', requireAuth, requireAdmin, async (req: AuthRequest, re
     doc.fontSize(10).fillColor('#666').text('No transactions found for this period.');
   } else {
     const cols = [
-      { label: 'Date',       w: 72 },
-      { label: 'User Phone', w: 90 },
-      { label: 'Name',       w: 90 },
-      { label: 'Type',       w: 65 },
-      { label: 'Status',     w: 60 },
-      { label: 'USDC',       w: 55 },
-      { label: 'TZS',        w: 70 },
+      { label: 'Date',       w: 62 },
+      { label: 'Account No', w: 78 },
+      { label: 'Phone',      w: 82 },
+      { label: 'Name',       w: 78 },
+      { label: 'Type',       w: 58 },
+      { label: 'Status',     w: 52 },
+      { label: 'USDC',       w: 48 },
+      { label: 'TZS',        w: 44 },
     ];
     const totalW = cols.reduce((s, c) => s + c.w, 0);  // 502
     const TX     = 40;
@@ -423,8 +433,9 @@ router.get('/report/pdf', requireAuth, requireAdmin, async (req: AuthRequest, re
 
       const cells = [
         new Date(t.createdAt).toISOString().slice(0, 10),
+        (t.user as any)?.accountNo ?? '',
         t.user?.phone    ?? '',
-        (t.user?.kycName ?? '').slice(0, 14),
+        (t.user?.kycName ?? '').slice(0, 12),
         t.type,
         t.status,
         `$${(t.amountUsdc ?? 0).toFixed(2)}`,
@@ -465,7 +476,7 @@ router.get('/report/pdf-data', requireAuth, requireAdmin, async (req: AuthReques
   const [txs, userCount, agg] = await Promise.all([
     prisma.transaction.findMany({
       where,
-      include: { user: { select: { phone: true, kycName: true } } },
+      include: { user: { select: { phone: true, kycName: true, accountNo: true } } },
       orderBy: { createdAt: 'desc' },
       take:    5000,
     }),
@@ -490,6 +501,7 @@ router.get('/report/pdf-data', requireAuth, requireAdmin, async (req: AuthReques
     transactions: txs.map(t => ({
       date:       new Date(t.createdAt).toISOString().slice(0, 10),
       time:       new Date(t.createdAt).toISOString().slice(11, 19),
+      accountNo:  (t.user as any)?.accountNo ?? '',
       userPhone:  t.user?.phone    ?? '',
       userName:   t.user?.kycName  ?? '',
       type:       t.type,
