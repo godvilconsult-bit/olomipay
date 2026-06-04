@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import nacl from 'tweetnacl';
 import { encodeBase64 } from 'tweetnacl-util';
 import { requireAuth, AuthRequest } from '../middleware/auth';
@@ -8,7 +9,6 @@ import { encryptSecret } from '../services/crypto';
 import { emitToUser } from '../socket';
 
 const router = Router();
-const prisma = new PrismaClient();
 const ok   = (data: any) => ({ success: true,  data });
 const fail = (msg: string) => ({ success: false, error: msg });
 
@@ -66,20 +66,27 @@ router.get('/users/search', requireAuth, async (req: AuthRequest, res) => {
   const q       = (req.query.q as string ?? '').trim();
   const myId    = req.userId!;
 
+  // Privacy: never expose the whole user directory. Require a real search term;
+  // users find each other by name, phone, or account number — not by browsing.
+  if (q.length < 2) {
+    return res.json(ok({ users: [] }));
+  }
+
+  // Account-number search (OP-XXXX) is uppercased to match stored format.
+  const qUpper = q.toUpperCase();
+
   try {
-    // Get ALL users except self
     const users = await prisma.user.findMany({
-      where: q.length >= 2
-        ? {
-            AND: [
-              { id: { not: myId } },
-              { OR: [
-                { phone:   { contains: q } },
-                { kycName: { contains: q, mode: 'insensitive' } },
-              ]},
-            ],
-          }
-        : { id: { not: myId } },
+      where: {
+        AND: [
+          { id: { not: myId } },
+          { OR: [
+            { phone:     { contains: q } },
+            { kycName:   { contains: q, mode: 'insensitive' } },
+            { accountNo: { contains: qUpper } },
+          ]},
+        ],
+      },
       select: {
         id:           true,
         kycName:      true,

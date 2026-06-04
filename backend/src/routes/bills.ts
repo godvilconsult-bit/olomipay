@@ -2,6 +2,7 @@ import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 import { BILLERS, validateBillAccount, payBill } from '../services/bills';
 import { contractTransfer } from '../services/stellar';
@@ -10,7 +11,6 @@ import { tzsToUsdc } from '../services/mpesa';
 import { notify } from '../services/notifications';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 const limiter = rateLimit({ windowMs: 60_000, max: 5,
   message: { success: false, error: 'Too many requests' } });

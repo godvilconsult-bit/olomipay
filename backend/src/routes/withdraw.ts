@@ -2,6 +2,7 @@ import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import axios from 'axios';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 import { userSendUsdcToPlatform, getBalance } from '../services/stellar';
@@ -9,7 +10,6 @@ import { verifyPin } from '../services/crypto';
 import { notify } from '../services/notifications';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 const limiter = rateLimit({ windowMs: 60_000, max: 3,
   message: { success: false, error: 'Too many requests' } });

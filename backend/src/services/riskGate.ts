@@ -17,8 +17,8 @@
  */
 
 import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 
-const prisma = new PrismaClient();
 
 // Absolute hard cap (USDC) — above this a single tx is blocked outright.
 // Set well above normal limits so it never catches ordinary users.

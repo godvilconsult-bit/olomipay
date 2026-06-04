@@ -4,12 +4,12 @@ import sharp from 'sharp';
 import crypto from 'crypto';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 import { isEncryptedKeyValid } from '../services/crypto';
 import { makeAccountNo } from '../services/accountNo';
 
 const router = Router();
-const prisma  = new PrismaClient();
 const ok   = (data: any) => ({ success: true,  data });
 const fail = (msg: string) => ({ success: false, error: msg });
 

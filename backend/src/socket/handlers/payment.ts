@@ -1,11 +1,11 @@
 import { Server, Socket } from 'socket.io';
 import { PrismaClient }   from '@prisma/client';
+import { prisma } from '../../lib/prisma';
 import { userSendUsdcWithFee, userSendXlm, getBalance, getFeeWalletPublic } from '../../services/stellar';
 import { verifyPin }      from '../../services/crypto';
 import { sendPushToUser } from '../../services/notifications';
 import { writeLedgerRows } from '../../services/ledger';
 
-const prisma   = new PrismaClient();
 const TZS_RATE = 2600;
 
 // ── Send payment in chat ───────────────────────────────────────────────────────

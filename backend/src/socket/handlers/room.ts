@@ -1,7 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../lib/prisma';
 
-const prisma = new PrismaClient();
 
 export async function handleMarkRead(io: Server, socket: Socket, data: any) {
   const { conversationId } = data;

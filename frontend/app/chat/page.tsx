@@ -74,15 +74,8 @@ export default function ChatPage() {
     inviteApi('/link').then(r => { if (r.success) setInviteLink(r.data.link); });
   }, []);
 
-  useEffect(() => {
-    if (tab === 'people' && allUsers.length === 0) {
-      setSearching(true);
-      chatApi('/users/search').then(r => {
-        if (r.success) setAllUsers(r.data.users ?? []);
-        setSearching(false);
-      });
-    }
-  }, [tab]);
+  // Privacy: we no longer fetch the whole user directory. People are found by
+  // searching name / phone / account number (handled by the query effect below).
 
   useEffect(() => {
     if (query.length === 0) { setSearchResults([]); setPhoneCheck(null); return; }
@@ -201,7 +194,7 @@ export default function ChatPage() {
     else { navigator.clipboard.writeText(msg); toast.success('Invite link copied!'); }
   }
 
-  const displayedUsers = query.length >= 2 ? searchResults : allUsers;
+  const displayedUsers = query.length >= 2 ? searchResults : [];
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#0a1120] pb-28">
@@ -402,9 +395,16 @@ export default function ChatPage() {
           )}
 
           {/* All OlomiPay users */}
-          {searching && displayedUsers.length === 0 ? (
+          {query.length < 2 ? (
+            /* No directory browsing — prompt to search (privacy by design) */
+            <div className="text-center py-12 px-8">
+              <Search size={36} className="mx-auto mb-3 text-slate-200" />
+              <p className="font-semibold text-slate-600 dark:text-slate-300">Find someone to pay or chat</p>
+              <p className="text-sm text-slate-400 mt-1">Search by name, phone number, or their OlomiPay account number.</p>
+            </div>
+          ) : searching && displayedUsers.length === 0 ? (
             <div className="flex justify-center py-10"><Loader2 size={20} className="animate-spin text-slate-300" /></div>
-          ) : displayedUsers.length === 0 && query.length >= 2 ? (
+          ) : displayedUsers.length === 0 ? (
             <div className="text-center py-10 px-8">
               <Users size={36} className="mx-auto mb-3 text-slate-200" />
               <p className="text-sm text-slate-400 mb-4">No user found for "{query}"</p>
@@ -414,11 +414,6 @@ export default function ChatPage() {
             </div>
           ) : (
             <>
-              {!query && displayedUsers.length > 0 && (
-                <p className="px-4 pt-1 pb-2 text-xs font-semibold text-slate-400 uppercase tracking-wide">
-                  All OlomiPay users ({displayedUsers.length})
-                </p>
-              )}
               {displayedUsers.map(user => {
                 const name = user.displayName ?? user.kycName ?? user.phoneMasked;
                 return (

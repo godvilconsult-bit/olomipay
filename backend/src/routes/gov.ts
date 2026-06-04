@@ -2,13 +2,13 @@ import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import crypto from 'crypto';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 import { platformSendUsdc, generateKeypair } from '../services/stellar';
 import { sendSms } from '../services/sms';
 
 const router = Router();
-const prisma = new PrismaClient();
 const limiter = rateLimit({ windowMs: 60_000, max: 5, message: { success: false, error: 'Rate limited' } });
 const ok   = (data: any) => ({ success: true,  data });
 const fail = (msg: string) => ({ success: false, error: msg });

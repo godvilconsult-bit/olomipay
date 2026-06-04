@@ -7,12 +7,12 @@
 import { Server as HttpServer } from 'http';
 import { Server } from 'socket.io';
 import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import jwt from 'jsonwebtoken';
 import { handleSendMessage }     from './handlers/message';
 import { handleSendPayment, handlePaymentRequest, handlePayRequest, handleRejectRequest } from './handlers/payment';
 import { handleMarkRead, handleDeleteMessage } from './handlers/room';
 
-const prisma = new PrismaClient();
 
 // ── Global io — lets REST routes emit real-time events
 let _io: Server | null = null;

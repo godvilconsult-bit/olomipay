@@ -5,9 +5,9 @@
  */
 
 import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import webpush from 'web-push';
 
-const prisma = new PrismaClient();
 
 // Configure VAPID once at startup
 if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {

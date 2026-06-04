@@ -1,8 +1,8 @@
 import { Server, Socket } from 'socket.io';
 import { PrismaClient }   from '@prisma/client';
+import { prisma } from '../../lib/prisma';
 import { sendPushToUser } from '../../services/notifications';
 
-const prisma = new PrismaClient();
 
 async function verifyMembership(userId: string, conversationId: string): Promise<boolean> {
   const member = await prisma.conversationMember.findUnique({

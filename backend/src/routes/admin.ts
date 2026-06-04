@@ -1,5 +1,6 @@
 import { Router }      from 'express';
 import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import PDFDocument      from 'pdfkit';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 import { requireStepUp } from '../services/stepUp';
@@ -12,7 +13,6 @@ import {
 } from '../services/stellar';
 
 const router = Router();
-const prisma  = new PrismaClient();
 const ok   = (data: any) => ({ success: true,  data });
 const fail = (msg: string) => ({ success: false, error: msg });
 

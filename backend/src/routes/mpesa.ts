@@ -21,6 +21,7 @@ import { Router }       from 'express';
 import rateLimit        from 'express-rate-limit';
 import { z }            from 'zod';
 import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 import {
   calculateDepositFees,
@@ -50,7 +51,6 @@ import { notify }      from '../services/notifications';
 import { emitToUser }  from '../socket';
 
 const router = Router();
-const prisma  = new PrismaClient();
 const MAX_TZS_PER_TX  = 5_000_000;
 const MAX_TZS_PER_DAY = 10_000_000;
 const depositLimiter  = rateLimit({ windowMs: 60_000, max: 5, message: { error: 'Too many attempts.' } });

@@ -4,12 +4,12 @@
  */
 
 import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { contractTransfer } from './stellar';
 import { decryptSecret } from './crypto';
 import { notify } from './notifications';
 import * as StellarSdk from '@stellar/stellar-sdk';
 
-const prisma = new PrismaClient();
 
 function nextRunDate(frequency: string, from: Date): Date {
   const d = new Date(from);

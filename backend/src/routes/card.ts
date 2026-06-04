@@ -1,13 +1,13 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import axios from 'axios';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 import { verifyPin } from '../services/crypto';
 import { notify } from '../services/notifications';
 
 const router = Router();
-const prisma = new PrismaClient();
 const ok   = (data: any) => ({ success: true,  data });
 const fail = (msg: string) => ({ success: false, error: msg });
 

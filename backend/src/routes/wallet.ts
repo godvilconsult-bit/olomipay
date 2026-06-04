@@ -1,11 +1,11 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 import { getBalance, getTransactionHistory, getAccountInfo, buildStellarPayUri, friendbotFund, activateUserWallet, deriveKeypairFromPhone, IS_TESTNET_NETWORK } from '../services/stellar';
 import { verifyPin, encryptSecret, decryptSecret, WalletKeyError } from '../services/crypto';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // ── POST /api/wallet/activate ──────────────────────────────────────────────────
 // Fund the account with min XLM + add the USDC trustline (signed with user's PIN).

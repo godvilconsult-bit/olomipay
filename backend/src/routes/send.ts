@@ -2,15 +2,15 @@ import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { requireAuth, AuthRequest } from '../middleware/auth';
-import { contractTransfer, userSendXlm, userSendUsdcWithFee, getFeeWalletPublic, PLATFORM_FEE_PCT } from '../services/stellar';
+import { contractTransfer, userSendXlm, userSendUsdcWithFee, getFeeWalletPublic, PLATFORM_FEE_PCT, invalidateBalance } from '../services/stellar';
 import { notify } from '../services/notifications';
 import { emitToUser } from '../socket';
 import { verifyPin } from '../services/crypto';
 import { evaluateSend, logRiskReview } from '../services/riskGate';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 const fail = (msg: string) => ({ success: false, error: msg });
 
@@ -130,6 +130,7 @@ router.post('/stellar', requireAuth, sendLimiter, async (req: AuthRequest, res) 
       where: { id: dbTx.id },
       data:  { status: 'CONFIRMED', stellarTxId: hash, amountUsdc: amount },
     });
+    invalidateBalance(user.stellarPubKey); // reflect the new balance immediately
 
     // Fee record
     await prisma.transaction.create({
@@ -291,6 +292,7 @@ router.post('/xlm', requireAuth, sendLimiter, async (req: AuthRequest, res) => {
     });
 
     await prisma.transaction.update({ where: { id: dbTx.id }, data: { status: 'CONFIRMED', stellarTxId: hash } });
+    invalidateBalance(user.stellarPubKey);
 
     // Record receive for recipient if they're an OlomiPay user
     const recipient = await prisma.user.findUnique({ where: { stellarPubKey: toAddress } });

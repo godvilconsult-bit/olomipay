@@ -4,13 +4,13 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { z } from 'zod';
 import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { deriveKeypairFromPhone, activateUserWallet, IS_TESTNET_NETWORK } from '../services/stellar';
 import { encryptSecret, hashPin, verifyPin, isEncryptedKeyValid } from '../services/crypto';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 import { makeAccountNo } from '../services/accountNo';
 
 const router  = Router();
-const prisma  = new PrismaClient();
 
 // Tanzania phone number: +255 followed by 9 digits
 const phoneSchema = z

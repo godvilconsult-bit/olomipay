@@ -3,12 +3,12 @@ import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import * as StellarSdk from '@stellar/stellar-sdk';
 import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 import { verifyPin } from '../services/crypto';
 import { getUserKeypair } from '../services/stellar';
 
 const router = Router();
-const prisma = new PrismaClient();
 const limiter = rateLimit({ windowMs: 60_000, max: 10, message: { success: false, error: 'Too many requests' } });
 const ok   = (data: any) => ({ success: true,  data });
 const fail = (msg: string) => ({ success: false, error: msg });

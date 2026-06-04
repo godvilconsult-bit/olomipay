@@ -263,7 +263,15 @@ export interface WalletBalance {
   usdc: string; // in USDC (7-decimal string)
 }
 
-export async function getBalance(publicKey: string): Promise<WalletBalance> {
+// Short-lived balance cache (per address). Horizon round-trips are ~100-500ms;
+// caching 15s makes the dashboard feel instant without showing stale money for long.
+const balanceCache = new Map<string, { value: WalletBalance; expiry: number }>();
+const BALANCE_TTL_MS = 15_000;
+
+export async function getBalance(publicKey: string, opts?: { fresh?: boolean }): Promise<WalletBalance> {
+  const cached = balanceCache.get(publicKey);
+  if (!opts?.fresh && cached && Date.now() < cached.expiry) return cached.value;
+
   try {
     const account = await server.loadAccount(publicKey);
     let xlm  = '0';
@@ -281,14 +289,23 @@ export async function getBalance(publicKey: string): Promise<WalletBalance> {
       }
     }
 
-    return { xlm, usdc };
+    const value = { xlm, usdc };
+    balanceCache.set(publicKey, { value, expiry: Date.now() + BALANCE_TTL_MS });
+    return value;
   } catch (err: any) {
     if (err?.response?.status === 404) {
       // Account not activated yet
       return { xlm: '0', usdc: '0' };
     }
+    // On a transient Horizon error, serve the last known balance if we have one
+    if (cached) return cached.value;
     throw err;
   }
+}
+
+/** Invalidate the cached balance for an address (call right after a send/receive). */
+export function invalidateBalance(publicKey: string): void {
+  balanceCache.delete(publicKey);
 }
 
 // ── Transaction history ────────────────────────────────────────────────────────

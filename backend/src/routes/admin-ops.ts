@@ -1,11 +1,11 @@
 import { Router } from 'express';
 import crypto from 'crypto';
 import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 import { getBalance, getFeeWalletPublic } from '../services/stellar';
 
 const router  = Router();
-const prisma  = new PrismaClient();
 const ok   = (data: any) => ({ success: true,  data });
 const fail = (msg: string) => ({ success: false, error: msg });
 

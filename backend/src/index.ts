@@ -47,9 +47,8 @@ app.get('/health', (_req, res) => res.json({
 // Readiness probe — verifies the DB is actually reachable (for load balancers)
 app.get('/ready', async (_req, res) => {
   try {
-    const { PrismaClient } = await import('@prisma/client');
-    const p = new PrismaClient();
-    await p.$queryRawUnsafe('SELECT 1');
+    const { prisma } = await import('./lib/prisma');
+    await prisma.$queryRawUnsafe('SELECT 1');
     return res.json({ ready: true, db: 'up', ts: new Date().toISOString() });
   } catch (e: any) {
     return res.status(503).json({ ready: false, db: 'down', error: e.message });
@@ -108,12 +107,12 @@ async function loadRoutes() {
   console.log('[routes] All routes loaded');
 }
 
-// ── Debug: list all users (remove in production) ─────────────────────────────
+// ── Debug: list all users — disabled unless DEBUG_USERS=1 (it leaks PII) ──────
 app.get('/debug/users', async (_req, res) => {
+  if (process.env.DEBUG_USERS !== '1') return res.status(404).json({ error: 'Not found' });
   try {
-    const { PrismaClient } = await import('@prisma/client');
-    const p = new PrismaClient();
-    const users = await p.user.findMany({
+    const { prisma } = await import('./lib/prisma');
+    const users = await prisma.user.findMany({
       select: { id: true, phone: true, kycName: true, kycStatus: true, stellarPubKey: true, createdAt: true },
       orderBy: { createdAt: 'desc' },
     });

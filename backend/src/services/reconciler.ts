@@ -13,11 +13,11 @@
  */
 
 import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { notify } from './notifications';
 import { findTxHashByMemo } from './stellar';
 import { writeLedgerRows, drainLedgerBackfill } from './ledger';
 
-const prisma = new PrismaClient();
 
 const DEPOSIT_TIMEOUT_MIN = Number(process.env.RECONCILE_DEPOSIT_TIMEOUT_MIN ?? 30);
 const INTERVAL_MS         = Number(process.env.RECONCILE_INTERVAL_MS ?? 120_000); // every 2 min

@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 const ok  = (data: any) => ({ success: true,  data });
 const err = (msg: string, status = 400) => ({ success: false, error: msg, _status: status });
