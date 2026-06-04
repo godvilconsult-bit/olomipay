@@ -27,8 +27,12 @@ export default function KeyboardAware() {
     const applyInset = () => {
       if (!vv) return;
       const inset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      // Guard against transient tiny readings (URL-bar transitions, backgrounding)
+      // that would otherwise collapse keyboard-sized screens. Never go below 40%
+      // of the layout viewport.
+      const vh = Math.max(vv.height, window.innerHeight * 0.4);
       root.style.setProperty('--kb-inset', `${inset}px`);
-      root.style.setProperty('--app-vh',  `${Math.round(vv.height)}px`);
+      root.style.setProperty('--app-vh',  `${Math.round(vh)}px`);
     };
 
     // 2) Only scroll a focused field into view when it is ACTUALLY hidden
