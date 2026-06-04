@@ -2,9 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bell } from 'lucide-react';
+import { Bell, Repeat, Receipt, TrendingUp, Briefcase, ArrowRight } from 'lucide-react';
 import BalanceCard from '../../components/BalanceCard';
-import QuickActions from '../../components/QuickActions';
 import TransactionItem from '../../components/TransactionItem';
 import BottomNav from '../../components/BottomNav';
 import UserAvatar from '../../components/UserAvatar';
@@ -91,11 +90,38 @@ export default function DashboardPage() {
           userTag={user?.userTag}
         />
 
-        {/* Quick actions */}
-        <section>
-          <h2 className="ds-eyebrow mb-3">Quick actions</h2>
-          <QuickActions />
+        {/* Secondary shortcuts — primary actions (Send/Add/Scan) live on the card */}
+        <section className="grid grid-cols-4 gap-2.5">
+          {[
+            { label: 'Swap',     icon: Repeat,     href: '/swap',     tint: 'text-cyan-600 dark:text-cyan-400'   },
+            { label: 'Bills',    icon: Receipt,    href: '/bills',    tint: 'text-violet-600 dark:text-violet-400'},
+            { label: 'Grow',     icon: TrendingUp, href: '/grow',     tint: 'text-emerald-600 dark:text-emerald-400'},
+            { label: 'Business', icon: Briefcase,  href: '/business', tint: 'text-blue-600 dark:text-blue-400'   },
+          ].map(({ label, icon: Icon, href, tint }) => (
+            <button key={href} onClick={() => router.push(href)}
+              className="flex flex-col items-center gap-2 active:scale-95 transition-transform">
+              <div className={`w-full aspect-square max-w-[64px] rounded-2xl bg-white/70 dark:bg-white/5 backdrop-blur
+                              border border-white/60 dark:border-white/10 shadow-sm flex items-center justify-center ${tint}`}>
+                <Icon size={21} strokeWidth={1.9} />
+              </div>
+              <span className="text-[11px] font-medium text-slate-600 dark:text-slate-400">{label}</span>
+            </button>
+          ))}
         </section>
+
+        {/* Grow highlight — surfaces savings/earning */}
+        <button onClick={() => router.push('/grow')}
+          className="w-full flex items-center gap-4 rounded-3xl p-4 text-left text-white
+                     bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg active:scale-[0.99] transition-transform">
+          <div className="w-11 h-11 rounded-2xl bg-white/20 flex items-center justify-center flex-shrink-0">
+            <TrendingUp size={22} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-[15px] leading-tight">Make your money grow</p>
+            <p className="text-xs text-white/80 leading-tight mt-0.5">Earn interest on your balance — start saving today</p>
+          </div>
+          <ArrowRight size={18} className="text-white/70 flex-shrink-0" />
+        </button>
 
         {/* Recent transactions */}
         <section>

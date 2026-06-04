@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Eye, EyeOff, RefreshCw, Copy } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Eye, EyeOff, RefreshCw, Copy, Send, Download, QrCode } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { formatUsdc, formatTzs } from '../lib/utils';
 import { wallet, mobile_money } from '../lib/api';
@@ -15,6 +16,7 @@ interface Props {
 }
 
 export default function BalanceCard({ publicKey, name, profilePicUrl, userTag }: Props) {
+  const router = useRouter();
   const [usdc,      setUsdc]      = useState<string | null>(null);
   const [xlm,       setXlm]       = useState<string | null>(null);
   const [tzsRate,   setTzsRate]   = useState<number>(2600);
@@ -97,22 +99,32 @@ export default function BalanceCard({ publicKey, name, profilePicUrl, userTag }:
         </div>
 
         {/* Primary balance */}
-        <div className="mb-1">
-          <span className="text-4xl font-bold tracking-tight">
+        <p className="text-xs text-white/55 mb-1">Total balance</p>
+        <div className="flex items-baseline gap-2">
+          <span className="text-[2.6rem] leading-none font-bold tracking-tight">
             {hidden ? '••••••' : formatUsdc(usdcNum)}
           </span>
-          <span className="ml-2 text-lg font-medium text-white/70">USD</span>
+          <span className="text-base font-medium text-white/70">USD</span>
         </div>
 
         {/* TZS equivalent */}
-        <div className="text-sm text-white/60 mb-4">
+        <div className="text-sm text-white/60 mt-1.5 mb-5">
           ≈ {hidden ? '•••' : formatTzs(tzsEquiv)} TZS
         </div>
 
-        {/* Single-balance model — wallet label + the user's unique ID */}
-        <div className="flex items-center gap-2 text-xs text-white/50">
-          <span>Olomi Wallet</span>
-          {userTag && (<><span>·</span><span className="font-mono">{userTag}</span></>)}
+        {/* Inline quick actions — consolidated here (no separate section) */}
+        <div className="grid grid-cols-3 gap-2.5">
+          {[
+            { label: 'Send',     icon: Send,     href: '/send'    },
+            { label: 'Add money',icon: Download, href: '/deposit' },
+            { label: 'Scan',     icon: QrCode,   href: '/scan'    },
+          ].map(({ label, icon: Icon, href }) => (
+            <button key={href} onClick={() => router.push(href)}
+              className="flex flex-col items-center justify-center gap-1.5 rounded-2xl bg-white/15 hover:bg-white/25 backdrop-blur py-3 active:scale-95 transition-all">
+              <Icon size={18} strokeWidth={2.1} />
+              <span className="text-[11px] font-semibold">{label}</span>
+            </button>
+          ))}
         </div>
       </div>
     </div>
