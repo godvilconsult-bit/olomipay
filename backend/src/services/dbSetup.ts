@@ -582,6 +582,11 @@ export async function setupDatabase(): Promise<void> {
         "decidedAt" TIMESTAMP
       );
     `);
+    // Multi-step approval: how many distinct sign-offs are required, and who has
+    // signed off so far ([{adminId, phone, role, at}]). 4-eyes is the special
+    // case requiredApprovals = 1 (one checker besides the maker).
+    await prisma.$executeRawUnsafe(`ALTER TABLE "AdminApproval" ADD COLUMN IF NOT EXISTS "requiredApprovals" INT NOT NULL DEFAULT 3`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "AdminApproval" ADD COLUMN IF NOT EXISTS "approvals" JSONB NOT NULL DEFAULT '[]'::jsonb`).catch(() => {});
 
     // Auto-reconciler log — what the self-healing job did to stuck transactions
     await prisma.$executeRawUnsafe(`

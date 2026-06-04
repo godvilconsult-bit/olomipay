@@ -145,7 +145,49 @@ router.get('/audit', requireAuth, requireAdmin, async (req: AuthRequest, res) =>
 // PHASE 2 — Maker–checker (4-eyes) for money-moving actions
 // ════════════════════════════════════════════════════════════════════════════
 
-// Maker proposes a manual credit — does NOT execute; queues for a second admin.
+// ── Multi-step approval helpers ──────────────────────────────────────────────
+// Sensitive (money-moving) actions need THREE distinct admin sign-offs before
+// they execute. The SUPER_ADMIN (OWNER) can override and execute in one step.
+const isSuper = (role?: string | null) => roleSatisfies(role, ['SUPER_ADMIN']);
+
+async function getAdminRole(userId: string): Promise<string | null> {
+  const u = await prisma.user.findUnique({ where: { id: userId }, select: { adminRole: true } });
+  return u?.adminRole ?? null;
+}
+
+// How many OTHER admins can validly approve (FINANCE or SUPER_ADMIN/OWNER)?
+async function validApproverCount(excludeId: string): Promise<number> {
+  const admins = await prisma.user.findMany({
+    where: { isAdmin: true, id: { not: excludeId } }, select: { adminRole: true },
+  });
+  return admins.filter(a => roleSatisfies(a.adminRole, ['FINANCE', 'SUPER_ADMIN'])).length;
+}
+
+// Run the queued action. Throws on failure. Extend here for new action types.
+async function executeApprovalAction(appr: any): Promise<string> {
+  const payload = JSON.parse(appr.payload ?? '{}');
+  if (appr.action === 'manual_credit') {
+    const u = await prisma.user.findUnique({ where: { id: payload.userId } });
+    if (!u) throw new Error('User no longer exists');
+    const hash = await platformSendUsdc(u.stellarPubKey, payload.amountUsdc, `Manual credit: ${payload.reason}`.slice(0, 28));
+    await prisma.transaction.create({ data: {
+      userId: u.id, type: 'RECEIVE', status: 'CONFIRMED', amountUsdc: payload.amountUsdc,
+      stellarTxId: hash, memo: `Manual credit (admin): ${payload.reason}`,
+    }});
+    return hash;
+  }
+  throw new Error(`Unknown approval action: ${appr.action}`);
+}
+
+async function markExecuted(apprId: string, finalApproverId: string, approvals: any[], result: string) {
+  await prisma.$executeRawUnsafe(
+    `UPDATE "AdminApproval" SET "status"='APPROVED', "checkerId"=$1, "result"=$2, "approvals"=$3::jsonb, "decidedAt"=NOW() WHERE "id"=$4`,
+    finalApproverId, result, JSON.stringify(approvals), apprId,
+  );
+}
+
+// Maker proposes a manual credit. SUPER_ADMIN executes immediately (override);
+// everyone else queues it for a 3-step approval by other admins.
 router.post('/users/:id/credit', requireAuth, requireAdmin, async (req: AuthRequest, res) => {
   const amountUsdc = Number(req.body?.amountUsdc);
   const reason     = String(req.body?.reason ?? '').slice(0, 300);
@@ -155,14 +197,39 @@ router.post('/users/:id/credit', requireAuth, requireAdmin, async (req: AuthRequ
   const target = await prisma.user.findUnique({ where: { id: req.params.id }, select: { id: true, phone: true } });
   if (!target) return res.status(404).json(fail('User not found'));
 
-  const payload = { userId: target.id, phone: target.phone, amountUsdc, reason };
+  const payload    = { userId: target.id, phone: target.phone, amountUsdc, reason };
+  const makerRole  = await getAdminRole(req.userId!);
+  const makerPhone = (req as any).adminPhone ?? null;
+
+  // SUPER_ADMIN override — execute now, recorded as a single sign-off.
+  if (isSuper(makerRole)) {
+    const approvals = [{ adminId: req.userId!, phone: makerPhone, role: 'SUPER_ADMIN', at: new Date().toISOString() }];
+    const [row] = await prisma.$queryRawUnsafe<any[]>(
+      `INSERT INTO "AdminApproval" ("action","payload","makerId","makerPhone","requiredApprovals","approvals")
+       VALUES ($1,$2,$3,$4,1,$5::jsonb) RETURNING *`,
+      'manual_credit', JSON.stringify(payload), req.userId!, makerPhone, JSON.stringify(approvals),
+    );
+    try {
+      const result = await executeApprovalAction(row);
+      await markExecuted(row.id, req.userId!, approvals, result);
+      await audit(req, 'override_credit', target.id, 'user', { ...payload, result });
+      return res.json(ok({ approvalId: row.id, executed: true, result, message: 'Executed (super-admin override).' }));
+    } catch (e: any) {
+      await prisma.$executeRawUnsafe(`UPDATE "AdminApproval" SET "status"='FAILED', "result"=$1, "decidedAt"=NOW() WHERE "id"=$2`, e.message, row.id);
+      return res.status(502).json(fail(e.message ?? 'Execution failed'));
+    }
+  }
+
+  // Otherwise queue for multi-step approval (3, capped to available approvers).
+  const others   = await validApproverCount(req.userId!);
+  const required = Math.max(1, Math.min(3, others));
   const [row] = await prisma.$queryRawUnsafe<any[]>(
-    `INSERT INTO "AdminApproval" ("action","payload","makerId","makerPhone")
-     VALUES ($1,$2,$3,$4) RETURNING id`,
-    'manual_credit', JSON.stringify(payload), req.userId!, (req as any).adminPhone ?? null,
+    `INSERT INTO "AdminApproval" ("action","payload","makerId","makerPhone","requiredApprovals")
+     VALUES ($1,$2,$3,$4,$5) RETURNING id`,
+    'manual_credit', JSON.stringify(payload), req.userId!, makerPhone, required,
   );
-  await audit(req, 'propose_credit', target.id, 'user', payload);
-  return res.json(ok({ approvalId: row.id, message: 'Credit queued — a different admin must approve it.' }));
+  await audit(req, 'propose_credit', target.id, 'user', { ...payload, required });
+  return res.json(ok({ approvalId: row.id, requiredApprovals: required, message: `Credit queued — needs ${required} approval(s) from other admins.` }));
 });
 
 // Pending approvals queue
@@ -174,34 +241,42 @@ router.get('/approvals', requireAuth, requireAdmin, async (_req, res) => {
   return res.json(ok({ approvals: rows, total: rows.length, pending: count }));
 });
 
-// Checker approves → executes. Must be a DIFFERENT admin with FINANCE/SUPER role.
+// An approver signs off. Needs requiredApprovals distinct sign-offs (default 3)
+// before it executes; a SUPER_ADMIN overrides and executes in one step. The
+// maker can never approve their own request, and no admin can approve twice.
 router.post('/approvals/:id/approve', requireAuth, requireRole('FINANCE', 'SUPER_ADMIN'), async (req: AuthRequest, res) => {
   const [appr] = await prisma.$queryRawUnsafe<any[]>(`SELECT * FROM "AdminApproval" WHERE "id"=$1`, req.params.id);
   if (!appr) return res.status(404).json(fail('Approval not found'));
   if (appr.status !== 'PENDING') return res.status(400).json(fail('Already decided'));
-  if (appr.makerId === req.userId) return res.status(403).json(fail('The checker must be a different admin (4-eyes).'));
+  if (appr.makerId === req.userId) return res.status(403).json(fail('The maker cannot approve their own request (4-eyes).'));
 
+  const approvals: any[] = Array.isArray(appr.approvals) ? appr.approvals : [];
+  if (approvals.some((a: any) => a.adminId === req.userId)) {
+    return res.status(409).json(fail('You have already approved this request.'));
+  }
+
+  const role     = await getAdminRole(req.userId!);
+  const required = appr.requiredApprovals ?? 3;
+  const next     = [...approvals, { adminId: req.userId!, phone: (req as any).adminPhone ?? null, role: role ?? null, at: new Date().toISOString() }];
+  const override = isSuper(role);
+  const willExecute = override || next.length >= required;
+
+  // Not enough sign-offs yet — record progress and keep it pending.
+  if (!willExecute) {
+    await prisma.$executeRawUnsafe(`UPDATE "AdminApproval" SET "approvals"=$1::jsonb WHERE "id"=$2`, JSON.stringify(next), appr.id);
+    await audit(req, 'approve_step_' + appr.action, appr.id, 'approval', { step: next.length, required });
+    return res.json(ok({ executed: false, approved: next.length, required, message: `Approval ${next.length} of ${required} recorded — waiting for more.` }));
+  }
+
+  // Threshold met (or super-admin override) — execute.
   try {
-    const payload = JSON.parse(appr.payload ?? '{}');
-    let result = '';
-    if (appr.action === 'manual_credit') {
-      const u = await prisma.user.findUnique({ where: { id: payload.userId } });
-      if (!u) throw new Error('User no longer exists');
-      const hash = await platformSendUsdc(u.stellarPubKey, payload.amountUsdc, `Manual credit: ${payload.reason}`.slice(0, 28));
-      await prisma.transaction.create({ data: {
-        userId: u.id, type: 'RECEIVE', status: 'CONFIRMED', amountUsdc: payload.amountUsdc,
-        stellarTxId: hash, memo: `Manual credit (admin): ${payload.reason}`,
-      }});
-      result = hash;
-    }
-    await prisma.$executeRawUnsafe(
-      `UPDATE "AdminApproval" SET "status"='APPROVED', "checkerId"=$1, "result"=$2, "decidedAt"=NOW() WHERE "id"=$3`,
-      req.userId!, result, appr.id,
-    );
-    await audit(req, 'approve_' + appr.action, appr.id, 'approval', { result });
-    return res.json(ok({ message: 'Approved & executed', result }));
+    const result = await executeApprovalAction(appr);
+    await markExecuted(appr.id, req.userId!, next, result);
+    await audit(req, (override ? 'override_' : 'approve_') + appr.action, appr.id, 'approval', { result, approvals: next.length, required });
+    return res.json(ok({ executed: true, result, approved: next.length, required,
+      message: override ? 'Approved & executed (super-admin override).' : 'Final approval — executed.' }));
   } catch (e: any) {
-    await prisma.$executeRawUnsafe(`UPDATE "AdminApproval" SET "status"='FAILED', "checkerId"=$1, "result"=$2, "decidedAt"=NOW() WHERE "id"=$3`, req.userId!, e.message, appr.id);
+    await prisma.$executeRawUnsafe(`UPDATE "AdminApproval" SET "status"='FAILED', "checkerId"=$1, "result"=$2, "approvals"=$3::jsonb, "decidedAt"=NOW() WHERE "id"=$4`, req.userId!, e.message, JSON.stringify(next), appr.id);
     return res.status(502).json(fail(e.message ?? 'Execution failed'));
   }
 });

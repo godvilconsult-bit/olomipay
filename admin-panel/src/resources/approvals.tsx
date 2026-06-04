@@ -14,28 +14,39 @@ export const ApprovalsList = () => {
   useEffect(() => { load(); }, []);
 
   const decide = async (id: string, kind: 'approve' | 'reject') => {
-    try { await adminAction(`/approvals/${id}/${kind}`); notify(kind === 'approve' ? 'Approved & executed' : 'Rejected', { type: 'success' }); load(); }
-    catch (e: any) { notify(e.message, { type: 'error' }); }
+    try {
+      const r: any = await adminAction(`/approvals/${id}/${kind}`);
+      const msg = kind === 'reject' ? 'Rejected'
+        : r?.executed ? (r.message ?? 'Approved & executed')
+        : (r?.message ?? `Approval ${r?.approved ?? ''} of ${r?.required ?? ''} recorded`);
+      notify(msg, { type: 'success' });
+      load();
+    } catch (e: any) { notify(e.message, { type: 'error' }); }
   };
 
   return (
     <div style={{ padding: 16 }}>
-      <Title title="Approvals (4-eyes)" />
-      <h2>Maker–checker approvals</h2>
-      <p style={{ color: '#94a3b8', fontSize: 13 }}>Money-moving actions need a second admin (FINANCE / SUPER_ADMIN) to approve. You cannot approve your own request.</p>
+      <Title title="Approvals" />
+      <h2>Multi-step approvals</h2>
+      <p style={{ color: '#94a3b8', fontSize: 13 }}>Money-moving actions need <b>3 distinct admin approvals</b> (FINANCE / SUPER_ADMIN) before they execute. The maker can’t approve their own request, and no one can approve twice. A <b>SUPER_ADMIN</b> can override and execute in one step.</p>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
         <thead><tr style={{ textAlign: 'left', color: '#64748b' }}>
-          <th>When</th><th>Action</th><th>Maker</th><th>Detail</th><th>Status</th><th></th>
+          <th>When</th><th>Action</th><th>Maker</th><th>Detail</th><th>Progress</th><th>Status</th><th></th>
         </tr></thead>
         <tbody>
           {rows.map(a => {
             let p: any = {}; try { p = JSON.parse(a.payload ?? '{}'); } catch {}
+            const approvals = Array.isArray(a.approvals) ? a.approvals : [];
+            const required  = a.requiredApprovals ?? 3;
             return (
               <tr key={a.id} style={{ borderTop: '1px solid #e2e8f0' }}>
                 <td>{new Date(a.createdAt).toLocaleString()}</td>
                 <td>{a.action}</td>
                 <td>{a.makerPhone}</td>
                 <td style={{ fontSize: 12 }}>{p.amountUsdc ? `$${p.amountUsdc} → ${p.phone} (${p.reason})` : a.payload}</td>
+                <td title={approvals.map((x: any) => x.phone).join(', ')} style={{ fontWeight: 600, color: approvals.length >= required ? '#166534' : '#854d0e' }}>
+                  {approvals.length} / {required}
+                </td>
                 <td><span style={{ fontWeight: 600, color: a.status === 'PENDING' ? '#854d0e' : a.status === 'APPROVED' ? '#166534' : '#991b1b' }}>{a.status}</span></td>
                 <td style={{ display: 'flex', gap: 6, padding: '6px 0' }}>
                   {a.status === 'PENDING' && <>
