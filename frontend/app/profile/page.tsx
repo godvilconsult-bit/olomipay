@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Copy, LogOut, Shield, Camera, Wallet, RefreshCw, Edit2, Check, Wrench, LifeBuoy } from 'lucide-react';
+import { ArrowLeft, Copy, LogOut, Shield, Camera, Wallet, RefreshCw, Edit2, Check, Wrench, LifeBuoy, Briefcase, History } from 'lucide-react';
 import BottomNav from '../../components/BottomNav';
 import PinInput from '../../components/PinInput';
 import { auth, clearTokens } from '../../lib/api';
@@ -303,6 +303,26 @@ export default function ProfilePage() {
           <button onClick={() => router.push('/deposit')}
             className="mt-4 w-full bg-white text-primary font-bold py-3 rounded-2xl text-sm">
             Deposit via Mobile Money →
+          </button>
+        </div>
+
+        {/* ── Quick links ── */}
+        <div className="bg-white dark:bg-slate-800 rounded-3xl divide-y divide-slate-100 dark:divide-slate-700">
+          <button onClick={() => router.push('/business')}
+            className="w-full flex items-center gap-3 px-5 py-4 hover:bg-slate-50 dark:hover:bg-slate-700">
+            <Briefcase size={18} className="text-primary" />
+            <div className="flex-1 text-left">
+              <p className="font-medium text-sm">Business</p>
+              <p className="text-xs text-slate-400">Merchant payments &amp; payroll</p>
+            </div>
+          </button>
+          <button onClick={() => router.push('/history')}
+            className="w-full flex items-center gap-3 px-5 py-4 hover:bg-slate-50 dark:hover:bg-slate-700">
+            <History size={18} className="text-primary" />
+            <div className="flex-1 text-left">
+              <p className="font-medium text-sm">Transaction history</p>
+              <p className="text-xs text-slate-400">All your past payments &amp; transfers</p>
+            </div>
           </button>
         </div>
 

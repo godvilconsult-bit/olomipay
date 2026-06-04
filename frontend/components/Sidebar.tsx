@@ -5,10 +5,9 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useChatUnread, chatState } from '../lib/chatState';
 import {
-  Home, Send, MessageCircle, PiggyBank, TrendingUp,
-  Users, Receipt, ArrowUpDown, HandCoins, CreditCard,
-  Star, Shield, History, User, Bell, Calendar,
-  QrCode, Landmark, Building2, TrendingDown, LogOut, Briefcase,
+  Home, Send, MessageCircle, TrendingUp, Receipt, ArrowUpDown,
+  History, User, QrCode, Building2, LogOut, Briefcase,
+  Download, ArrowDownToLine,
 } from 'lucide-react';
 
 // Routes where the sidebar must NEVER appear
@@ -20,28 +19,45 @@ function isPublicPath(path: string): boolean {
   return PUBLIC_PREFIXES.some(p => path.startsWith(p));
 }
 
-const NAV_ITEMS = [
-  { href: '/dashboard',     label: 'Home',       icon: Home         },
-  { href: '/chat',          label: 'Chat',        icon: MessageCircle },
-  { href: '/send',          label: 'Send',        icon: Send         },
-  { href: '/savings',       label: 'Savings',     icon: PiggyBank    },
-  { href: '/stake',         label: 'Earn',        icon: TrendingUp   },
-  { href: '/chama',         label: 'Chama',       icon: Users        },
-  { href: '/bills',         label: 'Bills',       icon: Receipt      },
-  { href: '/swap',          label: 'Swap',        icon: ArrowUpDown  },
-  { href: '/lending',       label: 'Lending',     icon: HandCoins    },
-  { href: '/card',          label: 'Card',        icon: CreditCard   },
-  { href: '/invest',        label: 'Bonds',       icon: Landmark     },
-  { href: '/merchant',      label: 'Merchant',    icon: QrCode       },
-  { href: '/payroll',       label: 'Payroll',     icon: Briefcase    },
-  { href: '/rewards',       label: 'Rewards',     icon: Star         },
-  { href: '/credit',        label: 'Credit',      icon: Shield       },
-  { href: '/history',       label: 'History',     icon: History      },
-  { href: '/notifications', label: 'Alerts',      icon: Bell         },
-  { href: '/schedule',      label: 'Scheduled',   icon: Calendar     },
-  { href: '/protect',       label: 'Protection',  icon: TrendingDown },
-  { href: '/admin',         label: 'Admin',       icon: Building2    },
-  { href: '/profile',       label: 'Profile',     icon: User         },
+const NAV_SECTIONS = [
+  {
+    title: '',
+    items: [
+      { href: '/dashboard', label: 'Home', icon: Home          },
+      { href: '/chat',      label: 'Chat', icon: MessageCircle },
+    ],
+  },
+  {
+    title: 'Money',
+    items: [
+      { href: '/send',     label: 'Send',      icon: Send           },
+      { href: '/deposit',  label: 'Add money', icon: Download        },
+      { href: '/withdraw', label: 'Withdraw',  icon: ArrowDownToLine },
+      { href: '/scan',     label: 'Scan',      icon: QrCode          },
+      { href: '/swap',     label: 'Swap',      icon: ArrowUpDown     },
+      { href: '/bills',    label: 'Bills',     icon: Receipt         },
+    ],
+  },
+  {
+    title: 'Grow',
+    items: [
+      { href: '/grow', label: 'Grow', icon: TrendingUp },
+    ],
+  },
+  {
+    title: 'Business',
+    items: [
+      { href: '/business', label: 'Business', icon: Briefcase },
+    ],
+  },
+  {
+    title: 'Account',
+    items: [
+      { href: '/history', label: 'History', icon: History    },
+      { href: '/admin',   label: 'Admin',   icon: Building2  },
+      { href: '/profile', label: 'Profile', icon: User       },
+    ],
+  },
 ];
 
 export default function Sidebar() {
@@ -90,7 +106,7 @@ export default function Sidebar() {
           <div>
             <p className="font-bold text-white text-sm leading-tight">OlomiPay</p>
             <p className="text-[9px] leading-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
-              Building Trust Through Blockchain
+              Money made simple
             </p>
           </div>
         </div>
@@ -98,39 +114,46 @@ export default function Sidebar() {
 
       {/* Nav items */}
       <nav className="thin-scroll relative flex-1 overflow-y-auto py-3 px-3 space-y-1">
-        {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-          const active    = path === href || path.startsWith(href + '/');
-          const showBadge = href === '/chat' && unread > 0 && !active;
-          return (
-            <Link key={href} href={href}
-              className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
-                active
-                  ? 'text-white font-semibold'
-                  : 'text-slate-400 hover:text-white hover:bg-white/5'
-              }`}>
-              {/* active gradient pill */}
-              {active && (
-                <span className="absolute inset-0 -z-10 rounded-xl bg-gradient-to-r from-blue-500 to-emerald-500 shadow-lg shadow-blue-500/25" />
-              )}
-              {/* active left accent */}
-              {active && <span className="absolute -left-3 top-1/2 h-6 -translate-y-1/2 w-1 rounded-full bg-gradient-to-b from-blue-400 to-emerald-400" />}
-              <div className="relative flex-shrink-0">
-                <Icon size={18} strokeWidth={active ? 2.4 : 1.8} />
-                {showBadge && (
-                  <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-0.5">
-                    {unread > 99 ? '99+' : unread}
-                  </span>
-                )}
-              </div>
-              <span className="text-sm flex-1">{label}</span>
-              {showBadge && (
-                <span className="bg-gradient-to-r from-blue-500 to-emerald-500 text-white text-[9px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 ml-auto">
-                  {unread > 99 ? '99+' : unread}
-                </span>
-              )}
-            </Link>
-          );
-        })}
+        {NAV_SECTIONS.map((section, si) => (
+          <div key={si} className={si > 0 ? 'pt-3' : ''}>
+            {section.title && (
+              <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                {section.title}
+              </p>
+            )}
+            {section.items.map(({ href, label, icon: Icon }) => {
+              const active    = path === href || path.startsWith(href + '/');
+              const showBadge = href === '/chat' && unread > 0 && !active;
+              return (
+                <Link key={href} href={href}
+                  className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
+                    active
+                      ? 'text-white font-semibold'
+                      : 'text-slate-400 hover:text-white hover:bg-white/5'
+                  }`}>
+                  {active && (
+                    <span className="absolute inset-0 -z-10 rounded-xl bg-gradient-to-r from-blue-500 to-emerald-500 shadow-lg shadow-blue-500/25" />
+                  )}
+                  {active && <span className="absolute -left-3 top-1/2 h-6 -translate-y-1/2 w-1 rounded-full bg-gradient-to-b from-blue-400 to-emerald-400" />}
+                  <div className="relative flex-shrink-0">
+                    <Icon size={18} strokeWidth={active ? 2.4 : 1.8} />
+                    {showBadge && (
+                      <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-0.5">
+                        {unread > 99 ? '99+' : unread}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-sm flex-1">{label}</span>
+                  {showBadge && (
+                    <span className="bg-gradient-to-r from-blue-500 to-emerald-500 text-white text-[9px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 ml-auto">
+                      {unread > 99 ? '99+' : unread}
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+        ))}
       </nav>
 
       {/* Logout */}
