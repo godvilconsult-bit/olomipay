@@ -42,7 +42,7 @@ export default function DashboardPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pb-24">
+    <div className="min-h-screen pb-24">
       {/* Header */}
       <div className="sticky top-0 z-40 px-5 pt-safe-top pt-4 pb-3">
         <div className="flex items-center justify-between max-w-md mx-auto">

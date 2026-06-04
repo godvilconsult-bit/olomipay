@@ -152,7 +152,7 @@ export default function PayrollPage() {
   // ── Result screen ────────────────────────────────────────────────────────────
   if (step === 'result' && result) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center px-5 pb-24">
+      <div className="min-h-screen flex flex-col items-center justify-center px-5 pb-24">
         <div className="max-w-md w-full text-center space-y-5">
           <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto">
             <CheckCircle2 size={40} className="text-green-600" />
@@ -179,7 +179,7 @@ export default function PayrollPage() {
   // ── PIN screen ───────────────────────────────────────────────────────────────
   if (step === 'pin' && preview) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pb-24">
+      <div className="min-h-screen pb-24">
         <div className="sticky top-0 z-40 bg-white dark:bg-slate-900 border-b border-slate-100 px-5 py-4 flex items-center gap-3">
           <button onClick={() => setStep('preview')} className="p-2 -ml-2 rounded-full hover:bg-slate-100">
             <ArrowLeft size={20} />
@@ -207,7 +207,7 @@ export default function PayrollPage() {
   // ── Preview screen ───────────────────────────────────────────────────────────
   if (step === 'preview' && preview) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pb-28">
+      <div className="min-h-screen pb-28">
         <div className="sticky top-0 z-40 bg-white dark:bg-slate-900 border-b border-slate-100 px-5 py-4 flex items-center gap-3">
           <button onClick={() => setStep('build')} className="p-2 -ml-2 rounded-full hover:bg-slate-100">
             <ArrowLeft size={20} />
@@ -264,7 +264,7 @@ export default function PayrollPage() {
 
   // ── Build screen (default) ───────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pb-28">
+    <div className="min-h-screen pb-28">
       <div className="sticky top-0 z-40 bg-white dark:bg-slate-900 border-b border-slate-100 px-5 py-4 flex items-center gap-3">
         <button onClick={() => router.back()} className="p-2 -ml-2 rounded-full hover:bg-slate-100">
           <ArrowLeft size={20} />

@@ -196,7 +196,7 @@ export default function AdminPage() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pb-24">
+    <div className="min-h-screen pb-24">
       {/* Header */}
       <div className="bg-gradient-to-r from-[#1a3a6b] to-[#1a56db] text-white px-5 py-5">
         <div className="flex items-center gap-3 mb-1">

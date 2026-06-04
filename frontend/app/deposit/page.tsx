@@ -159,7 +159,7 @@ export default function DepositPage() {
 
   // ── MOMO: waiting step ─────────────────────────────────────────────────────
   if (tab === 'mobile' && momoStep === 'waiting') return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center px-5 pb-24">
+    <div className="min-h-screen flex flex-col items-center justify-center px-5 pb-24">
       <div className="max-w-md w-full text-center space-y-6">
         <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mx-auto animate-pulse">
           <Smartphone size={40} className="text-primary" />
@@ -180,7 +180,7 @@ export default function DepositPage() {
   );
 
   if (tab === 'mobile' && momoStep === 'success') return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center px-5 pb-24">
+    <div className="min-h-screen flex flex-col items-center justify-center px-5 pb-24">
       <div className="max-w-md w-full text-center space-y-5">
         <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto">
           <CheckCircle2 size={40} className="text-green-600" />
@@ -194,7 +194,7 @@ export default function DepositPage() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pb-24">
+    <div className="min-h-screen pb-24">
       {/* Header */}
       <div className="sticky top-0 z-40 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-5 py-4 flex items-center gap-3">
         <button onClick={() => router.back()} className="p-2 -ml-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800">

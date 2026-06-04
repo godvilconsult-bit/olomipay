@@ -74,7 +74,7 @@ export default function BillsPage() {
 
   if (step === 'success') {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center px-5 pb-24">
+      <div className="min-h-screen flex flex-col items-center justify-center px-5 pb-24">
         <div className="max-w-md w-full text-center space-y-5">
           <div className="w-20 h-20 bg-success/10 rounded-full flex items-center justify-center mx-auto">
             <CheckCircle2 size={40} className="text-success" />
@@ -101,7 +101,7 @@ export default function BillsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pb-24">
+    <div className="min-h-screen pb-24">
       <div className="sticky top-0 z-40 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-5 py-4 flex items-center gap-3">
         <button onClick={() => step === 'select' ? router.back() : setStep('select')}
           className="p-2 -ml-2 rounded-full hover:bg-slate-100 min-h-[44px] min-w-[44px] flex items-center justify-center">

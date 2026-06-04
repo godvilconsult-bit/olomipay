@@ -155,6 +155,61 @@
   .skeleton {
     @apply bg-slate-200 dark:bg-slate-700 rounded-xl animate-pulse;
   }
+
+  /* ── Active filter chip — gradient pill matching the kit ─────────────────── */
+  /* Usage: add 'chip-active' to the active chip alongside any other classes */
+  .chip-active {
+    background: linear-gradient(to right, #3b82f6, #22c55e) !important;
+    color: #fff !important;
+  }
+
+  /* ── Section eyebrow label (e.g. "Quick actions", "Recent") ─────────────── */
+  .section-label {
+    @apply text-[13px] font-semibold text-slate-500 dark:text-slate-400;
+  }
+
+  /* ── Pill badge (e.g. "4.5% APY", "✓ Verified") ─────────────────────────── */
+  .pill {
+    @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full
+           text-xs font-semibold
+           bg-success/10 text-success;
+  }
+  .pill-primary { @apply pill bg-primary/10 text-primary; }
+  .pill-amber   { @apply pill bg-amber-500/10 text-amber-600; }
+  .pill-slate   { @apply pill bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-slate-400; }
+
+  /* ── Dark-gradient confirm card (payment/staking confirm step) ───────────── */
+  .confirm-card {
+    @apply w-full rounded-[1.25rem] p-5 text-center
+           bg-gradient-to-br from-[#1a3a6b] to-[#1a56db] text-white;
+  }
+
+  /* ── Segmented control (pill track style) ────────────────────────────────── */
+  .seg-track {
+    @apply flex gap-1 bg-slate-100 dark:bg-white/[0.06] rounded-2xl p-1;
+  }
+  .seg-item {
+    @apply flex-1 py-2 rounded-xl text-[13.5px] font-semibold border-0 cursor-pointer
+           bg-transparent text-slate-500 dark:text-slate-400
+           transition-all duration-150;
+  }
+  .seg-item.active {
+    @apply bg-white dark:bg-white/10 text-slate-900 dark:text-white
+           shadow-sm;
+  }
+
+  /* ── Row (fee breakdown, detail sheet rows) ──────────────────────────────── */
+  .fee-row {
+    @apply flex items-center justify-between py-1.5 text-sm;
+  }
+  .fee-row-label { @apply text-slate-500; }
+  .fee-row-value { @apply font-semibold text-slate-800 dark:text-slate-200; }
+
+  /* ── Success state container ─────────────────────────────────────────────── */
+  .success-icon {
+    @apply w-20 h-20 rounded-full flex items-center justify-center
+           bg-success/10 text-success mb-4;
+  }
 }
 
 /* ═════════════════════════════════════════════════════════════════════════════
@@ -359,8 +414,23 @@
 }
 
 /* Make authenticated page roots transparent so the mesh shows through.
-   (Cards, sticky headers, sheets keep their own bg — they aren't min-h-screen.) */
-.app-canvas .min-h-screen { background-color: transparent !important; }
+   Targets .min-h-screen AND the common Tailwind bg-* combos pages use.
+   Cards / sticky headers / sheets keep their own bg — they aren't page roots. */
+.app-canvas .min-h-screen,
+.app-canvas .min-h-\[100dvh\],
+.app-canvas .min-h-screen.bg-slate-50,
+.app-canvas .min-h-screen.bg-slate-100,
+.app-canvas .min-h-screen.bg-white {
+  background-color: transparent !important;
+  background: none !important;
+}
+/* dark: variant prefix classes can't be overridden by descendant selector alone
+   — cover the actual rendered values for both slate-50 and slate-900 */
+.app-canvas [class*="min-h-screen"][class*="bg-slate"],
+.app-canvas [class*="min-h-screen"][class*="bg-white"] {
+  background-color: transparent !important;
+  background: none !important;
+}
 
 /* Thin, theme-matched scrollbar (sidebar nav, scroll areas) */
 .thin-scroll { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.15) transparent; }

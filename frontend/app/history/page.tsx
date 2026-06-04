@@ -47,7 +47,7 @@ export default function HistoryPage() {
   const filtered = filter === 'ALL' ? txs : txs.filter(t => t.type === filter);
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pb-24">
+    <div className="min-h-screen pb-24">
       <div className="sticky top-0 z-40 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800">
         <div className="flex items-center gap-3 px-5 py-4">
           <button onClick={() => router.back()} className="p-2 -ml-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 min-h-[44px] min-w-[44px] flex items-center justify-center">
@@ -64,7 +64,7 @@ export default function HistoryPage() {
               onClick={() => setFilter(f.value)}
               className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors min-h-[36px] ${
                 filter === f.value
-                  ? 'bg-primary text-white'
+                  ? 'chip-active'
                   : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
               }`}
             >
