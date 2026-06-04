@@ -834,7 +834,7 @@ function MoneySheet({ name, recipientId, convId, onClose, onSent, emit }: any) {
   const [step,   setStep]   = useState<'amount' | 'pin'>('amount');
   const [req,    setReq]    = useState(false);
   const [busy,   setBusy]   = useState(false);
-  const [asset,  setAsset]  = useState<'USDC' | 'XLM'>('USDC');
+  const asset = 'USDC' as const;   // single USD balance — XLM is never user-facing
   // Idempotency: one stable ref per opened sheet; a retry reuses it so the
   // server never sends a second payment for the same intent.
   const clientRefRef = useRef<string>(

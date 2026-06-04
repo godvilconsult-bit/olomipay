@@ -57,6 +57,81 @@ function getPlatformKeypair(): StellarSdk.Keypair {
   return StellarSdk.Keypair.fromSecret(secret);
 }
 
+// ── Gas treasury: users hold ZERO XLM ────────────────────────────────────────────
+// Value always moves as USDC; XLM is only the network "gas" + the small account
+// reserve Stellar requires. Both are paid by the PLATFORM TREASURY (the platform
+// keypair), so users never need to buy, hold, or even see XLM.
+//
+//   • Gas        → every user-signed tx is wrapped in a FEE-BUMP paid by the
+//                  treasury (submitWithPlatformFee), so the user pays no fee.
+//   • Reserve    → new accounts are created with SPONSORED reserves on mainnet
+//                  (startingBalance 0), so the user account locks 0 XLM.
+
+/**
+ * Submit a USER-signed transaction with the platform treasury paying the network
+ * fee (fee-bump). This is how users hold zero XLM — they never pay gas.
+ *
+ * Falls back to submitting the inner tx directly if the treasury can't fee-bump
+ * (e.g. STELLAR_SECRET_KEY unset, or treasury temporarily empty), so a transfer
+ * is never blocked on a network where the account holds its own XLM (testnet).
+ */
+async function submitWithPlatformFee(
+  innerTx: StellarSdk.Transaction,
+): Promise<{ hash: string }> {
+  try {
+    const platform = getPlatformKeypair();
+    const feeBump = StellarSdk.TransactionBuilder.buildFeeBumpTransaction(
+      platform,
+      String(Number(StellarSdk.BASE_FEE) * 20), // generous gas cap (~0.0002 XLM)
+      innerTx,
+      NETWORK_PASSPHRASE,
+    );
+    feeBump.sign(platform);
+    const r = await server.submitTransaction(feeBump);
+    return { hash: r.hash };
+  } catch (e: any) {
+    console.warn('[stellar] fee-bump unavailable, submitting inner tx directly:', e?.message);
+    const r = await server.submitTransaction(innerTx);
+    return { hash: r.hash };
+  }
+}
+
+/**
+ * Health of the XLM gas treasury (the platform keypair). The operator monitors
+ * this so they can top up before they run out of gas / sponsorship capacity.
+ */
+export async function getTreasuryStatus(): Promise<{
+  publicKey:        string;
+  xlm:              number;
+  estAccountsLeft:  number;  // how many more user accounts it can sponsor
+  estTxLeft:        number;  // how many more transactions it can fee-bump
+  healthy:          boolean;
+}> {
+  let publicKey = '';
+  try { publicKey = getPlatformKeypair().publicKey(); }
+  catch { publicKey = process.env.STELLAR_PUBLIC_KEY ?? ''; }
+
+  let xlm = 0;
+  try {
+    const acct   = await server.loadAccount(publicKey);
+    const native = acct.balances.find((b: any) => b.asset_type === 'native');
+    xlm = parseFloat(native?.balance ?? '0');
+  } catch { /* account may not exist yet */ }
+
+  const RESERVE_PER_ACCOUNT = 1.6;    // base (1) + USDC trustline (0.5) + buffer
+  const FEE_PER_TX          = 0.0002; // generous fee-bump cap
+  const PLATFORM_MIN_BUFFER = 5;      // keep the treasury account itself alive
+  const usable = Math.max(0, xlm - PLATFORM_MIN_BUFFER);
+
+  return {
+    publicKey,
+    xlm,
+    estAccountsLeft: Math.floor(usable / RESERVE_PER_ACCOUNT),
+    estTxLeft:       Math.floor(usable / FEE_PER_TX),
+    healthy:         xlm > 20,
+  };
+}
+
 // ── Fee wallet ─────────────────────────────────────────────────────────────────
 // The fee wallet is the Stellar address that receives all 1% platform fees.
 // Priority: FEE_WALLET_PUBLIC → FEE_ACCOUNT → STELLAR_PUBLIC_KEY
@@ -190,15 +265,31 @@ export async function activateUserWallet(params: {
     if (IS_TESTNET) {
       await fetch(`https://friendbot.stellar.org?addr=${encodeURIComponent(publicKey)}`);
     } else {
-      // Mainnet: platform creates + funds the new account (base + trustline reserve + a little gas)
+      // Mainnet: platform SPONSORS the new account so the user holds ZERO XLM.
+      // One atomic tx creates the account with startingBalance 0, adds the USDC
+      // trustline, and ends sponsorship — the platform treasury locks all the
+      // reserves. Requires both the platform key (sponsor) and the user key.
       const platform = getPlatformKeypair();
+      const signer   = getUserKeypair(encryptedSecret, pin, phone);
       const pAcct    = await server.loadAccount(platform.publicKey());
       const tx = new StellarSdk.TransactionBuilder(pAcct, {
         fee: StellarSdk.BASE_FEE, networkPassphrase: NETWORK_PASSPHRASE,
-      }).addOperation(StellarSdk.Operation.createAccount({
-        destination: publicKey, startingBalance: '2.5',
-      })).setTimeout(60).build();
+      })
+        .addOperation(StellarSdk.Operation.beginSponsoringFutureReserves({
+          sponsoredId: publicKey, source: platform.publicKey(),
+        }))
+        .addOperation(StellarSdk.Operation.createAccount({
+          destination: publicKey, startingBalance: '0',
+        }))
+        .addOperation(StellarSdk.Operation.changeTrust({
+          asset: USDC_ASSET, limit: '1000000', source: publicKey,
+        }))
+        .addOperation(StellarSdk.Operation.endSponsoringFutureReserves({
+          source: publicKey,
+        }))
+        .setTimeout(120).build();
       tx.sign(platform);
+      tx.sign(signer);
       await server.submitTransaction(tx);
     }
     // Wait for the account to appear on-ledger (a few seconds)
@@ -550,7 +641,7 @@ export async function userSendUsdcWithFee(params: {
 
   const tx = txBuilder.build();
   tx.sign(signer);
-  const result = await server.submitTransaction(tx);
+  const result = await submitWithPlatformFee(tx);   // treasury pays gas → user holds no XLM
 
   return { hash: result.hash, netUsdc, feeUsdc, feeWallet };
 }
@@ -586,7 +677,7 @@ export async function userSendUsdcToPlatform(params: {
   const tx = txBuilder.setTimeout(30).build();
   tx.sign(signer);
 
-  const result = await server.submitTransaction(tx);
+  const result = await submitWithPlatformFee(tx);   // treasury pays gas → user holds no XLM
   return result.hash;
 }
 

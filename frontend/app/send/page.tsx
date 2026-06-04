@@ -10,11 +10,6 @@ import FeePreview from '../../components/FeePreview';
 import { send } from '../../lib/api';
 import { parseRecipient, parseAmount, calcFee, isValidStellarAddress } from '../../lib/utils';
 
-const API = process.env.NEXT_PUBLIC_API_URL;
-function getToken() {
-  return sessionStorage.getItem('olomipay_at') || (sessionStorage.getItem('olomipay_at') || sessionStorage.getItem('olomipay_rt')) || '';
-}
-
 type Step = 'form' | 'pin' | 'success';
 
 function SendPageInner() {
@@ -23,7 +18,7 @@ function SendPageInner() {
   const [step,      setStep]      = useState<Step>('form');
   const [recipient, setRecipient] = useState('');
   const [amount,    setAmount]    = useState('');
-  const [asset,     setAsset]     = useState<'USDC' | 'XLM'>('USDC');
+  const asset = 'USDC' as const;   // single USD balance — XLM is never user-facing
   const [memo,      setMemo]      = useState('');
   const [pin,       setPin]       = useState('');
   const [loading,   setLoading]   = useState(false);
@@ -36,11 +31,9 @@ function SendPageInner() {
   useEffect(() => {
     const to     = searchParams.get('to');
     const amt    = searchParams.get('amount');
-    const ast    = searchParams.get('asset');
     const m      = searchParams.get('memo');
     if (to)  setRecipient(to);
     if (amt) setAmount(amt);
-    if (ast) setAsset(ast.toUpperCase() as 'XLM' | 'USDC');
     if (m)   setMemo(m);
   }, [searchParams]);
 
@@ -75,17 +68,7 @@ function SendPageInner() {
     setLoading(true);
     try {
       let result: any;
-      if (asset === 'XLM') {
-        // Direct XLM send
-        const r = await fetch(`${API}/api/send/xlm`, {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
-          body:    JSON.stringify({ toAddress: recipient, amount: amountNum, memo, pin }),
-        });
-        result = await r.json();
-        if (!result.success && result.error) throw new Error(result.error);
-        setTxHash(result.hash ?? '');
-      } else if (recipientType === 'phone') {
+      if (recipientType === 'phone') {
         result = await send.toPhone({ toPhone: recipient, amount: amountNum, asset, pin });
         setTxHash(result.hash ?? '');
       } else {

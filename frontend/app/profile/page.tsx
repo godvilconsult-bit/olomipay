@@ -213,16 +213,10 @@ export default function ProfilePage() {
             <span className="ml-auto text-xs px-2 py-0.5 rounded-full font-medium bg-green-100 text-green-700">Active</span>
           </div>
 
-          {/* Balances */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-slate-50 dark:bg-slate-700 rounded-2xl p-3 text-center">
-              <p className="text-xs text-slate-400 mb-1">USD Balance</p>
-              <p className="font-bold text-lg">${parseFloat(wallet?.balance?.usdc ?? '0').toFixed(2)}</p>
-            </div>
-            <div className="bg-slate-50 dark:bg-slate-700 rounded-2xl p-3 text-center">
-              <p className="text-xs text-slate-400 mb-1">Coins Balance</p>
-              <p className="font-bold text-lg">{parseFloat(wallet?.balance?.xlm ?? '0').toFixed(2)}</p>
-            </div>
+          {/* Balance — single USD money balance */}
+          <div className="bg-slate-50 dark:bg-slate-700 rounded-2xl p-3 text-center">
+            <p className="text-xs text-slate-400 mb-1">Balance</p>
+            <p className="font-bold text-lg">${parseFloat(wallet?.balance?.usdc ?? '0').toFixed(2)}</p>
           </div>
 
           {/* Wallet ID — no Stellar mention */}

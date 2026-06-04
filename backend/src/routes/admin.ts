@@ -9,6 +9,7 @@ import {
   getFeeWalletPublic,
   getAccountInfo,
   setupFeeWallet,
+  getTreasuryStatus,
   PLATFORM_FEE_PCT,
 } from '../services/stellar';
 
@@ -186,6 +187,17 @@ router.get('/fees', requireAuth, requireAdmin, async (req: AuthRequest, res) => 
       estimatedFeeUsdc: (r._sum.amountUsdc ?? 0) * PLATFORM_FEE_PCT,
     })),
   }));
+});
+
+// ── GET /api/admin/treasury ────────────────────────────────────────────────────
+// XLM gas-treasury health: how much gas/sponsorship capacity is left.
+router.get('/treasury', requireAuth, requireAdmin, async (_req, res) => {
+  try {
+    const t = await getTreasuryStatus();
+    res.json(ok(t));
+  } catch (e: any) {
+    res.status(500).json(fail(e?.message ?? 'Failed to load treasury status'));
+  }
 });
 
 // ── GET /api/admin/fee-wallet ──────────────────────────────────────────────────

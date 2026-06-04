@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useChatUnread, chatState } from '../lib/chatState';
 import {
-  Home, Send, MessageCircle, TrendingUp, Receipt, ArrowUpDown,
+  Home, Send, MessageCircle, TrendingUp, Receipt,
   History, User, QrCode, Building2, LogOut, Briefcase,
   Download, ArrowDownToLine,
 } from 'lucide-react';
@@ -34,7 +34,6 @@ const NAV_SECTIONS = [
       { href: '/deposit',  label: 'Add money', icon: Download        },
       { href: '/withdraw', label: 'Withdraw',  icon: ArrowDownToLine },
       { href: '/scan',     label: 'Scan',      icon: QrCode          },
-      { href: '/swap',     label: 'Swap',      icon: ArrowUpDown     },
       { href: '/bills',    label: 'Bills',     icon: Receipt         },
     ],
   },

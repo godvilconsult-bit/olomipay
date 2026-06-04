@@ -52,7 +52,6 @@ export default function DepositPage() {
   // Receive / QR state
   const [receiveData, setReceiveData] = useState<any>(null);
   const [rcvLoading,  setRcvLoading]  = useState(true);
-  const [qrAsset,     setQrAsset]     = useState<'XLM' | 'USDC'>('USDC');
   const [fundLoading, setFundLoading] = useState(false);
   const [accountInfo, setAccountInfo] = useState<any>(null);
 
@@ -155,7 +154,7 @@ export default function DepositPage() {
   }
 
   // ── QR URI to show ─────────────────────────────────────────────────────────
-  const qrUri = qrAsset === 'XLM' ? receiveData?.xlmQrUri : receiveData?.usdcQrUri;
+  const qrUri = receiveData?.usdcQrUri;
 
   // ── MOMO: waiting step ─────────────────────────────────────────────────────
   if (tab === 'mobile' && momoStep === 'waiting') return (

@@ -82,14 +82,10 @@ export default function RecoverPage() {
           <p className="mt-1.5 text-sm text-slate-400">Your wallet and balance are restored — same address, nothing lost.</p>
 
           <div className="glass mt-6 rounded-3xl p-5 text-left">
-            <div className="grid grid-cols-2 gap-3 mb-4">
+            <div className="mb-4">
               <div className="rounded-2xl bg-white/5 p-3 text-center">
-                <p className="text-xs text-slate-400">USD</p>
+                <p className="text-xs text-slate-400">Balance</p>
                 <p className="text-lg font-bold">${parseFloat(done.balance.usdc ?? '0').toFixed(2)}</p>
-              </div>
-              <div className="rounded-2xl bg-white/5 p-3 text-center">
-                <p className="text-xs text-slate-400">Coins</p>
-                <p className="text-lg font-bold">{parseFloat(done.balance.xlm ?? '0').toFixed(2)}</p>
               </div>
             </div>
             <p className="text-[10px] text-slate-400 mb-1">Your wallet ID</p>

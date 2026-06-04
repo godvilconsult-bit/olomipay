@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import {
   Home, Send, MessageCircle, TrendingUp, User, Plus, X,
-  Receipt, ArrowUpDown, QrCode, Download, ArrowDownToLine,
+  Receipt, QrCode, Download, ArrowDownToLine,
 } from 'lucide-react';
 import { useChatUnread, chatState } from '../lib/chatState';
 
@@ -25,7 +25,6 @@ const PAY_ACTIONS = [
   { href: '/deposit',  label: 'Add money',  icon: Download,       grad: 'from-emerald-500 to-teal-500' },
   { href: '/withdraw', label: 'Withdraw',   icon: ArrowDownToLine,grad: 'from-amber-500 to-orange-500' },
   { href: '/scan',     label: 'Scan',       icon: QrCode,         grad: 'from-violet-500 to-purple-500'},
-  { href: '/swap',     label: 'Swap',       icon: ArrowUpDown,    grad: 'from-fuchsia-500 to-pink-500' },
   { href: '/bills',    label: 'Bills',      icon: Receipt,        grad: 'from-slate-500 to-slate-600'  },
 ];
 
