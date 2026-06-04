@@ -9,7 +9,6 @@ import {
   getFeeWalletPublic,
   getAccountInfo,
   setupFeeWallet,
-  getTreasuryStatus,
   getWalletsOverview,
   topUpTreasuryFromUsdc,
   generateKeypair,
@@ -193,16 +192,10 @@ router.get('/fees', requireAuth, requireAdmin, async (req: AuthRequest, res) => 
   }));
 });
 
-// ── GET /api/admin/treasury ────────────────────────────────────────────────────
-// XLM gas-treasury health: how much gas/sponsorship capacity is left.
-router.get('/treasury', requireAuth, requireAdmin, async (_req, res) => {
-  try {
-    const t = await getTreasuryStatus();
-    res.json(ok(t));
-  } catch (e: any) {
-    res.status(500).json(fail(e?.message ?? 'Failed to load treasury status'));
-  }
-});
+// NOTE: GET /treasury lives in admin-ops.ts (returns platformWallet/feeWallet/
+// reconciliation for the Operations page). Gas-treasury health is exposed via
+// GET /wallets (getWalletsOverview) instead — do NOT add a second /treasury here
+// or it will shadow the Operations-page route.
 
 // ── POST /api/admin/wallets/generate-fee ───────────────────────────────────────
 // Generate a NEW dedicated fee keypair (separate from the gas wallet) and return

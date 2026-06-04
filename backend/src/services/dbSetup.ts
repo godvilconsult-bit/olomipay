@@ -745,8 +745,10 @@ async function seedAdmin() {
       return;
     }
 
-    // Build update: always set admin flags
-    const updateData: any = { isAdmin: true, isFeeCollector: true };
+    // Build update: always set admin flags. The seed phone is the SUPER_ADMIN —
+    // the only role that can assign other roles, add admins, and override/approve
+    // anything (OWNER bypasses every RBAC gate via roleSatisfies()).
+    const updateData: any = { isAdmin: true, isFeeCollector: true, adminRole: 'SUPER_ADMIN' };
 
     // Link admin's Stellar account to the platform keys so fees go to them
     if (PLATFORM_SECRET && PLATFORM_PUBLIC) {

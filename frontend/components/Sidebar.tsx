@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useChatUnread, chatState } from '../lib/chatState';
+import { auth } from '../lib/api';
 import {
   Home, Send, MessageCircle, TrendingUp, Receipt,
   History, User, QrCode, Building2, LogOut, Briefcase,
@@ -52,18 +53,21 @@ const NAV_SECTIONS = [
   {
     title: 'Account',
     items: [
-      { href: '/history', label: 'History', icon: History    },
-      { href: '/admin',   label: 'Admin',   icon: Building2  },
-      { href: '/profile', label: 'Profile', icon: User       },
+      { href: '/history', label: 'History', icon: History },
+      { href: '/profile', label: 'Profile', icon: User    },
     ],
   },
 ];
+
+// Admin entry — only appended when the logged-in user is an admin.
+const ADMIN_ITEM = { href: '/admin', label: 'Admin', icon: Building2 };
 
 export default function Sidebar() {
   const path    = usePathname();
   const router  = useRouter();
   const unread  = useChatUnread();
-  const [authed, setAuthed] = useState(false);
+  const [authed,  setAuthed]  = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // Clear unread when user navigates to /chat
   useEffect(() => {
@@ -77,8 +81,27 @@ export default function Sidebar() {
     setAuthed(hasToken || hasCookie);
   }, [path]); // re-check on every navigation
 
+  // Resolve admin status from the server — the Admin link only appears for admins.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await auth.me();
+        if (!cancelled) setIsAdmin(!!r?.user?.isAdmin);
+      } catch { if (!cancelled) setIsAdmin(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [authed]);
+
   // Don't render on public pages or when not authenticated
   if (isPublicPath(path) || !authed) return null;
+
+  // Build the section list, appending Admin to "Account" only for admins.
+  const sections = NAV_SECTIONS.map(s =>
+    s.title === 'Account' && isAdmin
+      ? { ...s, items: [s.items[0], ADMIN_ITEM, ...s.items.slice(1)] }
+      : s,
+  );
 
   function handleLogout() {
     sessionStorage.clear();
@@ -113,7 +136,7 @@ export default function Sidebar() {
 
       {/* Nav items */}
       <nav className="thin-scroll relative flex-1 overflow-y-auto py-3 px-3 space-y-1">
-        {NAV_SECTIONS.map((section, si) => (
+        {sections.map((section, si) => (
           <div key={si} className={si > 0 ? 'pt-3' : ''}>
             {section.title && (
               <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
