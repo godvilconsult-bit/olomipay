@@ -5,7 +5,7 @@
    4-step flow (phone → name → PIN → confirm) and auth.register preserved.
    ════════════════════════════════════════════════════════════════════════════ */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
@@ -46,6 +46,30 @@ export default function RegisterPage() {
 
   const phoneFull  = '+255' + digits;
   const phoneValid = digits.length === 9;
+
+  // Physical keyboard support (desktop without touchscreen).
+  // 'name' step uses a real text input, so we let the browser handle it there.
+  useEffect(() => {
+    if (step === 'name') return;
+    function onKey(e: KeyboardEvent) {
+      const digit = /^[0-9]$/.test(e.key);
+      if (step === 'phone') {
+        if (digit)                      { e.preventDefault(); setDigits(p => (p.length < 9 ? p + e.key : p)); }
+        else if (e.key === 'Backspace') { e.preventDefault(); setDigits(p => p.slice(0, -1)); }
+        else if (e.key === 'Enter' && phoneValid) { e.preventDefault(); setStep('name'); }
+      } else if (step === 'pin') {
+        if (digit)                      { e.preventDefault(); setPin(p => (p.length < 6 ? p + e.key : p)); }
+        else if (e.key === 'Backspace') { e.preventDefault(); setPin(p => p.slice(0, -1)); }
+        else if (e.key === 'Enter' && pin.length === 6) { e.preventDefault(); setStep('confirm'); }
+      } else if (step === 'confirm') {
+        if (digit)                      { e.preventDefault(); setConfirm(c => (c.length < 6 ? c + e.key : c)); }
+        else if (e.key === 'Backspace') { e.preventDefault(); setConfirm(c => c.slice(0, -1)); }
+        else if (e.key === 'Enter')     { e.preventDefault(); handleSubmit(); }
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
 
   async function handleSubmit() {
     if (pin !== confirm) { toast.error('PINs do not match'); return; }

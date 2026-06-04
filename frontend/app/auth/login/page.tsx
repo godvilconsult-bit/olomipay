@@ -6,7 +6,7 @@
    Real auth logic preserved (auth.login → setTokens → ?next redirect).
    ════════════════════════════════════════════════════════════════════════════ */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
@@ -51,6 +51,18 @@ export default function LoginPage() {
       setDigits(prev => prev.slice(0, -1));
     }
   }
+
+  // Physical keyboard support (desktop without touchscreen) — type digits,
+  // Backspace to delete, Enter to submit. Same logic path as the on-screen pad.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (/^[0-9]$/.test(e.key))      { e.preventDefault(); onDigit(e.key); }
+      else if (e.key === 'Backspace') { e.preventDefault(); onBackspace(); }
+      else if (e.key === 'Enter')     { e.preventDefault(); handleLogin(); }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
 
   async function handleLogin() {
     if (!ready) return;
