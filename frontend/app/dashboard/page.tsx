@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bell, Repeat, Receipt, TrendingUp, Briefcase, History, LifeBuoy, ChevronRight } from 'lucide-react';
+import { Bell, Repeat, Receipt, TrendingUp, Briefcase, History, LifeBuoy, ChevronRight, AlertTriangle } from 'lucide-react';
 import BalanceCard from '../../components/BalanceCard';
 import BottomNav from '../../components/BottomNav';
 import UserAvatar from '../../components/UserAvatar';
@@ -63,20 +63,6 @@ export default function DashboardPage() {
       </div>
 
       <div className="px-5 max-w-md mx-auto space-y-5 mt-2">
-        {/* Wallet health banner — corrupt/legacy key needs re-activation */}
-        {!loading && user && user.walletKeyValid === false && (
-          <button onClick={() => router.push('/profile')}
-            className="w-full flex items-center gap-3 rounded-2xl border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 p-3.5 text-left active:scale-[0.99] transition-transform">
-            <div className="w-9 h-9 rounded-full bg-amber-100 dark:bg-amber-800/40 flex items-center justify-center flex-shrink-0">
-              <span className="text-lg">⚠️</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Your wallet needs re-activation</p>
-              <p className="text-xs text-amber-600/80 dark:text-amber-500">Payments may fail until you re-activate. Tap to fix it →</p>
-            </div>
-          </button>
-        )}
-
         {/* Balance */}
         <BalanceCard
           publicKey={user?.stellarPubKey}
@@ -102,6 +88,18 @@ export default function DashboardPage() {
               <span className="text-[11px] font-medium text-slate-600 dark:text-slate-400">{label}</span>
             </button>
           ))}
+
+          {/* Activate wallet — only when the key needs re-activation */}
+          {!loading && user && user.walletKeyValid === false && (
+            <button onClick={() => router.push('/profile')}
+              className="flex flex-col items-center gap-2 active:scale-95 transition-transform">
+              <div className="w-full aspect-square max-w-[64px] rounded-2xl bg-amber-50 dark:bg-amber-500/10
+                              border border-amber-300 dark:border-amber-700 shadow-sm flex items-center justify-center text-amber-600 dark:text-amber-400">
+                <AlertTriangle size={21} strokeWidth={1.9} />
+              </div>
+              <span className="text-[11px] font-medium text-amber-600 dark:text-amber-400 text-center leading-tight">Activate wallet</span>
+            </button>
+          )}
         </section>
 
         {/* Quick links — activity & support */}
