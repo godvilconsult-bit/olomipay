@@ -11,6 +11,7 @@ import { OpsList } from './resources/ops';
 import { SupportList } from './resources/support';
 import { TicketsList } from './resources/tickets';
 import { SecurityList } from './resources/security';
+import { WalletsList } from './resources/wallets';
 import LoginPage from './LoginPage';
 
 export default function App() {
@@ -23,6 +24,7 @@ export default function App() {
       <Resource name="kyc"          list={KycList}       options={{ label: 'KYC review' }} />
       <Resource name="approvals"    list={ApprovalsList} options={{ label: 'Approvals' }} />
       <Resource name="ops"          list={OpsList}       options={{ label: 'Operations' }} />
+      <Resource name="wallets"      list={WalletsList}   options={{ label: 'Wallets & gas' }} />
       <Resource name="audit"        list={AuditList}     options={{ label: 'Audit log' }} />
       <Resource name="security"     list={SecurityList}  options={{ label: 'Security (2FA)' }} />
     </Admin>
