@@ -263,7 +263,7 @@ export default function ScanPage() {
               {result.amount && (
                 <div className="flex justify-between">
                   <span className="text-white/40">Amount</span>
-                  <span className="font-semibold">{result.amount} {result.assetCode === 'USDC' ? 'USD' : 'coins'}</span>
+                  <span className="font-semibold">${result.amount}</span>
                 </div>
               )}
               {result.assetCode && (

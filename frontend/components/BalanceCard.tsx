@@ -109,11 +109,10 @@ export default function BalanceCard({ publicKey, name, profilePicUrl, userTag }:
           ≈ {hidden ? '•••' : formatTzs(tzsEquiv)} TZS
         </div>
 
-        {/* Single-balance model — no second asset shown */}
+        {/* Single-balance model — wallet label + the user's unique ID */}
         <div className="flex items-center gap-2 text-xs text-white/50">
           <span>Olomi Wallet</span>
-          <span>·</span>
-          <span>Building Trust Through Blockchain</span>
+          {userTag && (<><span>·</span><span className="font-mono">{userTag}</span></>)}
         </div>
       </div>
     </div>

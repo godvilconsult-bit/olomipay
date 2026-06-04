@@ -52,8 +52,7 @@ function PaymentBubble({
   const failed    = msg.paymentStatus === 'FAILED';
   const pending   = msg.paymentStatus === 'PENDING';
   const isRequest = msg.type === 'PAYMENT_REQUEST';
-  const isXlm     = msg.paymentAsset === 'XLM';
-  const fmtAmt    = (n: number) => isXlm ? `${Number(n).toFixed(Number(n) < 1 ? 4 : 2)} coins` : formatUsdc(n);
+  const fmtAmt    = (n: number) => formatUsdc(n);  // single-balance: always $
 
   const borderCls = confirmed
     ? 'border-green-200 bg-green-50 dark:bg-green-900/20'
@@ -232,7 +231,7 @@ function AcceptPayModal({
   loading:   boolean;
 }) {
   const [pin, setPin] = useState('');
-  const fmtAmt = (n: number) => asset === 'XLM' ? `${Number(n).toFixed(Number(n) < 1 ? 4 : 2)} coins` : formatUsdc(n);
+  const fmtAmt = (n: number) => formatUsdc(n);  // single-balance: always $
   return (
     <div className="fixed inset-0 z-50 flex flex-col justify-end">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
