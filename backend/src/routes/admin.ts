@@ -12,6 +12,8 @@ import {
   getTreasuryStatus,
   getWalletsOverview,
   topUpTreasuryFromUsdc,
+  generateKeypair,
+  getGasWalletPublic,
   PLATFORM_FEE_PCT,
 } from '../services/stellar';
 
@@ -199,6 +201,38 @@ router.get('/treasury', requireAuth, requireAdmin, async (_req, res) => {
     res.json(ok(t));
   } catch (e: any) {
     res.status(500).json(fail(e?.message ?? 'Failed to load treasury status'));
+  }
+});
+
+// ── POST /api/admin/wallets/generate-fee ───────────────────────────────────────
+// Generate a NEW dedicated fee keypair (separate from the gas wallet) and return
+// the exact env vars to paste into Railway. The secret is NOT stored server-side
+// — the operator saves it. This only mints a random keypair; it moves no funds.
+router.post('/wallets/generate-fee', requireAuth, requireAdmin, async (_req, res) => {
+  try {
+    const kp     = generateKeypair();
+    const gasPub = getGasWalletPublic();
+    if (kp.publicKey === gasPub) {
+      return res.status(500).json(fail('Generated key collided with gas wallet — retry'));
+    }
+    res.json(ok({
+      publicKey: kp.publicKey,
+      secret:    kp.secretKey,
+      env: {
+        FEE_WALLET_PUBLIC: kp.publicKey,
+        FEE_WALLET_SECRET: kp.secretKey,
+      },
+      gasWallet: gasPub,
+      steps: [
+        'Copy FEE_WALLET_PUBLIC and FEE_WALLET_SECRET into Railway → backend → Variables.',
+        'Redeploy the backend so the new variables take effect.',
+        'Fund this new fee wallet with a little XLM (~2 XLM) so it can hold a USDC trustline.',
+        'On this Admin page, open the Fee Wallet card and tap “Setup” to add its USDC trustline.',
+        'Done — fees now collect here and auto-fund gas. Store the secret safely; it is shown once.',
+      ],
+    }));
+  } catch (e: any) {
+    res.status(500).json(fail(e?.message ?? 'Failed to generate fee wallet'));
   }
 });
 

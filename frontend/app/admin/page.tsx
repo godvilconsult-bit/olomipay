@@ -30,6 +30,8 @@ export default function AdminPage() {
   const [feeWallet, setFeeWallet] = useState<any>(null);
   const [wallets,   setWallets]   = useState<any>(null);   // combined gas + fees overview
   const [topupBusy, setTopupBusy] = useState(false);
+  const [genBusy,   setGenBusy]   = useState(false);
+  const [genFee,    setGenFee]    = useState<any>(null);   // generated fee keypair (shown once)
   const [setupBusy, setSetupBusy] = useState(false);
   const [tab,       setTab]       = useState('overview');
   const [loading,  setLoading]  = useState(true);
@@ -85,6 +87,19 @@ export default function AdminPage() {
       if (walR.success) setWallets(walR.data);
     } catch (e: any) { toast.error(e.message ?? 'Top-up failed'); }
     finally { setTopupBusy(false); }
+  }
+
+  async function handleGenerateFeeWallet() {
+    setGenBusy(true);
+    try {
+      const r = await fetch(`${API}/api/admin/wallets/generate-fee`, {
+        method: 'POST', headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      const d = await r.json();
+      if (!d.success) throw new Error(d.error);
+      setGenFee(d.data);
+    } catch (e: any) { toast.error(e.message ?? 'Failed to generate'); }
+    finally { setGenBusy(false); }
   }
 
   async function handleFeeWalletSetup() {
@@ -458,10 +473,47 @@ export default function AdminPage() {
                   </p>
                 </div>
 
-                <button onClick={handleTreasuryTopup} disabled={topupBusy}
-                  className="w-full bg-grad-brand text-white font-semibold py-2.5 rounded-xl text-sm disabled:opacity-50">
-                  {topupBusy ? 'Topping up…' : 'Top up gas now'}
-                </button>
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={handleTreasuryTopup} disabled={topupBusy}
+                    className="bg-grad-brand text-white font-semibold py-2.5 rounded-xl text-sm disabled:opacity-50">
+                    {topupBusy ? 'Topping up…' : 'Top up gas now'}
+                  </button>
+                  {!wallets.separated && (
+                    <button onClick={handleGenerateFeeWallet} disabled={genBusy}
+                      className="bg-slate-100 dark:bg-slate-700 font-semibold py-2.5 rounded-xl text-sm disabled:opacity-50">
+                      {genBusy ? 'Generating…' : 'Generate fee wallet'}
+                    </button>
+                  )}
+                </div>
+
+                {/* One-time reveal of the generated fee keypair + env vars */}
+                {genFee && (
+                  <div className="rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-800 p-3 space-y-2">
+                    <p className="text-xs font-bold text-amber-700 dark:text-amber-400">
+                      ⚠ Save these now — the secret is shown only once
+                    </p>
+                    <div className="space-y-1.5">
+                      {[
+                        ['FEE_WALLET_PUBLIC', genFee.env?.FEE_WALLET_PUBLIC],
+                        ['FEE_WALLET_SECRET', genFee.env?.FEE_WALLET_SECRET],
+                      ].map(([k, v]) => (
+                        <div key={k} className="bg-white dark:bg-slate-800 rounded-lg p-2">
+                          <p className="text-[10px] text-slate-400">{k}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-mono text-[11px] break-all flex-1 text-slate-700 dark:text-slate-200">{v}</p>
+                            <button onClick={() => { navigator.clipboard.writeText(v as string); toast.success('Copied'); }}
+                              className="text-primary text-xs font-semibold shrink-0">Copy</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <ol className="list-decimal list-inside space-y-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                      {(genFee.steps ?? []).map((s: string, i: number) => <li key={i}>{s}</li>)}
+                    </ol>
+                    <button onClick={() => setGenFee(null)}
+                      className="text-xs text-slate-400 underline">I’ve saved them — hide</button>
+                  </div>
+                )}
               </div>
             )}
 
