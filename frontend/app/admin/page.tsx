@@ -28,6 +28,8 @@ export default function AdminPage() {
   const [txs,       setTxs]       = useState<any[]>([]);
   const [wallet,    setWallet]    = useState<any>(null);
   const [feeWallet, setFeeWallet] = useState<any>(null);
+  const [wallets,   setWallets]   = useState<any>(null);   // combined gas + fees overview
+  const [topupBusy, setTopupBusy] = useState(false);
   const [setupBusy, setSetupBusy] = useState(false);
   const [tab,       setTab]       = useState('overview');
   const [loading,  setLoading]  = useState(true);
@@ -48,12 +50,13 @@ export default function AdminPage() {
   async function loadAll() {
     setLoading(true);
     try {
-      const [sR, uR, tR, wR, fwR] = await Promise.all([
+      const [sR, uR, tR, wR, fwR, walR] = await Promise.all([
         adminApi('/stats'),
         adminApi('/users'),
         adminApi('/transactions'),
         adminApi('/wallet'),
         adminApi('/fee-wallet'),
+        adminApi('/wallets'),
       ]);
       if (!sR.success) { toast.error('Admin access denied'); router.push('/dashboard'); return; }
       setStats(sR.data);
@@ -61,8 +64,27 @@ export default function AdminPage() {
       setTxs(tR.data?.transactions ?? []);
       if (wR.success)  setWallet(wR.data);
       if (fwR.success) setFeeWallet(fwR.data);
+      if (walR.success) setWallets(walR.data);
     } catch { toast.error('Failed to load'); }
     finally { setLoading(false); }
+  }
+
+  async function handleTreasuryTopup() {
+    setTopupBusy(true);
+    try {
+      const r = await fetch(`${API}/api/admin/treasury/topup`, {
+        method: 'POST', headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      const d = await r.json();
+      if (!d.success) throw new Error(d.error);
+      const x = d.data;
+      toast.success(x.refilled
+        ? `Refilled +${(x.xlmAfter - x.xlmBefore).toFixed(2)} XLM for ${x.usdcSpent} USDC`
+        : `No refill: ${x.reason}`);
+      const walR = await adminApi('/wallets');
+      if (walR.success) setWallets(walR.data);
+    } catch (e: any) { toast.error(e.message ?? 'Top-up failed'); }
+    finally { setTopupBusy(false); }
   }
 
   async function handleFeeWalletSetup() {
@@ -389,6 +411,60 @@ export default function AdminPage() {
                 {stats.feeTxCount} fee transactions · from ${parseFloat(stats.totalVolumeUsdc ?? 0).toFixed(2)} volume
               </p>
             </div>
+            {/* ── Gas treasury + Fees wallet (separated, auto-communicating) ── */}
+            {wallets && (
+              <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="font-semibold text-sm">Platform Wallets</p>
+                  <span className={`text-xs px-2 py-1 rounded-full font-bold ${wallets.separated ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                    {wallets.separated ? 'Separated ✓' : 'Shared ⚠'}
+                  </span>
+                </div>
+
+                {/* Low-gas alert */}
+                {wallets.gas?.low && (
+                  <div className="rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3 flex items-start gap-2">
+                    <span>⛽</span>
+                    <p className="text-xs text-red-600 dark:text-red-400">
+                      Gas treasury is low. {wallets.autoRefill ? 'Auto-refill from fees is enabled, or' : ''} top it up now.
+                    </p>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-2">
+                  {/* Gas wallet */}
+                  <div className="bg-slate-50 dark:bg-slate-700 rounded-xl p-3 space-y-1">
+                    <p className="text-xs text-slate-400">⛽ Gas wallet (XLM)</p>
+                    <p className={`font-bold text-lg ${wallets.gas?.healthy ? 'text-slate-700 dark:text-slate-200' : 'text-red-500'}`}>
+                      {Number(wallets.gas?.xlm ?? 0).toFixed(2)}
+                    </p>
+                    <p className="text-[10px] text-slate-400">
+                      ~{wallets.gas?.estAccountsLeft?.toLocaleString()} accounts · ~{wallets.gas?.estTxLeft?.toLocaleString()} txs left
+                    </p>
+                  </div>
+                  {/* Fees wallet */}
+                  <div className="bg-primary/5 rounded-xl p-3 space-y-1">
+                    <p className="text-xs text-slate-400">💰 Fees wallet (USDC)</p>
+                    <p className="font-bold text-primary text-lg">${Number(wallets.fees?.usdc ?? 0).toFixed(2)}</p>
+                    <p className="text-[10px] text-slate-400">Revenue + activation fees</p>
+                  </div>
+                </div>
+
+                <div className="rounded-xl bg-slate-50 dark:bg-slate-700 p-3">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                    {wallets.autoRefill
+                      ? '✓ Auto-refill ON — when gas runs low, the fees wallet automatically funds it (USDC → XLM).'
+                      : 'ℹ️ Auto-refill OFF — set FEE_WALLET_PUBLIC + FEE_WALLET_SECRET (separate from the gas key) so fees can auto-fund gas.'}
+                  </p>
+                </div>
+
+                <button onClick={handleTreasuryTopup} disabled={topupBusy}
+                  className="w-full bg-grad-brand text-white font-semibold py-2.5 rounded-xl text-sm disabled:opacity-50">
+                  {topupBusy ? 'Topping up…' : 'Top up gas now'}
+                </button>
+              </div>
+            )}
+
             {/* Fee wallet live balance */}
             {feeWallet && (
               <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 space-y-3">

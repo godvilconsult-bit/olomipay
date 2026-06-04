@@ -132,6 +132,51 @@ export async function getTreasuryStatus(): Promise<{
   };
 }
 
+/**
+ * Combined view of BOTH platform wallets for the admin console:
+ *   • Gas wallet  — holds XLM, pays gas + sponsors reserves (the treasury).
+ *   • Fees wallet — receives the 1% USDC revenue + activation reimbursements.
+ * They are separate accounts for clean accounting + security; the gas wallet
+ * auto-refills itself by sweeping/converting USDC from the fees wallet.
+ */
+export async function getWalletsOverview(): Promise<{
+  separated: boolean;
+  autoRefill: boolean;
+  gas:  { publicKey: string; xlm: number; usdc: number; estAccountsLeft: number; estTxLeft: number; healthy: boolean; low: boolean };
+  fees: { publicKey: string; usdc: number; xlm: number };
+}> {
+  const treasury = await getTreasuryStatus();
+  const gasPub   = treasury.publicKey;
+  const feePub   = getFeeWalletPublic();
+
+  const balOf = async (pub: string) => {
+    try {
+      const a = await server.loadAccount(pub);
+      return {
+        xlm:  parseFloat(a.balances.find((b: any) => b.asset_type === 'native')?.balance ?? '0'),
+        usdc: parseFloat(a.balances.find((b: any) => b.asset_code === 'USDC' && b.asset_issuer === USDC_ISSUER)?.balance ?? '0'),
+      };
+    } catch { return { xlm: 0, usdc: 0 }; }
+  };
+
+  const [gasBal, feeBal] = await Promise.all([balOf(gasPub), balOf(feePub)]);
+  const MIN = Number(process.env.TREASURY_MIN_XLM ?? '50');
+  // Auto-refill possible if fees wallet is separate AND we can sign for it.
+  const feeKp = getFeeWalletKeypair();
+  const autoRefill = !!feeKp && feeKp.publicKey() === feePub && feePub !== gasPub;
+
+  return {
+    separated:  !!feePub && feePub !== gasPub,
+    autoRefill,
+    gas: {
+      publicKey: gasPub, xlm: gasBal.xlm, usdc: gasBal.usdc,
+      estAccountsLeft: treasury.estAccountsLeft, estTxLeft: treasury.estTxLeft,
+      healthy: treasury.healthy, low: gasBal.xlm < MIN,
+    },
+    fees: { publicKey: feePub, usdc: feeBal.usdc, xlm: feeBal.xlm },
+  };
+}
+
 // ── Fee wallet ─────────────────────────────────────────────────────────────────
 // The fee wallet is the Stellar address that receives all 1% platform fees.
 // Priority: FEE_WALLET_PUBLIC → FEE_ACCOUNT → STELLAR_PUBLIC_KEY
@@ -158,6 +203,22 @@ function getFeeWalletSecret(): string {
     process.env.FEE_WALLET_SECRET  ??
     process.env.STELLAR_SECRET_KEY ?? ''
   );
+}
+
+/** Fee-wallet keypair if its secret is configured (needed to auto-sweep fees → gas). */
+function getFeeWalletKeypair(): StellarSdk.Keypair | null {
+  try {
+    const s = process.env.FEE_WALLET_SECRET;
+    if (s) return StellarSdk.Keypair.fromSecret(s);
+    // If no dedicated fee secret, the fee wallet is the platform/gas wallet itself.
+    return getPlatformKeypair();
+  } catch { return null; }
+}
+
+/** The XLM gas wallet (treasury) public address — the platform signing keypair. */
+export function getGasWalletPublic(): string {
+  try { return getPlatformKeypair().publicKey(); }
+  catch { return process.env.STELLAR_PUBLIC_KEY ?? ''; }
 }
 
 export const PLATFORM_FEE_BPS = 100; // 1% = 100 basis points
@@ -243,24 +304,56 @@ export async function topUpTreasuryFromUsdc(opts?: { force?: boolean }): Promise
   try { platform = getPlatformKeypair(); }
   catch { return { refilled: false, reason: 'platform key not set', xlmBefore: 0 }; }
 
-  const acct   = await server.loadAccount(platform.publicKey());
+  const gasPub = platform.publicKey();
+  const feePub = getFeeWalletPublic();
+  let acct     = await server.loadAccount(gasPub);
   const xlm    = parseFloat(acct.balances.find((b: any) => b.asset_type === 'native')?.balance ?? '0');
   if (!opts?.force && xlm >= MIN) {
     return { refilled: false, reason: 'treasury healthy', xlmBefore: xlm };
   }
 
-  const usdcBal = parseFloat(
+  // How much XLM we want, and the USDC needed to buy it.
+  const needXlm    = Math.max(0, TARGET - xlm);
+  const probe      = await getDexQuote({ fromAsset: 'USDC', toAsset: 'XLM', sendAmount: 1 });
+  const xlmPerUsdc = probe.rate || 8;
+  const usdcWanted = Math.min(needXlm / xlmPerUsdc, MAX_USDC);
+
+  const gasUsdc = () => parseFloat(
     acct.balances.find((b: any) => b.asset_code === 'USDC' && b.asset_issuer === USDC_ISSUER)?.balance ?? '0',
   );
-  if (usdcBal <= 0.01) {
-    return { refilled: false, reason: 'platform holds no USDC to convert', xlmBefore: xlm };
+
+  // ── Auto-communication: if the GAS wallet lacks USDC and the FEES wallet is a
+  //    SEPARATE account we can sign for, sweep the shortfall fees → gas wallet. ──
+  if (gasUsdc() < usdcWanted && feePub && feePub !== gasPub) {
+    const feeKp = getFeeWalletKeypair();
+    if (feeKp && feeKp.publicKey() === feePub) {
+      try {
+        const feeAcct  = await server.loadAccount(feePub);
+        const feeUsdc  = parseFloat(
+          feeAcct.balances.find((b: any) => b.asset_code === 'USDC' && b.asset_issuer === USDC_ISSUER)?.balance ?? '0',
+        );
+        const sweep = Math.min(usdcWanted - gasUsdc(), feeUsdc);
+        if (sweep >= 0.01) {
+          const sweepTx = new StellarSdk.TransactionBuilder(feeAcct, {
+            fee: StellarSdk.BASE_FEE, networkPassphrase: NETWORK_PASSPHRASE,
+          }).addOperation(StellarSdk.Operation.payment({
+            destination: gasPub, asset: USDC_ASSET, amount: sweep.toFixed(7),
+          })).addMemo(StellarSdk.Memo.text('fees → gas refill')).setTimeout(60).build();
+          sweepTx.sign(feeKp);
+          await submitWithPlatformFee(sweepTx);   // gas wallet pays the sweep's own fee
+          acct = await server.loadAccount(gasPub); // reload to see swept USDC
+        }
+      } catch (e: any) {
+        console.warn('[treasury] fee→gas sweep failed:', e?.message);
+      }
+    }
   }
 
-  // Size the swap: enough to reach TARGET, capped by MAX_USDC and available USDC.
-  const needXlm     = Math.max(0, TARGET - xlm);
-  const probe       = await getDexQuote({ fromAsset: 'USDC', toAsset: 'XLM', sendAmount: 1 });
-  const xlmPerUsdc  = probe.rate || 8;
-  const usdcToSpend = Math.min(needXlm / xlmPerUsdc, MAX_USDC, usdcBal);
+  const usdcBal = gasUsdc();
+  if (usdcBal <= 0.01) {
+    return { refilled: false, reason: 'no USDC in gas/fees wallet to convert', xlmBefore: xlm };
+  }
+  const usdcToSpend = Math.min(usdcWanted, usdcBal);
   if (usdcToSpend < 0.01) return { refilled: false, reason: 'amount too small', xlmBefore: xlm };
 
   const quote      = await getDexQuote({ fromAsset: 'USDC', toAsset: 'XLM', sendAmount: usdcToSpend });

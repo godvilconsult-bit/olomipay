@@ -10,6 +10,7 @@ import {
   getAccountInfo,
   setupFeeWallet,
   getTreasuryStatus,
+  getWalletsOverview,
   topUpTreasuryFromUsdc,
   PLATFORM_FEE_PCT,
 } from '../services/stellar';
@@ -198,6 +199,17 @@ router.get('/treasury', requireAuth, requireAdmin, async (_req, res) => {
     res.json(ok(t));
   } catch (e: any) {
     res.status(500).json(fail(e?.message ?? 'Failed to load treasury status'));
+  }
+});
+
+// ── GET /api/admin/wallets ─────────────────────────────────────────────────────
+// Combined gas + fees wallet overview for the admin dashboard.
+router.get('/wallets', requireAuth, requireAdmin, async (_req, res) => {
+  try {
+    const o = await getWalletsOverview();
+    res.json(ok(o));
+  } catch (e: any) {
+    res.status(500).json(fail(e?.message ?? 'Failed to load wallets'));
   }
 });
 
