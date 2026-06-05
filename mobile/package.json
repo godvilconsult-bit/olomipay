@@ -1,0 +1,25 @@
+{
+  "name": "olomipay-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "description": "OlomiPay native iOS/Android shell (Capacitor) — wraps the web app + native push, biometrics, QR.",
+  "scripts": {
+    "sync": "cap sync",
+    "android": "cap open android",
+    "ios": "cap open ios",
+    "add:android": "cap add android",
+    "add:ios": "cap add ios"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.1.2",
+    "@capacitor/app": "^6.0.1",
+    "@capacitor/core": "^6.1.2",
+    "@capacitor/ios": "^6.1.2",
+    "@capacitor/push-notifications": "^6.0.2",
+    "@capacitor/splash-screen": "^6.0.2",
+    "@capacitor/status-bar": "^6.0.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.1.2"
+  }
+}

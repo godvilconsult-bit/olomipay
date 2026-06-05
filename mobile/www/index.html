@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>OlomiPay</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #060b18; color: #fff;
+      font-family: -apple-system, system-ui, Roboto, sans-serif; }
+    .wrap { height: 100%; display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 16px; text-align: center; padding: 24px; }
+    .dot { width: 56px; height: 56px; border-radius: 16px;
+      background: linear-gradient(135deg, #3b82f6, #22c55e); }
+    .sub { color: #94a3b8; font-size: 14px; max-width: 280px; line-height: 1.5; }
+    .spin { width: 22px; height: 22px; border: 3px solid rgba(255,255,255,.2);
+      border-top-color: #3b82f6; border-radius: 50%; animation: s .8s linear infinite; }
+    @keyframes s { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <!-- Fallback shown only if the live app can't load (offline / first paint).
+       In hosted mode Capacitor immediately loads https://olomipay.vercel.app -->
+  <div class="wrap">
+    <div class="dot"></div>
+    <h1 style="margin:0;font-size:22px;">OlomiPay</h1>
+    <div class="spin"></div>
+    <p class="sub">Connecting… If this screen stays, check your internet connection and reopen the app.</p>
+  </div>
+</body>
+</html>
