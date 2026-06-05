@@ -27,11 +27,14 @@ export function middleware(req: NextRequest) {
   const hasSession = req.cookies.has('olomipay_session');
 
   if (!hasSession) {
-    // Redirect unauthenticated users to the landing page
+    // Redirect unauthenticated users to the LOGIN page — never to '/'.
+    // The landing page redirects authed-looking users to /dashboard, so if we
+    // sent them back to '/' here, a cookie/token mismatch would ping-pong
+    // forever (/ ↔ /dashboard), freezing the app. /auth/login has no such
+    // redirect, so it's a safe terminal.
     const url = req.nextUrl.clone();
-    url.pathname = '/';
-    // Preserve the originally-requested URL so we can redirect back after login
-    url.searchParams.set('next', pathname);
+    url.pathname = '/auth/login';
+    url.searchParams.set('next', pathname); // so we can return after login
     return NextResponse.redirect(url);
   }
 

@@ -79,7 +79,13 @@ async function apiFetch<T = any>(path: string, options: ApiOptions = {}): Promis
       }
     }
     clearTokens();
-    if (typeof window !== 'undefined') window.location.href = '/auth/login';
+    // Redirect to login on session loss — but NOT if we're already on a public/
+    // auth page, or we'd hard-reload that page in a loop.
+    if (typeof window !== 'undefined') {
+      const p = window.location.pathname;
+      const onPublic = p === '/' || p.startsWith('/auth/') || p.startsWith('/claim/') || p.startsWith('/join/');
+      if (!onPublic) window.location.href = '/auth/login';
+    }
     throw new ApiError(401, 'Session expired');
   }
 

@@ -82,7 +82,11 @@ export default function Sidebar() {
   }, [path]); // re-check on every navigation
 
   // Resolve admin status from the server — the Admin link only appears for admins.
+  // IMPORTANT: never call auth.me() on public/unauthenticated pages. On the login
+  // page (no token) a 401 makes api.ts hard-redirect to /auth/login, which would
+  // remount the sidebar and call auth.me() again → infinite page-refresh loop.
   useEffect(() => {
+    if (!authed || isPublicPath(path)) { setIsAdmin(false); return; }
     let cancelled = false;
     (async () => {
       try {
@@ -91,7 +95,7 @@ export default function Sidebar() {
       } catch { if (!cancelled) setIsAdmin(false); }
     })();
     return () => { cancelled = true; };
-  }, [authed]);
+  }, [authed, path]);
 
   // Don't render on public pages or when not authenticated
   if (isPublicPath(path) || !authed) return null;
