@@ -25,6 +25,59 @@ export interface NotificationPayload {
   data?: Record<string, any>;
 }
 
+// ── Native push (FCM) for the iOS/Android apps ────────────────────────────────
+// Lazily initialised from FCM_SERVICE_ACCOUNT (the Firebase service-account JSON).
+// Wrapped so a missing package or missing env NEVER crashes the server — push
+// just falls back to web-push only.
+let fcm: any = null;
+try {
+  const svc = process.env.FCM_SERVICE_ACCOUNT;
+  if (svc) {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const admin = require('firebase-admin');
+    if (!admin.apps.length) {
+      admin.initializeApp({ credential: admin.credential.cert(JSON.parse(svc)) });
+    }
+    fcm = admin.messaging();
+    console.log('[fcm] native push enabled');
+  } else {
+    console.log('[fcm] FCM_SERVICE_ACCOUNT not set — native push disabled (web-push only)');
+  }
+} catch (e: any) {
+  console.warn('[fcm] init failed — native push disabled:', e?.message);
+}
+
+async function sendNativePush(userId: string, payload: NotificationPayload): Promise<void> {
+  if (!fcm) return;
+  const rows = await prisma.$queryRawUnsafe<any[]>(
+    `SELECT "token" FROM "DeviceToken" WHERE "userId" = $1`, userId,
+  ).catch(() => [] as any[]);
+  if (!rows.length) return;
+
+  const data: Record<string, string> = {};
+  for (const [k, v] of Object.entries(payload.data ?? {})) data[k] = String(v);
+  data.type = payload.type;
+
+  try {
+    const resp = await fcm.sendEachForMulticast({
+      tokens:       rows.map(r => r.token),
+      notification: { title: payload.title, body: payload.body },
+      data,
+      android:      { priority: 'high' },
+      apns:         { payload: { aps: { sound: 'default' } } },
+    });
+    await Promise.all(resp.responses.map((r: any, i: number) => {
+      const code = r.error?.code ?? '';
+      if (!r.success && /not-registered|invalid-argument|invalid-registration/.test(code)) {
+        return prisma.$executeRawUnsafe(`DELETE FROM "DeviceToken" WHERE "token" = $1`, rows[i].token).catch(() => {});
+      }
+      return Promise.resolve();
+    }));
+  } catch (e: any) {
+    console.warn('[fcm] send failed:', e?.message);
+  }
+}
+
 // ── Send push to all user subscriptions ──────────────────────────────────────
 
 export async function sendPushToUser(userId: string, payload: NotificationPayload): Promise<void> {
@@ -63,6 +116,9 @@ export async function sendPushToUser(userId: string, payload: NotificationPayloa
       }),
     ),
   );
+
+  // 3. Native push to the iOS/Android apps (FCM). No-op if FCM isn't configured.
+  await sendNativePush(userId, payload).catch(() => {});
 }
 
 // ── Pre-built notification templates (Swahili + English) ─────────────────────

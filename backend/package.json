@@ -17,6 +17,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.600.0",
     "@prisma/client": "^5.14.0",
+    "firebase-admin": "^12.3.1",
     "@socket.io/redis-adapter": "^8.3.0",
     "@stellar/stellar-sdk": "^12.3.0",
     "@types/pdfkit": "^0.17.6",

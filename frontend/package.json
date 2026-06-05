@@ -9,6 +9,8 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@capacitor/core": "^6.2.1",
+    "@capacitor/push-notifications": "^6.0.5",
     "@stellar/stellar-sdk": "^12.3.0",
     "axios": "^1.7.2",
     "browser-image-compression": "^2.0.2",

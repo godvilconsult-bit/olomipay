@@ -33,6 +33,21 @@ router.post('/subscribe', requireAuth, async (req: AuthRequest, res) => {
   return res.json(ok({ message: 'Subscribed to push notifications' }));
 });
 
+// ── POST /api/notifications/register-device ───────────────────────────────────
+// Native app (Capacitor) registers its FCM/APNs device token here so the
+// backend can push money/chat notifications to the phone.
+router.post('/register-device', requireAuth, async (req: AuthRequest, res) => {
+  const token    = String(req.body?.token ?? '').trim();
+  const platform = String(req.body?.platform ?? 'android').slice(0, 16);
+  if (!token) return res.status(400).json(err('token required'));
+  await prisma.$executeRawUnsafe(
+    `INSERT INTO "DeviceToken" ("userId","token","platform") VALUES ($1,$2,$3)
+     ON CONFLICT ("token") DO UPDATE SET "userId" = $1, "platform" = $3`,
+    req.userId!, token, platform,
+  ).catch(() => {});
+  return res.json(ok({ message: 'Device registered' }));
+});
+
 // ── DELETE /api/notifications/unsubscribe ─────────────────────────────────────
 
 router.delete('/unsubscribe', requireAuth, async (req: AuthRequest, res) => {

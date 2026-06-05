@@ -174,6 +174,17 @@ export async function setupDatabase(): Promise<void> {
       );
     `);
 
+    // Native push (FCM/APNs) device tokens for the iOS/Android apps.
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "DeviceToken" (
+        "id"        TEXT NOT NULL PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        "userId"    TEXT NOT NULL,
+        "token"     TEXT NOT NULL UNIQUE,
+        "platform"  TEXT,
+        "createdAt" TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+    `);
+
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "Notification" (
         "id" TEXT NOT NULL PRIMARY KEY,
