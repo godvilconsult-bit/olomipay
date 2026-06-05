@@ -391,6 +391,26 @@ export default function ChatThread() {
 
   // ── Socket events ─────────────────────────────────────────────────────────
   useEffect(() => {
+    // On every (re)connect, re-join and CATCH UP: re-fetch recent messages so
+    // anything sent while we were briefly offline shows up instantly, then mark
+    // read. socket.io fires 'connect' on the initial connect and every reconnect.
+    const uc = on('connect', () => {
+      emit('join_conversation', { conversationId: convId });
+      emit('mark_read',         { conversationId: convId });
+      api(`/conversations/${convId}/messages?limit=100`).then((mr: any) => {
+        if (!mr?.success) return;
+        const server: any[] = mr.data.messages ?? [];
+        setMessages(prev => {
+          // keep any still-unconfirmed optimistic bubbles not yet on the server
+          const temps = prev.filter((m: any) =>
+            typeof m.id === 'string' && m.id.startsWith('temp_') &&
+            !server.some((s: any) => s.senderId === m.senderId &&
+              (s.encryptedContent === m.plainContent || s.plainContent === m.plainContent)));
+          return [...server, ...temps];
+        });
+      }).catch(() => {});
+    });
+
     // New message (text, image, payment, request)
     const u1 = on('new_message', (msg: any) => {
       if (msg.conversationId !== convId) return;
@@ -493,7 +513,7 @@ export default function ChatThread() {
       toast.success(`💚 Amana imefanikiwa! $${Number(amountUsdc).toFixed(2)}`);
     });
 
-    return () => { u0(); u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); u11(); };
+    return () => { uc(); u0(); u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); u11(); };
   }, [on, convId, myId, emit]);
 
   // ── Send image ─────────────────────────────────────────────────────────────

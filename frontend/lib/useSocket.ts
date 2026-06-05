@@ -11,13 +11,18 @@ export function useSocket(token: string | null) {
 
   useEffect(() => {
     if (!token) return;
-    if (_socket?.connected) { socketRef.current = _socket; return; }
+    // Reuse the existing singleton even if it's mid-reconnect — it has its own
+    // retry logic. Only creating a 2nd socket when one exists would leak it.
+    if (_socket) { socketRef.current = _socket; return; }
 
     _socket = io(process.env.NEXT_PUBLIC_API_URL!, {
-      auth:                { token },
-      transports:          ['websocket', 'polling'],
-      reconnectionAttempts: 5,
-      reconnectionDelay:   1_000,
+      auth:                  { token },
+      transports:            ['websocket', 'polling'],
+      reconnection:          true,
+      reconnectionAttempts:  Infinity,   // NEVER give up — reconnect whenever the network returns
+      reconnectionDelay:     1_000,
+      reconnectionDelayMax:  5_000,       // capped backoff
+      timeout:               20_000,
     });
     socketRef.current = _socket;
 
