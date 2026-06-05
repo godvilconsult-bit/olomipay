@@ -416,6 +416,25 @@ export default function ChatThread() {
       }
     });
 
+    // Private confirmation of OUR OWN sent message — swap the optimistic bubble
+    // for the saved one (real id + delivered tick). Never rendered as incoming.
+    const u0 = on('message_sent', (msg: any) => {
+      if (msg.conversationId !== convId) return;
+      setMessages(prev => {
+        const idx = prev.findIndex(m => typeof m.id === 'string' && m.id.startsWith('temp_') && (
+          m.plainContent === msg.encryptedContent || m.plainContent === msg.plainContent ||
+          (m.type !== 'TEXT' && m.type === msg.type)
+        ));
+        if (idx !== -1) {
+          const next = [...prev];
+          next[idx] = { ...msg, plainContent: prev[idx].plainContent ?? msg.encryptedContent, deliveredAt: msg.deliveredAt ?? new Date().toISOString() };
+          return next;
+        }
+        if (prev.some(m => m.id === msg.id)) return prev;
+        return [...prev, { ...msg, plainContent: msg.plainContent ?? msg.encryptedContent }];
+      });
+    });
+
     const u2 = on('typing',         ({ userId }: any) => { if (userId !== myId) setIsTyping(true); });
     const u3 = on('stopped_typing', ()                => setIsTyping(false));
 
@@ -474,7 +493,7 @@ export default function ChatThread() {
       toast.success(`💚 Amana imefanikiwa! $${Number(amountUsdc).toFixed(2)}`);
     });
 
-    return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); u11(); };
+    return () => { u0(); u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); u11(); };
   }, [on, convId, myId, emit]);
 
   // ── Send image ─────────────────────────────────────────────────────────────

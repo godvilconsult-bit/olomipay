@@ -24,6 +24,7 @@ export default function KeyboardAware() {
     //    iOS Safari, where the keyboard OVERLAYS content (innerHeight/dvh do
     //    not shrink) and fixed bottom bars would otherwise hide behind it.
     const root = document.documentElement;
+    const KB_OPEN_PX = 80; // inset above this means the keyboard is up
     const applyInset = () => {
       if (!vv) return;
       const inset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
@@ -33,11 +34,15 @@ export default function KeyboardAware() {
       const vh = Math.max(vv.height, window.innerHeight * 0.4);
       root.style.setProperty('--kb-inset', `${inset}px`);
       root.style.setProperty('--app-vh',  `${Math.round(vh)}px`);
+      // Flag keyboard-open so CSS can hide the fixed bottom nav (stops it
+      // jumping up over the field you're typing into). Resets on close.
+      root.classList.toggle('kb-open', inset > KB_OPEN_PX);
     };
 
     // 2) Only scroll a focused field into view when it is ACTUALLY hidden
-    //    behind the keyboard (or above the top). Use an instant, nearest
-    //    scroll so PIN entry (which refocuses on every digit) never bounces.
+    //    behind the keyboard (or above the top), and scroll the MINIMUM amount
+    //    (block:'nearest') so the page barely moves — no big jump that fails to
+    //    return. Instant scroll so PIN entry (refocuses per digit) never bounces.
     const onFocusIn = (e: FocusEvent) => {
       const t = e.target as HTMLElement | null;
       if (!t) return;
@@ -49,7 +54,7 @@ export default function KeyboardAware() {
         const top    = vv.offsetTop + 8;
         const bottom = vv.offsetTop + vv.height - 8;
         if (r.bottom > bottom || r.top < top) {
-          try { t.scrollIntoView({ block: 'center', behavior: 'auto' }); } catch {}
+          try { t.scrollIntoView({ block: 'nearest', behavior: 'auto' }); } catch {}
         }
       }, 300);
     };
@@ -63,6 +68,7 @@ export default function KeyboardAware() {
       document.removeEventListener('focusin', onFocusIn);
       vv?.removeEventListener('resize', applyInset);
       vv?.removeEventListener('scroll', applyInset);
+      root.classList.remove('kb-open');
     };
   }, []);
 

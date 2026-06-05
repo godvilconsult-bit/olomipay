@@ -551,6 +551,11 @@ nav.fixed.bottom-0 {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+/* While the on-screen keyboard is open, hide the fixed bottom nav so it doesn't
+   jump up above the keyboard and cover the field being typed into. It returns
+   to its normal position the moment the keyboard closes (.kb-open is removed). */
+html.kb-open nav.fixed.bottom-0 { display: none !important; }
+
 /* ─────────────────────────────────────────────────────────────────────────────
    Fluid typography — large display headings scale with viewport width so they
    never overflow on small screens and don't look tiny on large ones.

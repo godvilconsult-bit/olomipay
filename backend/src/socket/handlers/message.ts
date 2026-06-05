@@ -53,14 +53,20 @@ export async function handleSendMessage(io: Server, socket: Socket, data: any) {
       },
     });
 
-    // ── Delivery strategy: room + personal rooms ────────────────────────────
-    // io.to(conversationId) only reaches sockets that have already joined the room.
-    // If the recipient just logged in or hasn't opened this conversation yet,
-    // they won't be in the room — so we ALSO emit to their personal user:<id> room.
-    // This guarantees delivery regardless of conversation room membership.
+    // ── Delivery strategy: recipients only (NEVER echo to the sender) ───────────
+    // CRITICAL: do NOT broadcast the message back to the sender. The sender
+    // already shows it optimistically; echoing it back caused it to re-appear as
+    // an incoming "reply" in some timing cases. We:
+    //   • broadcast to the room EXCLUDING the sender's socket (socket.to),
+    //   • emit to each recipient's personal room (excludes sender by query),
+    //   • send the sender a private 'message_sent' confirmation so they can
+    //     swap their optimistic bubble for the saved message (real id + ticks).
 
-    // Emit to conversation room (reaches anyone already in it)
-    io.to(conversationId).emit('new_message', message);
+    // Reaches other members already in the conversation room (sender excluded)
+    socket.to(conversationId).emit('new_message', message);
+
+    // Confirm back to the sender ONLY (not as a new incoming message)
+    socket.emit('message_sent', message);
 
     // Get all members except sender
     const members = await prisma.conversationMember.findMany({
