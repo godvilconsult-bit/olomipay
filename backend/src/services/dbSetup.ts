@@ -146,6 +146,40 @@ export async function setupDatabase(): Promise<void> {
     `);
 
     await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "Agent" (
+        "id" TEXT NOT NULL PRIMARY KEY,
+        "userId" TEXT NOT NULL UNIQUE,
+        "code" TEXT NOT NULL UNIQUE,
+        "businessName" TEXT NOT NULL,
+        "city" TEXT NOT NULL,
+        "country" TEXT NOT NULL DEFAULT 'TZ',
+        "phone" TEXT NOT NULL,
+        "commissionPct" DOUBLE PRECISION NOT NULL DEFAULT 0.5,
+        "commissionEarned" DOUBLE PRECISION NOT NULL DEFAULT 0,
+        "status" TEXT NOT NULL DEFAULT 'pending',
+        "createdAt" TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS "Agent_country_status_idx" ON "Agent" ("country","status");
+
+      CREATE TABLE IF NOT EXISTS "AgentTransaction" (
+        "id" TEXT NOT NULL PRIMARY KEY,
+        "agentId" TEXT NOT NULL,
+        "userId" TEXT NOT NULL,
+        "type" TEXT NOT NULL,
+        "amountUsdc" DOUBLE PRECISION NOT NULL,
+        "localAmount" DOUBLE PRECISION NOT NULL DEFAULT 0,
+        "currency" TEXT NOT NULL DEFAULT 'TZS',
+        "code" TEXT,
+        "status" TEXT NOT NULL DEFAULT 'PENDING',
+        "stellarTxId" TEXT,
+        "commissionUsdc" DOUBLE PRECISION NOT NULL DEFAULT 0,
+        "createdAt" TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS "AgentTransaction_agentId_idx" ON "AgentTransaction" ("agentId");
+      CREATE INDEX IF NOT EXISTS "AgentTransaction_userId_idx" ON "AgentTransaction" ("userId");
+    `);
+
+    await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "BillPayment" (
         "id" TEXT NOT NULL PRIMARY KEY,
         "userId" TEXT NOT NULL,

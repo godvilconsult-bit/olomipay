@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bell, Receipt, TrendingUp, Briefcase, History, LifeBuoy, AlertTriangle, Sparkles } from 'lucide-react';
+import { Bell, Receipt, TrendingUp, Briefcase, History, LifeBuoy, AlertTriangle, Sparkles, Globe, Store } from 'lucide-react';
 import BalanceCard from '../../components/BalanceCard';
 import BottomNav from '../../components/BottomNav';
 import UserAvatar from '../../components/UserAvatar';
@@ -73,6 +73,8 @@ export default function DashboardPage() {
         {/* Secondary shortcuts — primary actions (Send/Add/Scan) live on the card */}
         <section className="grid grid-cols-4 gap-2.5">
           {[
+            { label: 'Send abroad', icon: Globe,   href: '/send-abroad', tint: 'text-cyan-600 dark:text-cyan-400'  },
+            { label: 'Cash agents', icon: Store,   href: '/agents',      tint: 'text-orange-600 dark:text-orange-400'},
             { label: 'Insights', icon: Sparkles,   href: '/insights', tint: 'text-amber-500 dark:text-amber-400' },
             { label: 'Bills',    icon: Receipt,    href: '/bills',    tint: 'text-violet-600 dark:text-violet-400'},
             { label: 'Grow',     icon: TrendingUp, href: '/grow',     tint: 'text-emerald-600 dark:text-emerald-400'},

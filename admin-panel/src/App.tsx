@@ -17,6 +17,7 @@ import { StaffMgmtList } from './resources/staffmgmt';
 import { MarketingList } from './resources/marketing';
 import { HealthList } from './resources/health';
 import { ReportsList } from './resources/reports';
+import { AgentsList } from './resources/agents';
 import LoginPage from './LoginPage';
 
 // Each role/department only sees the menu items relevant to it.
@@ -34,6 +35,7 @@ export default function App() {
           // Support — support + finance(compliance)
           can('SUPPORT') && <Resource key="support"  name="support"  list={SupportList} options={{ label: 'Support console' }} />,
           can('SUPPORT') && <Resource key="tickets"  name="tickets"  list={TicketsList} options={{ label: 'Support tickets' }} />,
+          can('SUPPORT') && <Resource key="agents"   name="agents"   list={AgentsList}  options={{ label: 'Cash agents' }} />,
           // Users / KYC — support + finance (PII-bearing; not marketing/IT)
           can('SUPPORT', 'FINANCE') && <Resource key="users" name="users" list={UserList} show={UserShow} />,
           can('SUPPORT', 'FINANCE') && <Resource key="kyc"   name="kyc"   list={KycList} options={{ label: 'KYC review' }} />,

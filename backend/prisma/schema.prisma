@@ -26,6 +26,7 @@ enum TxType {
   SAVINGS_WITHDRAW
   BILL_PAYMENT
   BANK_WITHDRAWAL
+  REMITTANCE
 }
 
 enum TxStatus {
@@ -260,6 +261,40 @@ model SavingsGoal {
   status         String    @default("active") // active | completed | archived
   createdAt      DateTime  @default(now())
 
+  @@index([userId])
+}
+
+model Agent {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  code            String   @unique
+  businessName    String
+  city            String
+  country         String   @default("TZ")
+  phone           String
+  commissionPct   Float    @default(0.5)
+  commissionEarned Float   @default(0)
+  status          String   @default("pending") // pending | active | suspended
+  createdAt       DateTime @default(now())
+
+  @@index([country, status])
+}
+
+model AgentTransaction {
+  id            String   @id @default(cuid())
+  agentId       String
+  userId        String   // the customer
+  type          String   // CASH_IN | CASH_OUT
+  amountUsdc    Float
+  localAmount   Float    @default(0)
+  currency      String   @default("TZS")
+  code          String?  // 6-digit confirmation code for cash-out
+  status        String   @default("PENDING") // PENDING | COMPLETED | CANCELLED
+  stellarTxId   String?
+  commissionUsdc Float   @default(0)
+  createdAt     DateTime @default(now())
+
+  @@index([agentId])
   @@index([userId])
 }
 
