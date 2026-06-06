@@ -15,6 +15,8 @@ import { WalletsList } from './resources/wallets';
 import { StaffActivityList } from './resources/staff';
 import { StaffMgmtList } from './resources/staffmgmt';
 import { MarketingList } from './resources/marketing';
+import { HealthList } from './resources/health';
+import { ReportsList } from './resources/reports';
 import LoginPage from './LoginPage';
 
 // Each role/department only sees the menu items relevant to it.
@@ -45,8 +47,12 @@ export default function App() {
           // IT — audit + security
           can('IT') && <Resource key="audit"    name="audit"    list={AuditList}    options={{ label: 'Audit log' }} />,
           can('IT') && <Resource key="security" name="security" list={SecurityList} options={{ label: 'Security (2FA)' }} />,
+          // Reports / exports — finance + super-admin
+          can('FINANCE') && <Resource key="reports" name="reports" list={ReportsList} options={{ label: 'Reports & export' }} />,
           // Marketing — growth dashboard (no PII / money)
           can('MARKETING') && <Resource key="marketing" name="marketing" list={MarketingList} options={{ label: 'Marketing' }} />,
+          // System health — visible to ALL staff
+          <Resource key="health" name="health" list={HealthList} options={{ label: 'System health' }} />,
           // Staff accounts — super-admin + any head (heads manage their dept)
           (isSuper || isHead) && <Resource key="staff" name="staff" list={StaffMgmtList} options={{ label: 'Staff accounts' }} />,
           // Staff activity (internal-fraud lens) — super-admin only

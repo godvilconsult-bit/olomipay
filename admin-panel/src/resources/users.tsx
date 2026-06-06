@@ -99,6 +99,42 @@ function Diagnose() {
   );
 }
 
+// ── This user's transactions — spot problems fast ──────────────────────────────
+function UserTransactions() {
+  const record = useRecordContext();
+  const [txs, setTxs] = useState<any[] | null>(null);
+  useEffect(() => {
+    if (!record) return;
+    fetch(`${API}/api/admin/transactions?userId=${record.id}&limit=50`, { headers: { Authorization: `Bearer ${atok()}` } })
+      .then(r => r.json()).then(j => setTxs(j.success ? (j.data.transactions ?? []) : []));
+  }, [record?.id]);
+  if (!record) return null;
+
+  const color = (s: string) => s === 'CONFIRMED' ? '#16a34a' : s === 'FAILED' ? '#dc2626' : '#d97706';
+  return (
+    <div style={{ padding: '8px 0' }}>
+      {!txs ? 'Loading…' : txs.length === 0 ? <p style={{ color: '#94a3b8', fontSize: 13 }}>No transactions.</p> : (
+        <table style={{ width: '100%', fontSize: 12.5, borderCollapse: 'collapse' }}>
+          <thead><tr style={{ textAlign: 'left', color: '#64748b' }}>
+            <th>Date</th><th>Type</th><th>Amount</th><th>Status</th><th>Ref</th>
+          </tr></thead>
+          <tbody>
+            {txs.map((t: any) => (
+              <tr key={t.id} style={{ borderTop: '1px solid #eee' }}>
+                <td>{new Date(t.createdAt).toLocaleString()}</td>
+                <td>{t.type}</td>
+                <td>{t.amountUsdc != null ? `$${Number(t.amountUsdc).toFixed(2)}` : (t.amountTzs ? `TZS ${Number(t.amountTzs).toLocaleString()}` : '')}</td>
+                <td style={{ color: color(t.status), fontWeight: 600 }}>{t.status}</td>
+                <td style={{ fontFamily: 'monospace' }}>{t.stellarTxId ? String(t.stellarTxId).slice(0, 8) : (t.errorMsg ? '⚠' : '')}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
 // ── Append-only support case notes ─────────────────────────────────────────────
 function CaseNotes() {
   const record = useRecordContext();
@@ -150,6 +186,7 @@ export const UserShow = () => (
       <FunctionField label="Wallet recoverable" render={(r: any) => r._full?.walletDeterministic ? '✓ deterministic (recoverable)' : '⚠ legacy address'} />
       <FunctionField label="Balance" render={(r: any) => r._full ? `$${parseFloat(r._full.balance?.usdc ?? 0).toFixed(2)} · ${parseFloat(r._full.balance?.xlm ?? 0).toFixed(2)} XLM` : '—'} />
       <DateField source="createdAt" label="Joined" showTime />
+      <FunctionField label="Transactions" render={() => <UserTransactions />} />
       <FunctionField label="Diagnosis" render={() => <Diagnose />} />
       <FunctionField label="Case notes" render={() => <CaseNotes />} />
     </SimpleShowLayout>
