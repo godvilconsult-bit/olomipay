@@ -5,9 +5,32 @@ import { useParams, useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import {
   ArrowLeft, Send, DollarSign, Check, CheckCheck, X,
-  Loader2, ImageIcon, CheckCircle2, XCircle,
+  Loader2, ImageIcon, CheckCircle2, XCircle, Paperclip, Download, Share2, FileText,
   Reply, CornerUpRight, Trash2, Copy, CheckSquare, MessageSquare,
 } from 'lucide-react';
+
+// Download a media URL (works for remote URLs + data: URLs) to the device.
+function downloadMedia(url: string, filename = 'olomipay-file') {
+  try {
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.target = '_blank'; a.rel = 'noopener';
+    document.body.appendChild(a); a.click(); a.remove();
+  } catch { window.open(url, '_blank'); }
+}
+// Share a media URL via the OS share sheet (falls back to copying the link).
+async function shareMedia(url: string, title = 'OlomiPay') {
+  try {
+    if ((navigator as any).share) { await (navigator as any).share({ title, url }); return; }
+    await navigator.clipboard.writeText(url);
+    toast.success('Link copied');
+  } catch { /* user cancelled */ }
+}
+function prettySize(bytes?: number): string {
+  if (!bytes) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
 import { useSocket } from '../../../lib/useSocket';
 import { formatUsdc, timeAgo } from '../../../lib/utils';
 import PinInput from '../../../components/PinInput';
@@ -139,13 +162,14 @@ function PaymentBubble({
 
 // ── Message bubble ─────────────────────────────────────────────────────────────
 function Bubble({
-  msg, isMine, recipientOnline, onAccept, onReject,
+  msg, isMine, recipientOnline, onAccept, onReject, onOpenImage,
 }: {
   msg:      any;
   isMine:   boolean;
   recipientOnline?: boolean;
   onAccept: (messageId: string, amount: number, asset?: string) => void;
   onReject: (messageId: string) => void;
+  onOpenImage?: (url: string, name?: string) => void;
 }) {
   const [hearts, setHearts] = useState<number[]>([]);
   const inAnim = isMine ? 'msg-in-right' : 'msg-in-left';
@@ -186,9 +210,44 @@ function Bubble({
         <div>
           <img src={msg.mediaThumbUrl ?? msg.mediaUrl} alt="Image"
             className="max-w-[220px] max-h-[220px] rounded-2xl object-cover cursor-pointer border border-slate-200 dark:border-slate-700"
-            onClick={() => window.open(msg.mediaUrl, '_blank')} />
+            onClick={() => onOpenImage?.(msg.mediaUrl, 'olomipay-image.webp')} />
           <div className={`flex items-center gap-1 mt-0.5 ${isMine ? 'justify-end' : 'justify-start'}`}>
             <span className="text-[10px] text-slate-400">{clockTime(msg.createdAt)}</span>
+            {isMine && <Ticks status={tickStatus} />}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Document / any non-image file
+  if (msg.type === 'FILE' && msg.mediaUrl) {
+    const fileName = msg.plainContent ?? msg.encryptedContent ?? 'Document';
+    const size     = prettySize(Number(msg.mediaThumbUrl) || undefined);
+    const ext      = (fileName.split('.').pop() ?? '').toUpperCase().slice(0, 4);
+    return (
+      <div className={`flex ${isMine ? 'justify-end' : 'justify-start'} mb-1 px-3`}>
+        <div className={`w-64 max-w-[80%] rounded-2xl border p-2.5 ${
+          isMine ? 'bg-blue-500/10 border-blue-300/40' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-white/10'}`}>
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/15 text-blue-500 flex items-center justify-center flex-shrink-0">
+              <FileText size={20} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-slate-800 dark:text-slate-100 truncate">{fileName}</p>
+              <p className="text-[11px] text-slate-400">{[ext, size].filter(Boolean).join(' · ')}</p>
+            </div>
+          </div>
+          <div className="flex items-center justify-end gap-1 mt-1.5">
+            <button onClick={() => downloadMedia(msg.mediaUrl, fileName)}
+              className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-white/10" title="Download">
+              <Download size={15} />
+            </button>
+            <button onClick={() => shareMedia(msg.mediaUrl, fileName)}
+              className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-white/10" title="Share">
+              <Share2 size={15} />
+            </button>
+            <span className="text-[10px] text-slate-400 ml-1">{clockTime(msg.createdAt)}</span>
             {isMine && <Ticks status={tickStatus} />}
           </div>
         </div>
@@ -293,6 +352,8 @@ export default function ChatThread() {
   const [isTyping,     setIsTyping]     = useState(false);
   const [showMoney,    setShowMoney]    = useState(false);
   const [uploadingImg, setUploadingImg] = useState(false);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [lightbox,     setLightbox]     = useState<{ url: string; name?: string } | null>(null);
 
   // Accept/reject state
   const [acceptModal,  setAcceptModal]  = useState<{ messageId: string; amount: number; asset?: string } | null>(null);
@@ -376,6 +437,7 @@ export default function ChatThread() {
   function cancelHold() { if (holdRef.current) { clearTimeout(holdRef.current); holdRef.current = null; } }
   const inputRef   = useRef<HTMLTextAreaElement>(null);
   const imgRef     = useRef<HTMLInputElement>(null);
+  const fileRef    = useRef<HTMLInputElement>(null);
 
   function scrollToBottom(smooth = true) {
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'instant' }), 60);
@@ -559,6 +621,43 @@ export default function ChatThread() {
     }
   }
 
+  // ── Send any document / file ────────────────────────────────────────────────
+  async function sendFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 25 * 1024 * 1024) { toast.error('File must be under 25MB'); return; }
+    setUploadingFile(true);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const res = await fetch(`${API}/api/chat/media/upload`, {
+        method: 'POST', headers: { Authorization: `Bearer ${getToken()}` }, body: form,
+      }).then(r => r.json());
+      if (!res.success) { toast.error(res.error ?? 'Upload failed'); return; }
+
+      if (res.data.kind === 'image') {
+        emit('send_message', {
+          conversationId: convId, encryptedContent: '[Image]', type: 'IMAGE',
+          mediaUrl: res.data.mediaUrl, mediaThumbUrl: res.data.mediaThumbUrl, mediaMimeType: res.data.mimeType,
+        });
+      } else {
+        // Document/file: filename goes in the content, size encoded in the memo-like field
+        emit('send_message', {
+          conversationId: convId,
+          encryptedContent: res.data.fileName ?? file.name,
+          type: 'FILE',
+          mediaUrl: res.data.mediaUrl, mediaMimeType: res.data.mimeType,
+          mediaThumbUrl: String(res.data.fileSize ?? file.size), // reuse field to carry size
+        });
+      }
+      scrollToBottom();
+    } catch { toast.error('Upload failed'); }
+    finally {
+      setUploadingFile(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  }
+
   // ── Send text message ──────────────────────────────────────────────────────
   function sendMessage() {
     const trimmed = text.trim();
@@ -698,6 +797,7 @@ export default function ChatThread() {
                   <div className={selectMode ? 'pl-9 pointer-events-none' : ''}>
                     <Bubble msg={msg} isMine={msg.senderId === myId}
                       recipientOnline={!!other?.isOnline}
+                      onOpenImage={(url, name) => setLightbox({ url, name })}
                       onAccept={handleAccept} onReject={handleReject} />
                   </div>
                 </div>
@@ -752,6 +852,15 @@ export default function ChatThread() {
             : <ImageIcon size={17} className="text-slate-500 dark:text-slate-300" />}
         </button>
         <input ref={imgRef} type="file" accept="image/*" className="hidden" onChange={sendImage} />
+
+        {/* Document / any file */}
+        <button onClick={() => fileRef.current?.click()} disabled={uploadingFile}
+          className="w-11 h-11 rounded-full bg-slate-100 dark:bg-white/10 flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform">
+          {uploadingFile
+            ? <Loader2 size={17} className="animate-spin text-slate-400" />
+            : <Paperclip size={17} className="text-slate-500 dark:text-slate-300" />}
+        </button>
+        <input ref={fileRef} type="file" className="hidden" onChange={sendFile} />
 
         {/* Text field */}
         <div className="flex-1 bg-slate-100 dark:bg-white/[0.07] rounded-3xl px-4 py-2.5 flex items-end min-h-[44px] border border-transparent focus-within:border-blue-400/40 transition-colors">
@@ -875,6 +984,24 @@ export default function ChatThread() {
           onSent={() => { setShowMoney(false); scrollToBottom(); }}
           emit={emit}
         />
+      )}
+
+      {/* Image lightbox — full-screen view + download + share */}
+      {lightbox && (
+        <div className="fixed inset-0 z-[60] bg-black/90 flex flex-col" onClick={() => setLightbox(null)}>
+          <div className="flex items-center justify-end gap-2 p-3" onClick={e => e.stopPropagation()}>
+            <button onClick={() => downloadMedia(lightbox.url, lightbox.name ?? 'image.webp')}
+              className="p-2.5 rounded-full bg-white/10 text-white" title="Download"><Download size={20} /></button>
+            <button onClick={() => shareMedia(lightbox.url, 'OlomiPay image')}
+              className="p-2.5 rounded-full bg-white/10 text-white" title="Share"><Share2 size={20} /></button>
+            <button onClick={() => setLightbox(null)}
+              className="p-2.5 rounded-full bg-white/10 text-white" title="Close"><X size={20} /></button>
+          </div>
+          <div className="flex-1 flex items-center justify-center p-4">
+            <img src={lightbox.url} alt="" className="max-w-full max-h-full object-contain rounded-lg"
+              onClick={e => e.stopPropagation()} />
+          </div>
+        </div>
       )}
     </div>
   );
