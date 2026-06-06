@@ -76,7 +76,7 @@ export default function Sidebar() {
 
   useEffect(() => {
     // Check both session storage and cookie
-    const hasToken  = !!(sessionStorage.getItem('olomipay_at') || sessionStorage.getItem('olomipay_rt'));
+    const hasToken  = !!(localStorage.getItem('olomipay_at') || localStorage.getItem('olomipay_rt'));
     const hasCookie = document.cookie.includes('olomipay_session=1');
     setAuthed(hasToken || hasCookie);
   }, [path]); // re-check on every navigation
@@ -108,7 +108,7 @@ export default function Sidebar() {
   );
 
   function handleLogout() {
-    sessionStorage.clear();
+    localStorage.clear();
     // Expire session cookie
     document.cookie = 'olomipay_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax';
     router.push('/');

@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation';
 export default function AlreadyAuthed() {
   const router = useRouter();
   useEffect(() => {
-    const hasToken  = !!(sessionStorage.getItem('olomipay_at') || sessionStorage.getItem('olomipay_rt'));
+    const hasToken  = !!(localStorage.getItem('olomipay_at') || localStorage.getItem('olomipay_rt'));
     const hasCookie = document.cookie.includes('olomipay_session=1');
 
     // CRITICAL: the middleware gates routes on the COOKIE only. If a token

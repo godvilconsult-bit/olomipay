@@ -25,7 +25,7 @@ const API = process.env.NEXT_PUBLIC_API_URL;
 
 function getToken(): string {
   if (typeof window === 'undefined') return '';
-  return sessionStorage.getItem('olomipay_at') || sessionStorage.getItem('olomipay_rt') || '';
+  return localStorage.getItem('olomipay_at') || localStorage.getItem('olomipay_rt') || '';
 }
 
 // ── Shared sound engine (one consistent voice across the whole app) ───────────

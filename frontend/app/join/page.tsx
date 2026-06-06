@@ -19,7 +19,7 @@ function JoinContent() {
   }, [ref]);
 
   useEffect(() => {
-    if (ref) sessionStorage.setItem('tuma_invite_ref', ref);
+    if (ref) localStorage.setItem('tuma_invite_ref', ref);
   }, [ref]);
 
   return (

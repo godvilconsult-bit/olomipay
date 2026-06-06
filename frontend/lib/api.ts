@@ -8,22 +8,44 @@
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
-// ── Token storage (memory only — never localStorage for secret keys) ──────────
+// ── Persistent token storage ──────────────────────────────────────────────────
+// Tokens live in localStorage (NOT sessionStorage), so the session survives app
+// restarts AND app updates — the native app reloads its web content on every
+// update, which wipes sessionStorage and used to sign users out. With
+// localStorage the user stays signed in until they sign out themselves.
 
 let accessToken:  string | null = null;
 let refreshToken: string | null = null;
+
+const SESSION_DAYS = 180;
+function writeSessionCookie() {
+  const expires = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000).toUTCString();
+  document.cookie = `olomipay_session=1; path=/; expires=${expires}; SameSite=Lax`;
+}
+
+// Initialise from persistent storage on load (and migrate any old
+// sessionStorage-based session so existing users aren't signed out by this change).
+if (typeof window !== 'undefined') {
+  try {
+    const ssAt = window.sessionStorage?.getItem('olomipay_at');
+    const ssRt = window.sessionStorage?.getItem('olomipay_rt');
+    if (ssAt && !localStorage.getItem('olomipay_at')) localStorage.setItem('olomipay_at', ssAt);
+    if (ssRt && !localStorage.getItem('olomipay_rt')) localStorage.setItem('olomipay_rt', ssRt);
+  } catch {}
+  accessToken  = localStorage.getItem('olomipay_at');
+  refreshToken = localStorage.getItem('olomipay_rt');
+  if (accessToken || refreshToken) writeSessionCookie();
+}
 
 export function setTokens(access: string, refresh: string) {
   accessToken  = access;
   refreshToken = refresh;
   if (typeof window !== 'undefined') {
-    sessionStorage.setItem('olomipay_rt', refresh);
-    sessionStorage.setItem('olomipay_at', access);
-    // Also write a cookie so Next.js middleware can protect routes server-side.
-    // HttpOnly is NOT set here (JS needs to read it for logout), but it's enough
-    // to gate route access. Expires in 7 days to match refresh token lifetime.
-    const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toUTCString();
-    document.cookie = `olomipay_session=1; path=/; expires=${expires}; SameSite=Lax`;
+    localStorage.setItem('olomipay_rt', refresh);
+    localStorage.setItem('olomipay_at', access);
+    // Cookie gates the Next.js middleware. Long-lived so a persisted session
+    // isn't bounced; the JWT/refresh flow handles actual token validity.
+    writeSessionCookie();
   }
 }
 
@@ -31,8 +53,8 @@ export function clearTokens() {
   accessToken  = null;
   refreshToken = null;
   if (typeof window !== 'undefined') {
-    sessionStorage.removeItem('olomipay_rt');
-    sessionStorage.removeItem('olomipay_at');
+    localStorage.removeItem('olomipay_rt');
+    localStorage.removeItem('olomipay_at');
     // Expire the session cookie
     document.cookie = 'olomipay_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax';
   }
@@ -40,7 +62,7 @@ export function clearTokens() {
 
 export function loadStoredRefreshToken(): string | null {
   if (typeof window === 'undefined') return null;
-  return sessionStorage.getItem('olomipay_rt');
+  return localStorage.getItem('olomipay_rt');
 }
 
 // ── Core fetch wrapper ─────────────────────────────────────────────────────────

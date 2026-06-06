@@ -44,7 +44,9 @@ function signRefreshToken(userId: string): string {
   return jwt.sign(
     { userId, type: 'refresh' },
     process.env.JWT_REFRESH_SECRET!,
-    { expiresIn: '7d' },
+    // Long-lived so users stay signed in until they sign out themselves; the
+    // 7d access token is rotated via this refresh token whenever it expires.
+    { expiresIn: '180d' },
   );
 }
 

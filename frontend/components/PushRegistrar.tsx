@@ -11,7 +11,7 @@ import { registerPush } from '../lib/usePushNotifications';
 export default function PushRegistrar() {
   useEffect(() => {
     // Only register if the user is logged in (has an access token)
-    const token = sessionStorage.getItem('olomipay_at') || sessionStorage.getItem('olomipay_rt');
+    const token = localStorage.getItem('olomipay_at') || localStorage.getItem('olomipay_rt');
     if (token) {
       // Small delay so the page renders first
       const t = setTimeout(() => registerPush(), 2000);

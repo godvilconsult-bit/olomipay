@@ -7,7 +7,7 @@ import BottomNav from '../../components/BottomNav';
 import { formatTzs, formatUsdc } from '../../lib/utils';
 
 async function pricelockApi(path: string) {
-  const token = (sessionStorage.getItem('olomipay_at') || sessionStorage.getItem('olomipay_rt'));
+  const token = (localStorage.getItem('olomipay_at') || localStorage.getItem('olomipay_rt'));
   const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/pricelock${path}`, {
     headers: { Authorization: `Bearer ${token}` },
   });

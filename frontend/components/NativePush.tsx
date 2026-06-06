@@ -17,7 +17,7 @@ export default function NativePush() {
       try { ({ Capacitor } = await import('@capacitor/core')); } catch { return; }
       if (!Capacitor?.isNativePlatform?.()) return; // web → do nothing
 
-      const token = sessionStorage.getItem('olomipay_at') || sessionStorage.getItem('olomipay_rt');
+      const token = localStorage.getItem('olomipay_at') || localStorage.getItem('olomipay_rt');
       if (!token) return; // only register once the user is logged in
 
       let PushNotifications: any;

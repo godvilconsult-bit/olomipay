@@ -14,7 +14,7 @@ export default function ClaimPage() {
 
   async function handleClaim() {
     setLoading(true);
-    const accessToken = (sessionStorage.getItem('olomipay_at') || sessionStorage.getItem('olomipay_rt'));
+    const accessToken = (localStorage.getItem('olomipay_at') || localStorage.getItem('olomipay_rt'));
     if (!accessToken) { router.push(`/auth/login?redirect=/claim/${token}`); return; }
 
     const res = await fetch(

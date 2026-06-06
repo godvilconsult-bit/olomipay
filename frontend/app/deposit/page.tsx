@@ -17,7 +17,7 @@ const QRCodeSVG = dynamic(() => import('qrcode.react').then(m => m.QRCodeSVG), {
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 function getToken() {
-  return sessionStorage.getItem('olomipay_at') || (sessionStorage.getItem('olomipay_at') || sessionStorage.getItem('olomipay_rt')) || '';
+  return localStorage.getItem('olomipay_at') || (localStorage.getItem('olomipay_at') || localStorage.getItem('olomipay_rt')) || '';
 }
 
 type Tab     = 'receive' | 'mobile' | 'bank';

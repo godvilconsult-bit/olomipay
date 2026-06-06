@@ -21,7 +21,7 @@ export type TumaContact = {
 };
 
 function getToken() {
-  return sessionStorage.getItem('olomipay_at') || sessionStorage.getItem('olomipay_rt') || '';
+  return localStorage.getItem('olomipay_at') || localStorage.getItem('olomipay_rt') || '';
 }
 
 export function isContactPickerSupported(): boolean {

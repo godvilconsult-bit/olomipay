@@ -13,7 +13,7 @@ import { formatUsdc } from '../../lib/utils';
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 function getToken() {
-  return sessionStorage.getItem('olomipay_at') || sessionStorage.getItem('olomipay_rt') || '';
+  return localStorage.getItem('olomipay_at') || localStorage.getItem('olomipay_rt') || '';
 }
 async function payrollApi(path: string, method = 'GET', body?: any) {
   const r = await fetch(`${API}/api/payroll${path}`, {
