@@ -61,66 +61,64 @@ function PaymentBubble({
     : 'border-amber-200 bg-amber-50 dark:bg-amber-900/20';
 
   return (
-    <div className="flex justify-center my-2 px-4">
-      <div className={`w-full max-w-xs rounded-3xl border-2 overflow-hidden ${borderCls}`}>
-        <div className="px-4 pt-3 pb-2">
-          {/* Header label */}
-          <p className="text-xs font-bold text-slate-500 mb-1 flex items-center gap-1">
-            {isRequest
-              ? isMine ? '💛 You requested' : '💛 Payment request'
-              : isMine ? '💸 You sent'       : '💚 You received'}
-          </p>
+    <div className={`flex ${isMine ? 'justify-end' : 'justify-start'} mb-1 px-3`}>
+      <div className={`w-56 max-w-[80%] rounded-2xl border overflow-hidden ${borderCls} ${isMine ? 'rounded-br-md' : 'rounded-bl-md'}`}>
+        <div className="px-3 py-2">
+          {/* Header + amount on one tight row */}
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+              {isRequest
+                ? isMine ? 'You requested' : 'Payment request'
+                : isMine ? 'You sent'       : 'You received'}
+            </span>
+            <span className="text-sm leading-none">
+              {isRequest ? '💛' : isMine ? '💸' : '💚'}
+            </span>
+          </div>
 
-          {/* Amount */}
-          <p className="text-2xl font-bold text-slate-900 dark:text-white">
+          <p className="text-lg font-bold text-slate-900 dark:text-white leading-tight mt-0.5">
             {fmtAmt(msg.amountUsdc ?? 0)}
           </p>
 
-          {/* Note */}
           {msg.paymentNote && (
-            <p className="text-sm italic text-slate-500 mt-1">
+            <p className="text-xs italic text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-2 break-words">
               "{msg.paymentNote}"
             </p>
           )}
 
-          {/* Status row */}
-          <div className="flex items-center justify-between mt-2">
-            <span className={`text-xs font-semibold ${
+          <div className="flex items-center justify-between mt-1">
+            <span className={`text-[11px] font-semibold ${
               confirmed ? 'text-green-600' : failed ? 'text-red-500' : 'text-amber-600'
             }`}>
-              {confirmed ? '✓ Confirmed' : failed ? '✕ Declined' : '○ Pending…'}
+              {confirmed ? '✓ Confirmed' : failed ? '✕ Declined' : '○ Pending'}
             </span>
             {msg.stellarTxId && (
-              <span className="text-[10px] text-slate-400 font-mono">
-                Ref {String(msg.stellarTxId).slice(0, 8).toUpperCase()}
+              <span className="text-[9px] text-slate-400 font-mono">
+                {String(msg.stellarTxId).slice(0, 6).toUpperCase()}
               </span>
             )}
           </div>
         </div>
 
-        {/* Accept / Reject buttons — only for pending REQUEST that's NOT mine */}
+        {/* Accept / Reject — pending REQUEST that's NOT mine */}
         {isRequest && pending && !isMine && (
-          <div className="flex border-t border-slate-200 dark:border-slate-700">
-            <button
-              onClick={() => onReject(msg.id)}
-              className="flex-1 flex items-center justify-center gap-1.5 py-3 text-sm font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors border-r border-slate-200 dark:border-slate-700">
-              <XCircle size={16} />
-              Decline
+          <div className="flex border-t border-slate-200/70 dark:border-slate-700">
+            <button onClick={() => onReject(msg.id)}
+              className="flex-1 flex items-center justify-center gap-1 py-2 text-xs font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 border-r border-slate-200/70 dark:border-slate-700">
+              <XCircle size={13} /> Decline
             </button>
-            <button
-              onClick={() => onAccept(msg.id, msg.amountUsdc, msg.paymentAsset)}
-              className="flex-1 flex items-center justify-center gap-1.5 py-3 text-sm font-bold text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors">
-              <CheckCircle2 size={16} />
-              Pay Now
+            <button onClick={() => onAccept(msg.id, msg.amountUsdc, msg.paymentAsset)}
+              className="flex-1 flex items-center justify-center gap-1 py-2 text-xs font-bold text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20">
+              <CheckCircle2 size={13} /> Pay
             </button>
           </div>
         )}
 
-        {/* My pending request — waiting state */}
+        {/* My pending request — waiting */}
         {isRequest && pending && isMine && (
-          <div className="border-t border-amber-200 dark:border-amber-800 px-4 py-2 flex items-center justify-center gap-2">
-            <Loader2 size={13} className="animate-spin text-amber-500" />
-            <span className="text-xs text-amber-600">Waiting for payment…</span>
+          <div className="border-t border-amber-200/70 dark:border-amber-800 px-3 py-1.5 flex items-center justify-center gap-1.5">
+            <Loader2 size={11} className="animate-spin text-amber-500" />
+            <span className="text-[11px] text-amber-600">Waiting…</span>
           </div>
         )}
       </div>
@@ -187,7 +185,7 @@ function Bubble({
   return (
     <div className={`flex ${isMine ? 'justify-end' : 'justify-start'} mb-1 px-3 ${inAnim}`}>
       <div onDoubleClick={react}
-        className={`group relative max-w-[78%] select-none px-3.5 py-2 shadow-sm transition-transform active:scale-[0.98] ${
+        className={`group relative max-w-[80%] select-none px-3 py-1.5 shadow-sm transition-transform active:scale-[0.98] ${
         isMine
           ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-2xl rounded-br-md shadow-blue-500/20'
           : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-2xl rounded-bl-md border border-slate-100 dark:border-white/10'
@@ -208,8 +206,8 @@ function Bubble({
             </p>
           </div>
         )}
-        <p className="text-[15px] leading-relaxed break-words whitespace-pre-wrap">{text}</p>
-        <div className={`flex items-center gap-1 mt-0.5 ${isMine ? 'justify-end' : 'justify-start'}`}>
+        <p className="text-[14.5px] leading-snug break-words whitespace-pre-wrap">{text}</p>
+        <div className={`flex items-center gap-1 -mt-0.5 ${isMine ? 'justify-end' : 'justify-start'}`}>
           <span className={`text-[10px] ${isMine ? 'text-white/70' : 'text-slate-400'}`}>
             {timeAgo(msg.createdAt)}
           </span>
