@@ -29,6 +29,7 @@ export default function AdminPage() {
   const [wallet,    setWallet]    = useState<any>(null);
   const [feeWallet, setFeeWallet] = useState<any>(null);
   const [wallets,   setWallets]   = useState<any>(null);   // combined gas + fees overview
+  const [staff,     setStaff]     = useState<any>(null);   // staff-activity (super-admin)
   const [topupBusy, setTopupBusy] = useState(false);
   const [genBusy,   setGenBusy]   = useState(false);
   const [genFee,    setGenFee]    = useState<any>(null);   // generated fee keypair (shown once)
@@ -67,6 +68,8 @@ export default function AdminPage() {
       if (wR.success)  setWallet(wR.data);
       if (fwR.success) setFeeWallet(fwR.data);
       if (walR.success) setWallets(walR.data);
+      // Staff-activity (SUPER_ADMIN only) — silently skipped for other roles
+      adminApi('/staff-activity?days=7').then(r => { if (r.success) setStaff(r.data); }).catch(() => {});
     } catch { toast.error('Failed to load'); }
     finally { setLoading(false); }
   }
@@ -516,6 +519,38 @@ export default function AdminPage() {
                       className="text-xs text-slate-400 underline">I’ve saved them — hide</button>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Staff activity — internal-fraud watch (SUPER_ADMIN only) */}
+            {staff && (
+              <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="font-semibold text-sm">Staff activity (7 days)</p>
+                  <span className="text-xs text-slate-400">{staff.totalActions} actions</span>
+                </div>
+                {(staff.staff ?? []).length === 0 ? (
+                  <p className="text-xs text-slate-400">No back-office actions in this period.</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {(staff.staff ?? []).slice(0, 6).map((s: any) => (
+                      <div key={s.adminId} className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm ${s.flags.length ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-slate-50 dark:bg-slate-700/40'}`}>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{s.adminPhone ?? s.adminId.slice(0, 8)}</p>
+                          <p className="text-[11px] text-slate-400">
+                            {s.sensitive} money/access · {s.offHours} off-hours · {s.distinctIps} IP{s.distinctIps === 1 ? '' : 's'}
+                          </p>
+                        </div>
+                        {s.flags.length > 0 && (
+                          <span className="text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-bold flex-shrink-0">
+                            ⚠ {s.flags.length}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <p className="text-[11px] text-slate-400">Watch for ⚠ flags: high money/access volume, off-hours, or many IPs.</p>
               </div>
             )}
 
