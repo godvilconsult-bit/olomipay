@@ -53,17 +53,12 @@ export async function handleSendMessage(io: Server, socket: Socket, data: any) {
       },
     });
 
-    // ── Delivery strategy: recipients only (NEVER echo to the sender) ───────────
-    // CRITICAL: do NOT broadcast the message back to the sender. The sender
-    // already shows it optimistically; echoing it back caused it to re-appear as
-    // an incoming "reply" in some timing cases. We:
-    //   • broadcast to the room EXCLUDING the sender's socket (socket.to),
-    //   • emit to each recipient's personal room (excludes sender by query),
-    //   • send the sender a private 'message_sent' confirmation so they can
-    //     swap their optimistic bubble for the saved message (real id + ticks).
-
-    // Reaches other members already in the conversation room (sender excluded)
-    socket.to(conversationId).emit('new_message', message);
+    // ── Delivery strategy: ONE delivery per recipient, never to the sender ──────
+    // We deliver to each recipient's PERSONAL room only (below). We deliberately
+    // do NOT also broadcast to the conversation room — a recipient is in BOTH
+    // their personal room and the conversation room, so broadcasting to both
+    // delivered every message TWICE (two notification pop-ups). The sender gets
+    // a private 'message_sent' confirmation instead of an echo.
 
     // Confirm back to the sender ONLY (not as a new incoming message)
     socket.emit('message_sent', message);

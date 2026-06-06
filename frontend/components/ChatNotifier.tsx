@@ -109,6 +109,8 @@ export default function ChatNotifier() {
 
   // Track which conversation ID we're currently viewing
   const currentConvId = path.startsWith('/chat/') ? path.split('/')[2] : null;
+  // Remember message ids we've already shown a pop-up for (dedup)
+  const seenIds = useRef<Set<string>>(new Set());
 
   // Fetch initial unread count on mount
   useEffect(() => {
@@ -139,6 +141,13 @@ export default function ChatNotifier() {
 
     // ── Incoming chat message ─────────────────────────────────────────────
     const u1 = on('new_message', (msg: any) => {
+      // Dedup: never react to the same message id twice (guards against any
+      // duplicate socket delivery → a single message = a single pop-up).
+      if (msg?.id) {
+        if (seenIds.current.has(msg.id)) return;
+        seenIds.current.add(msg.id);
+        if (seenIds.current.size > 200) seenIds.current = new Set([...seenIds.current].slice(-100));
+      }
       // Skip if we're already viewing this exact conversation
       if (msg.conversationId === currentConvId) return;
       // Skip system messages

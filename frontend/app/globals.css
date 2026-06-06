@@ -385,15 +385,27 @@
 .presence-ring { animation: presencePulse 2.2s ease-out infinite; }
 
 /* Chat backdrop — subtle animated gradient mesh */
+/* Attractive chat backdrop: layered brand glows + a subtle dot texture so the
+   thread feels premium without competing with the message bubbles. */
 .chat-bg {
-  background:
-    radial-gradient(1200px 600px at 10% -10%, rgba(59,130,246,0.10), transparent 60%),
-    radial-gradient(1000px 500px at 110% 10%, rgba(16,185,129,0.10), transparent 55%);
+  background-color: #eef3fb;
+  background-image:
+    radial-gradient(900px 520px at 6% -8%,  rgba(59,130,246,0.13), transparent 60%),
+    radial-gradient(820px 480px at 112% 6%, rgba(16,185,129,0.13), transparent 55%),
+    radial-gradient(640px 640px at 50% 122%, rgba(139,92,246,0.10), transparent 60%),
+    radial-gradient(rgba(59,130,246,0.07) 1px, transparent 1px);
+  background-size: auto, auto, auto, 22px 22px;
+  background-attachment: fixed, fixed, fixed, fixed;
 }
 .dark .chat-bg {
-  background:
-    radial-gradient(1200px 600px at 10% -10%, rgba(59,130,246,0.16), transparent 60%),
-    radial-gradient(1000px 500px at 110% 10%, rgba(16,185,129,0.14), transparent 55%);
+  background-color: #070d1a;
+  background-image:
+    radial-gradient(900px 520px at 6% -8%,  rgba(59,130,246,0.20), transparent 60%),
+    radial-gradient(820px 480px at 112% 6%, rgba(16,185,129,0.16), transparent 55%),
+    radial-gradient(640px 640px at 50% 122%, rgba(139,92,246,0.16), transparent 60%),
+    radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px);
+  background-size: auto, auto, auto, 22px 22px;
+  background-attachment: fixed, fixed, fixed, fixed;
 }
 
 /* ═════════════════════════════════════════════════════════════════════════════

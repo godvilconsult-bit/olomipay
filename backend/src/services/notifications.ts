@@ -58,6 +58,16 @@ async function sendNativePush(userId: string, payload: NotificationPayload): Pro
   for (const [k, v] of Object.entries(payload.data ?? {})) data[k] = String(v);
   data.type = payload.type;
 
+  // Unread count → shown as the app-icon badge / notification count, so the user
+  // sees how many messages/alerts are waiting before opening the app.
+  let badge = 0;
+  try {
+    const c = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT COUNT(*)::int AS n FROM "Notification" WHERE "userId" = $1 AND "isRead" = false`, userId,
+    );
+    badge = c?.[0]?.n ?? 0;
+  } catch { /* ignore */ }
+
   try {
     const resp = await fcm.sendEachForMulticast({
       tokens:       rows.map(r => r.token),
@@ -66,13 +76,14 @@ async function sendNativePush(userId: string, payload: NotificationPayload): Pro
       android: {
         priority: 'high',
         notification: {
-          sound:       'default',          // play a sound
+          sound:        'default',          // play a sound
           defaultSound: true,
-          channelId:   'olomipay_default', // the HIGH-importance channel the app created
+          channelId:    'olomipay_default', // the HIGH-importance channel the app created
           defaultVibrateTimings: true,
+          notificationCount: badge,         // number badge on the app icon
         },
       },
-      apns: { payload: { aps: { sound: 'default' } } },
+      apns: { payload: { aps: { sound: 'default', badge } } },
     });
     await Promise.all(resp.responses.map((r: any, i: number) => {
       const code = r.error?.code ?? '';

@@ -65,7 +65,7 @@ export default function BalanceCard({}: Props) {
             <span className="text-sm font-medium text-white/70">USD</span>
           </div>
           <p className="text-xs text-white/60 mt-1">
-            ≈ {hidden ? '•••' : formatTzs(tzsEquiv)} TZS
+            ≈ {hidden ? '•••' : formatTzs(tzsEquiv)}
           </p>
         </div>
 
