@@ -33,10 +33,21 @@ async function api(path: string, method = 'GET', body?: any) {
 import { sounds } from '../../../lib/sounds';
 
 // ── Tick icons ─────────────────────────────────────────────────────────────────
-function Ticks({ isRead, isDelivered }: { isRead: boolean; isDelivered: boolean }) {
-  if (isRead)      return <CheckCheck size={13} className="text-blue-400 flex-shrink-0" />;
-  if (isDelivered) return <CheckCheck size={13} className="text-white/50 flex-shrink-0" />;
-  return <Check size={13} className="text-white/40 flex-shrink-0" />;
+// Read receipts on MY sent messages (WhatsApp-style):
+//  • read      → two RED ticks
+//  • delivered → two FAINT ticks (recipient received it / is online)
+//  • not delivered (recipient offline) → no tick
+function Ticks({ status }: { status: 'none' | 'delivered' | 'read' }) {
+  if (status === 'read')      return <CheckCheck size={13} className="text-red-500 flex-shrink-0" />;
+  if (status === 'delivered') return <CheckCheck size={13} className="text-white/45 flex-shrink-0" />;
+  return null;
+}
+
+// Clock time the message was sent/received, e.g. "14:30"
+function clockTime(date: string | Date): string {
+  try {
+    return new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } catch { return ''; }
 }
 
 // ── Payment bubble (PAYMENT or PAYMENT_REQUEST) ───────────────────────────────
@@ -128,15 +139,21 @@ function PaymentBubble({
 
 // ── Message bubble ─────────────────────────────────────────────────────────────
 function Bubble({
-  msg, isMine, onAccept, onReject,
+  msg, isMine, recipientOnline, onAccept, onReject,
 }: {
   msg:      any;
   isMine:   boolean;
+  recipientOnline?: boolean;
   onAccept: (messageId: string, amount: number, asset?: string) => void;
   onReject: (messageId: string) => void;
 }) {
   const [hearts, setHearts] = useState<number[]>([]);
   const inAnim = isMine ? 'msg-in-right' : 'msg-in-left';
+  // Tick status for my sent messages
+  const read       = (msg.receipts?.length ?? 0) > 0;
+  const isTemp      = typeof msg.id === 'string' && msg.id.startsWith('temp_');
+  const tickStatus: 'none' | 'delivered' | 'read' =
+    read ? 'read' : (!isTemp && recipientOnline ? 'delivered' : 'none');
   function react() {
     const id = Date.now();
     setHearts(h => [...h, id]);
@@ -171,8 +188,8 @@ function Bubble({
             className="max-w-[220px] max-h-[220px] rounded-2xl object-cover cursor-pointer border border-slate-200 dark:border-slate-700"
             onClick={() => window.open(msg.mediaUrl, '_blank')} />
           <div className={`flex items-center gap-1 mt-0.5 ${isMine ? 'justify-end' : 'justify-start'}`}>
-            <span className="text-[10px] text-slate-400">{timeAgo(msg.createdAt)}</span>
-            {isMine && <Ticks isRead={(msg.receipts?.length ?? 0) > 0} isDelivered />}
+            <span className="text-[10px] text-slate-400">{clockTime(msg.createdAt)}</span>
+            {isMine && <Ticks status={tickStatus} />}
           </div>
         </div>
       </div>
@@ -180,7 +197,6 @@ function Bubble({
   }
 
   const text = msg.plainContent ?? msg.encryptedContent ?? '';
-  const isRead  = (msg.receipts?.length ?? 0) > 0;
 
   return (
     <div className={`flex ${isMine ? 'justify-end' : 'justify-start'} mb-1 px-3 ${inAnim}`}>
@@ -209,9 +225,9 @@ function Bubble({
         <p className="text-[14.5px] leading-snug break-words whitespace-pre-wrap">{text}</p>
         <div className={`flex items-center gap-1 -mt-0.5 ${isMine ? 'justify-end' : 'justify-start'}`}>
           <span className={`text-[10px] ${isMine ? 'text-white/70' : 'text-slate-400'}`}>
-            {timeAgo(msg.createdAt)}
+            {clockTime(msg.createdAt)}
           </span>
-          {isMine && <Ticks isRead={isRead} isDelivered />}
+          {isMine && <Ticks status={tickStatus} />}
         </div>
       </div>
     </div>
@@ -681,6 +697,7 @@ export default function ChatThread() {
                   )}
                   <div className={selectMode ? 'pl-9 pointer-events-none' : ''}>
                     <Bubble msg={msg} isMine={msg.senderId === myId}
+                      recipientOnline={!!other?.isOnline}
                       onAccept={handleAccept} onReject={handleReject} />
                   </div>
                 </div>
