@@ -355,6 +355,55 @@ router.get('/report/csv', requireAuth, requireAdmin, async (req: AuthRequest, re
   return res.send(lines.join('\n'));
 });
 
+// ── GET /api/admin/report/xlsx — true Excel workbook ──────────────────────────
+router.get('/report/xlsx', requireAuth, requireAdmin, denyDepartment('MARKETING'), async (req: AuthRequest, res) => {
+  const { from, to, userId } = req.query as Record<string, string | undefined>;
+  const where: any = {};
+  if (userId) where.userId = userId;
+  if (from || to) where.createdAt = {};
+  if (from) where.createdAt.gte = new Date(from!);
+  if (to)   where.createdAt.lte = new Date(to! + 'T23:59:59Z');
+
+  const txs = await prisma.transaction.findMany({
+    where, include: { user: { select: { phone: true, kycName: true, accountNo: true } } },
+    orderBy: { createdAt: 'desc' }, take: 50000,
+  });
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const ExcelJS = require('exceljs');
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Transactions');
+    ws.columns = [
+      { header: 'Date', key: 'date', width: 12 }, { header: 'Time', key: 'time', width: 10 },
+      { header: 'Account No', key: 'acct', width: 14 }, { header: 'Phone', key: 'phone', width: 16 },
+      { header: 'Name', key: 'name', width: 22 }, { header: 'Type', key: 'type', width: 12 },
+      { header: 'Status', key: 'status', width: 12 }, { header: 'Amount USDC', key: 'usdc', width: 14 },
+      { header: 'Amount TZS', key: 'tzs', width: 14 }, { header: 'Fee USDC', key: 'fee', width: 12 },
+      { header: 'Reference', key: 'ref', width: 24 }, { header: 'Memo', key: 'memo', width: 28 },
+    ];
+    ws.getRow(1).font = { bold: true };
+    for (const t of txs) {
+      const d = new Date(t.createdAt);
+      ws.addRow({
+        date: d.toISOString().slice(0, 10), time: d.toISOString().slice(11, 19),
+        acct: (t.user as any)?.accountNo ?? '', phone: t.user?.phone ?? '', name: t.user?.kycName ?? '',
+        type: t.type, status: t.status,
+        usdc: Number((t.amountUsdc ?? 0).toFixed(4)), tzs: Number((t.amountTzs ?? 0).toFixed(0)),
+        fee: Number(((t.amountUsdc ?? 0) * 0.01).toFixed(4)),
+        ref: t.stellarTxId ?? '', memo: t.memo ?? '',
+      });
+    }
+    const label = from && to ? `${from}_to_${to}` : 'all';
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="olomipay_report_${label}.xlsx"`);
+    await wb.xlsx.write(res);
+    res.end();
+  } catch (e: any) {
+    return res.status(500).json(fail('Excel export unavailable: ' + e.message));
+  }
+});
+
 // ── GET /api/admin/report/pdf ─────────────────────────────────────────────────
 // Query params: from (YYYY-MM-DD), to (YYYY-MM-DD), userId (optional)
 // Returns a proper PDF document

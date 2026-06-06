@@ -42,10 +42,37 @@ async function checkReconciliation(): Promise<void> {
   } catch { /* skip this cycle */ }
 }
 
+async function checkSecurity(): Promise<void> {
+  try {
+    const since = new Date(Date.now() - 20 * 60 * 1000); // last 20 min
+    // Mass lockouts (users or staff)
+    const locks = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT COUNT(*)::int AS c FROM "SecurityEvent" WHERE "type" IN ('account_locked','staff_account_locked') AND "createdAt" >= $1`, since,
+    ).catch(() => [{ c: 0 }]);
+    const lockCount = locks[0]?.c ?? 0;
+    if (lockCount >= 3) {
+      await sendOpsAlert({
+        key: 'mass_lockouts', severity: 'critical', title: 'Multiple account lockouts',
+        message: `${lockCount} accounts locked in the last 20 minutes — possible credential-stuffing attack.`,
+      });
+    }
+    // Suspicious IPs hammering logins
+    const ips = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT "ip", COUNT(*)::int AS c FROM "SecurityEvent" WHERE "type" IN ('failed_login','staff_failed_login') AND "createdAt" >= $1 AND "ip" IS NOT NULL GROUP BY "ip" HAVING COUNT(*) >= 15 ORDER BY c DESC LIMIT 5`, since,
+    ).catch(() => []);
+    if (ips.length) {
+      await sendOpsAlert({
+        key: 'suspicious_ip', severity: 'critical', title: 'Suspicious login activity',
+        message: `Heavy failed logins from: ${ips.map(x => `${x.ip} (${x.c})`).join(', ')}. Possible attack.`,
+      });
+    }
+  } catch { /* skip cycle */ }
+}
+
 export function startOpsMonitor(): void {
   const RUN_EVERY = 20 * 60 * 1000; // every 20 minutes
-  const run = () => { checkGasTreasury(); checkReconciliation(); };
+  const run = () => { checkGasTreasury(); checkReconciliation(); checkSecurity(); };
   setTimeout(run, 60_000);          // first run a minute after boot
   setInterval(run, RUN_EVERY);
-  console.log('[ops-monitor] started — gas + reconciliation watch every 20m');
+  console.log('[ops-monitor] started — gas + reconciliation + security watch every 20m');
 }

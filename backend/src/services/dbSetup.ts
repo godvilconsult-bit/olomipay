@@ -189,6 +189,8 @@ export async function setupDatabase(): Promise<void> {
         "createdAt"    TIMESTAMP NOT NULL DEFAULT NOW()
       );
     `);
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Staff" ADD COLUMN IF NOT EXISTS "failedLoginCount" INT NOT NULL DEFAULT 0`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Staff" ADD COLUMN IF NOT EXISTS "lockedUntil" TIMESTAMP`).catch(() => {});
 
     // Account-lockout fields — lock after repeated failed logins.
     await prisma.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "failedLoginCount" INT NOT NULL DEFAULT 0`).catch(() => {});

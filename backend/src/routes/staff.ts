@@ -40,18 +40,42 @@ async function audit(req: AuthRequest, action: string, targetId?: string, detail
   } catch {}
 }
 
-// ── Staff login (public) ──────────────────────────────────────────────────────
+// ── Staff login (public) — with lockout after repeated failures ───────────────
 router.post('/staff/login', async (req, res) => {
   const username = String(req.body?.username ?? '').toLowerCase().trim();
   const password = String(req.body?.password ?? '');
   if (!username || !password) return res.status(400).json(fail('Username and password required'));
 
+  const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0] ?? req.ip ?? null;
+  const logSec = (type: string, detail?: string) =>
+    prisma.$executeRawUnsafe(`INSERT INTO "SecurityEvent" ("type","phone","detail","ip") VALUES ($1,$2,$3,$4)`, type, username, detail ?? null, ip).catch(() => {});
+
   const rows = await prisma.$queryRawUnsafe<any[]>(`SELECT * FROM "Staff" WHERE "username" = $1`, username).catch(() => []);
   const s = rows[0];
-  if (!s || !s.isActive) return res.status(401).json(fail('Invalid credentials'));
-  if (!await verifyPin(password, s.passwordHash)) return res.status(401).json(fail('Invalid credentials'));
+  if (!s || !s.isActive) { logSec('staff_failed_login', 'unknown/disabled'); return res.status(401).json(fail('Invalid credentials')); }
 
-  await prisma.$executeRawUnsafe(`UPDATE "Staff" SET "lastLoginAt" = NOW() WHERE "id" = $1`, s.id).catch(() => {});
+  const LOCK_MINUTES = 30, MAX_ATTEMPTS = 5;
+  const now = Date.now();
+  const lockedUntilMs = s.lockedUntil ? new Date(s.lockedUntil).getTime() : 0;
+  if (lockedUntilMs > now) {
+    const mins = Math.ceil((lockedUntilMs - now) / 60_000);
+    return res.status(423).json({ success: false, error: `Account locked. Try again in ${mins} minute(s).`, locked: true, minutes: mins });
+  }
+
+  if (!await verifyPin(password, s.passwordHash)) {
+    const count = (s.failedLoginCount ?? 0) + 1;
+    if (count >= MAX_ATTEMPTS) {
+      const until = new Date(now + LOCK_MINUTES * 60_000);
+      await prisma.$executeRawUnsafe(`UPDATE "Staff" SET "failedLoginCount" = 0, "lockedUntil" = $1 WHERE "id" = $2`, until, s.id);
+      logSec('staff_account_locked', `locked ${LOCK_MINUTES}m after ${MAX_ATTEMPTS} fails`);
+      return res.status(423).json({ success: false, error: `Too many failed attempts. Account locked for ${LOCK_MINUTES} minutes.`, locked: true, minutes: LOCK_MINUTES });
+    }
+    await prisma.$executeRawUnsafe(`UPDATE "Staff" SET "failedLoginCount" = $1 WHERE "id" = $2`, count, s.id);
+    logSec('staff_failed_login', `attempt ${count}/${MAX_ATTEMPTS}`);
+    return res.status(401).json(fail(`Invalid credentials. ${MAX_ATTEMPTS - count} attempt(s) left before lockout.`));
+  }
+
+  await prisma.$executeRawUnsafe(`UPDATE "Staff" SET "lastLoginAt" = NOW(), "failedLoginCount" = 0, "lockedUntil" = NULL WHERE "id" = $1`, s.id).catch(() => {});
   const accessToken = jwt.sign({ kind: 'staff', staffId: s.id, role: s.role }, process.env.JWT_SECRET!, { expiresIn: '7d' });
   return res.json(ok({ accessToken, staff: { id: s.id, username: s.username, name: s.name, role: s.role } }));
 });

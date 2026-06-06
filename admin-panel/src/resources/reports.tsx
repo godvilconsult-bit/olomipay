@@ -27,7 +27,7 @@ export const ReportsList = () => {
     return s ? `?${s}` : '';
   };
 
-  const run = async (kind: 'csv' | 'pdf') => {
+  const run = async (kind: 'csv' | 'xlsx' | 'pdf') => {
     setBusy(kind);
     try {
       const label = `${from || 'all'}_${to || 'all'}`;
@@ -53,9 +53,12 @@ export const ReportsList = () => {
           <label style={{ fontSize: 13 }}>To<br /><input style={inp} type="date" value={to} onChange={e => setTo(e.target.value)} /></label>
           <span style={{ fontSize: 12, color: '#94a3b8' }}>Leave blank for all-time</span>
         </div>
-        <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+        <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
+          <button onClick={() => run('xlsx')} disabled={!!busy} style={{ ...btn, background: '#166534' }}>
+            {busy === 'xlsx' ? 'Preparing…' : '⬇ Excel (.xlsx)'}
+          </button>
           <button onClick={() => run('csv')} disabled={!!busy} style={{ ...btn, background: '#16a34a' }}>
-            {busy === 'csv' ? 'Preparing…' : '⬇ Excel / CSV'}
+            {busy === 'csv' ? 'Preparing…' : '⬇ CSV'}
           </button>
           <button onClick={() => run('pdf')} disabled={!!busy} style={{ ...btn, background: '#dc2626' }}>
             {busy === 'pdf' ? 'Preparing…' : '⬇ PDF'}
