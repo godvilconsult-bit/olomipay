@@ -24,42 +24,22 @@ function getToken() {
   return localStorage.getItem('olomipay_at') || localStorage.getItem('olomipay_rt') || '';
 }
 
+function isNative(): boolean {
+  return typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.();
+}
+
 export function isContactPickerSupported(): boolean {
+  // Native app → use the Capacitor contacts plugin. Web → use the Contact Picker API.
+  if (isNative()) return true;
   return typeof navigator !== 'undefined' &&
     'contacts' in navigator &&
     'ContactsManager' in window;
 }
 
-/**
- * Open the native contact picker and return OlomiPay users
- * that match numbers in the user's phonebook.
- * Each result includes the contact's saved name.
- */
-export async function pickAndMatchContacts(): Promise<TumaContact[]> {
-  if (!isContactPickerSupported()) {
-    throw new Error('Contact picker not supported on this device/browser');
-  }
-
-  // Ask for all contacts at once
-  const raw = await (navigator as any).contacts.select(
-    ['name', 'tel'],
-    { multiple: true }
-  ) as Array<{ name: string[]; tel: string[] }>;
-
-  if (!raw || raw.length === 0) return [];
-
-  // Build flat list of { savedName, phone }
-  const entries: { savedName: string; phone: string }[] = [];
-  for (const c of raw) {
-    const savedName = c.name?.[0] ?? 'Unknown';
-    for (const tel of c.tel ?? []) {
-      entries.push({ savedName, phone: tel });
-    }
-  }
-
+/** Match a flat list of {savedName, phone} against OlomiPay and merge names. */
+async function matchEntries(entries: { savedName: string; phone: string }[]): Promise<TumaContact[]> {
+  if (entries.length === 0) return [];
   const phones = entries.map(e => e.phone);
-
-  // Ask backend which ones are registered on OlomiPay
   const res = await fetch(`${API}/api/invite/match-contacts`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
@@ -68,7 +48,6 @@ export async function pickAndMatchContacts(): Promise<TumaContact[]> {
   const data = await res.json();
   if (!data.success) return [];
 
-  // Merge: for each matched user, find the saved name from contacts
   const normalize = (p: string) => {
     const c = p.replace(/[\s\-().+]/g, '');
     if (c.startsWith('0')   && c.length === 10) return '+255' + c.slice(1);
@@ -78,14 +57,55 @@ export async function pickAndMatchContacts(): Promise<TumaContact[]> {
   };
 
   return (data.data.matches as any[]).map(user => {
-    // Find the entry whose normalized phone matches this user's phone
     const entry = entries.find(e => normalize(e.phone) === user.phone);
-    return {
-      ...user,
-      savedName: entry?.savedName ?? user.kycName ?? user.phone,
-      isContact: true as const,
-    };
+    return { ...user, savedName: entry?.savedName ?? user.kycName ?? user.phone, isContact: true as const };
   });
+}
+
+/** Read ALL device contacts on the native app via the Capacitor plugin. */
+async function matchNativeContacts(): Promise<TumaContact[]> {
+  const { Contacts } = await import('@capacitor-community/contacts');
+  const perm = await Contacts.requestPermissions();
+  if (perm.contacts !== 'granted') throw new Error('Contacts permission denied');
+
+  const result = await Contacts.getContacts({ projection: { name: true, phones: true } });
+  const entries: { savedName: string; phone: string }[] = [];
+  for (const c of result.contacts ?? []) {
+    const savedName = (c as any).name?.display ?? 'Unknown';
+    for (const p of (c as any).phones ?? []) {
+      if (p?.number) entries.push({ savedName, phone: p.number });
+    }
+  }
+  return matchEntries(entries);
+}
+
+/**
+ * Open the native contact picker and return OlomiPay users
+ * that match numbers in the user's phonebook.
+ * Each result includes the contact's saved name.
+ */
+export async function pickAndMatchContacts(): Promise<TumaContact[]> {
+  // Native app → read the whole phonebook via the Capacitor contacts plugin.
+  if (isNative()) return matchNativeContacts();
+
+  if (!isContactPickerSupported()) {
+    throw new Error('Contact picker not supported on this device/browser');
+  }
+
+  // Web: open the Contact Picker and select all at once
+  const raw = await (navigator as any).contacts.select(
+    ['name', 'tel'],
+    { multiple: true }
+  ) as Array<{ name: string[]; tel: string[] }>;
+
+  if (!raw || raw.length === 0) return [];
+
+  const entries: { savedName: string; phone: string }[] = [];
+  for (const c of raw) {
+    const savedName = c.name?.[0] ?? 'Unknown';
+    for (const tel of c.tel ?? []) entries.push({ savedName, phone: tel });
+  }
+  return matchEntries(entries);
 }
 
 /**
