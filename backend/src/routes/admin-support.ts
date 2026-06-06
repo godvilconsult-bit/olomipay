@@ -142,6 +142,58 @@ router.get('/audit', requireAuth, requireAdmin, async (req: AuthRequest, res) =>
   return res.json(ok({ logs: rows, total: count }));
 });
 
+// ── GET /api/admin/staff-activity ─────────────────────────────────────────────
+// Internal-fraud watch: per-staff summary of back-office actions with risk flags
+// (high volume of money/access actions, off-hours activity), plus a feed of the
+// recent high-risk actions. SUPER_ADMIN only — this is the accountability lens.
+router.get('/staff-activity', requireAuth, requireRole('SUPER_ADMIN'), async (req: AuthRequest, res) => {
+  const days  = Math.min(Math.max(Number(req.query.days ?? 7), 1), 90);
+  const since = new Date(Date.now() - days * 86_400_000);
+  const rows = await prisma.$queryRawUnsafe<any[]>(
+    `SELECT "adminId","adminPhone","action","targetId","targetType","ip","createdAt"
+     FROM "AdminAuditLog" WHERE "createdAt" >= $1 ORDER BY "createdAt" DESC LIMIT 3000`, since,
+  ).catch(() => [] as any[]);
+
+  // Money-moving / access-changing actions = the ones that matter for staff fraud
+  const SENSITIVE = /(credit|refund|role|reset|block|unblock|send|approve|override|payout)/i;
+  const isOffHours = (d: any) => { const h = new Date(d).getHours(); return h < 6 || h >= 22; };
+
+  const byAdmin = new Map<string, any>();
+  const recentHighRisk: any[] = [];
+
+  for (const r of rows) {
+    const sensitive = SENSITIVE.test(r.action);
+    let a = byAdmin.get(r.adminId);
+    if (!a) {
+      a = { adminId: r.adminId, adminPhone: r.adminPhone, total: 0, sensitive: 0,
+            offHours: 0, ips: new Set<string>(), lastAction: r.action, lastAt: r.createdAt };
+      byAdmin.set(r.adminId, a);
+    }
+    a.total++;
+    if (sensitive) a.sensitive++;
+    if (isOffHours(r.createdAt)) a.offHours++;
+    if (r.ip) a.ips.add(r.ip);
+    if (sensitive && recentHighRisk.length < 60) {
+      recentHighRisk.push({ adminPhone: r.adminPhone, action: r.action, targetType: r.targetType,
+                            ip: r.ip, at: r.createdAt, offHours: isOffHours(r.createdAt) });
+    }
+  }
+
+  const staff = [...byAdmin.values()].map(a => {
+    const flags: string[] = [];
+    if (a.sensitive >= 20)      flags.push('high_sensitive_volume');
+    if (a.offHours  >= 5)       flags.push('frequent_off_hours');
+    if (a.ips.size  >= 4)       flags.push('many_ip_addresses');
+    return {
+      adminId: a.adminId, adminPhone: a.adminPhone,
+      total: a.total, sensitive: a.sensitive, offHours: a.offHours,
+      distinctIps: a.ips.size, lastAction: a.lastAction, lastAt: a.lastAt, flags,
+    };
+  }).sort((x, y) => y.sensitive - x.sensitive);
+
+  return res.json(ok({ days, totalActions: rows.length, staff, recentHighRisk }));
+});
+
 // ════════════════════════════════════════════════════════════════════════════
 // PHASE 2 — Maker–checker (4-eyes) for money-moving actions
 // ════════════════════════════════════════════════════════════════════════════

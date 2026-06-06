@@ -36,13 +36,16 @@ app.use(express.json({ limit: '10mb' }));
 app.use(rateLimit({ windowMs: 60_000, max: 200, standardHeaders: true, legacyHeaders: false }));
 
 // ── Health / Readiness / Metrics ──────────────────────────────────────────────
-app.get('/health', (_req, res) => res.json({
+const healthPayload = () => ({
   status:  'ok',
   ts:      new Date().toISOString(),
   phase:   4,
   version: '4.2.0',
   build:   'chat+payments+gov',
-}));
+});
+// Both /health and /api/health work (monitoring tools / uptime checks).
+app.get('/health',     (_req, res) => res.json(healthPayload()));
+app.get('/api/health', (_req, res) => res.json(healthPayload()));
 
 // Readiness probe — verifies the DB is actually reachable (for load balancers)
 app.get('/ready', async (_req, res) => {
