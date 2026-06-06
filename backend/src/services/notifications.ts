@@ -183,6 +183,22 @@ export const notify = {
       data:  { amount },
     }),
 
+  goalReached: (userId: string, goalName: string, amount: string) =>
+    sendPushToUser(userId, {
+      title: '🎉 Goal reached!',
+      body:  `You saved ${amount} for "${goalName}". Amazing work!`,
+      type:  'goal',
+      data:  { goalName, amount },
+    }),
+
+  autoSaveReminder: (userId: string, goalName: string, amount: string) =>
+    sendPushToUser(userId, {
+      title: 'Time to save 🎯',
+      body:  `Add ${amount} to your "${goalName}" goal to stay on track.`,
+      type:  'goal',
+      data:  { goalName, amount },
+    }),
+
   scheduledPaymentSent: (userId: string, amount: string, to: string) =>
     sendPushToUser(userId, {
       title: 'Scheduled payment sent ✅',

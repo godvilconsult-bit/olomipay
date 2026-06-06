@@ -246,6 +246,23 @@ model SavingsPosition {
   user         User      @relation(fields: [userId], references: [id])
 }
 
+model SavingsGoal {
+  id             String    @id @default(cuid())
+  userId         String
+  name           String
+  emoji          String    @default("🎯")
+  targetAmount   Float
+  savedAmount    Float     @default(0)
+  targetDate     DateTime?
+  autoSaveAmount Float     @default(0)
+  autoSaveFreq   String    @default("none") // none | weekly | monthly
+  nextAutoSaveAt DateTime?
+  status         String    @default("active") // active | completed | archived
+  createdAt      DateTime  @default(now())
+
+  @@index([userId])
+}
+
 // ── Feature 3: Bill Payments ──────────────────────────────────────────────────
 
 model BillPayment {

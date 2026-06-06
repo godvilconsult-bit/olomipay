@@ -107,6 +107,15 @@ export default function SavingsPage() {
         {/* Overview */}
         {tab === 'overview' && (
           <div className="space-y-4">
+            <button onClick={() => router.push('/goals')}
+              className="card w-full flex items-center gap-3 text-left hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
+              <span className="text-2xl">🎯</span>
+              <div className="flex-1">
+                <p className="font-semibold">Savings Goals</p>
+                <p className="text-xs text-slate-500">Save with purpose — school fees, rent, a new phone</p>
+              </div>
+              <span className="text-slate-400">›</span>
+            </button>
             <div className="card">
               <h3 className="font-semibold mb-3">How it works</h3>
               <div className="space-y-3 text-sm text-slate-600 dark:text-slate-400">

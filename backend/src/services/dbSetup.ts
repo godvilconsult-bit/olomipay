@@ -128,6 +128,24 @@ export async function setupDatabase(): Promise<void> {
     `);
 
     await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "SavingsGoal" (
+        "id" TEXT NOT NULL PRIMARY KEY,
+        "userId" TEXT NOT NULL,
+        "name" TEXT NOT NULL,
+        "emoji" TEXT NOT NULL DEFAULT '🎯',
+        "targetAmount" DOUBLE PRECISION NOT NULL,
+        "savedAmount" DOUBLE PRECISION NOT NULL DEFAULT 0,
+        "targetDate" TIMESTAMP,
+        "autoSaveAmount" DOUBLE PRECISION NOT NULL DEFAULT 0,
+        "autoSaveFreq" TEXT NOT NULL DEFAULT 'none',
+        "nextAutoSaveAt" TIMESTAMP,
+        "status" TEXT NOT NULL DEFAULT 'active',
+        "createdAt" TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS "SavingsGoal_userId_idx" ON "SavingsGoal" ("userId");
+    `);
+
+    await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "BillPayment" (
         "id" TEXT NOT NULL PRIMARY KEY,
         "userId" TEXT NOT NULL,
