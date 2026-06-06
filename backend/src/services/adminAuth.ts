@@ -17,7 +17,7 @@
 import { Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma';
-import { roleSatisfies } from './roles';
+import { roleSatisfies, departmentOf } from './roles';
 import { AuthRequest } from '../middleware/auth';
 
 export interface ResolvedAdmin {
@@ -79,5 +79,23 @@ export function requireRole(...roles: string[]) {
       }
       apply(req, a); next();
     }).catch(() => res.status(500).json({ success: false, error: 'Auth error' }));
+  };
+}
+
+/**
+ * Block specific departments from an endpoint (server-side least-privilege).
+ * Must run AFTER requireAdmin (it reads the resolved role). SUPER_ADMIN is never
+ * blocked. e.g. denyDepartment('MARKETING') on customer-PII / money endpoints.
+ */
+export function denyDepartment(...depts: string[]) {
+  const blocked = depts.map(d => d.toUpperCase());
+  return (req: AuthRequest, res: Response, next: NextFunction) => {
+    const role = (req as any).adminRole;
+    if (role === 'SUPER_ADMIN') return next();
+    const d = departmentOf(role);
+    if (d && blocked.includes(d)) {
+      return res.status(403).json({ success: false, error: 'Not permitted for your department' });
+    }
+    next();
   };
 }

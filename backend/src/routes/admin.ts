@@ -22,7 +22,7 @@ const ok   = (data: any) => ({ success: true,  data });
 const fail = (msg: string) => ({ success: false, error: msg });
 
 // Admin auth — centralized (accepts STAFF tokens + legacy app-user-admin).
-import { requireAdmin } from '../services/adminAuth';
+import { requireAdmin, denyDepartment } from '../services/adminAuth';
 
 // ── GET /api/admin/stats ──────────────────────────────────────────────────────
 router.get('/stats', requireAuth, requireAdmin, async (_req, res) => {
@@ -64,7 +64,7 @@ router.get('/stats', requireAuth, requireAdmin, async (_req, res) => {
 });
 
 // ── GET /api/admin/users ─────────────────────────────────────────────────────
-router.get('/users', requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+router.get('/users', requireAuth, requireAdmin, denyDepartment('MARKETING'), async (req: AuthRequest, res) => {
   const page  = parseInt(req.query.page  as string ?? '1');
   const limit = Math.min(parseInt(req.query.limit as string ?? '50'), 500);
   const q     = (req.query.q as string ?? '').trim();
@@ -97,7 +97,7 @@ router.get('/users', requireAuth, requireAdmin, async (req: AuthRequest, res) =>
 });
 
 // ── GET /api/admin/transactions ───────────────────────────────────────────────
-router.get('/transactions', requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+router.get('/transactions', requireAuth, requireAdmin, denyDepartment('MARKETING'), async (req: AuthRequest, res) => {
   const page   = parseInt(req.query.page   as string ?? '1');
   const limit  = Math.min(parseInt(req.query.limit as string ?? '100'), 1000);
   const from   = req.query.from   as string | undefined;
