@@ -17,11 +17,16 @@ import { prisma } from '../lib/prisma';
 import { hashPin, verifyPin } from '../services/crypto';
 import { requireRole } from '../services/adminAuth';
 import { AuthRequest } from '../middleware/auth';
+import {
+  STAFF_ROLES, APPROVER_ROLES, creatableRoles, canManageStaff,
+  isSuperAdmin, departmentOf,
+} from '../services/roles';
+import { queueApproval } from '../services/approvals';
 
 const router = Router();
 const ok   = (d: any) => ({ success: true, data: d });
 const fail = (m: string) => ({ success: false, error: m });
-const ROLES = ['SUPPORT', 'COMPLIANCE', 'FINANCE', 'SUPER_ADMIN'];
+const ROLES = STAFF_ROLES as readonly string[];
 
 async function audit(req: AuthRequest, action: string, targetId?: string, detail?: any) {
   try {
@@ -51,44 +56,68 @@ router.post('/staff/login', async (req, res) => {
   return res.json(ok({ accessToken, staff: { id: s.id, username: s.username, name: s.name, role: s.role } }));
 });
 
-// ── Current staff identity ────────────────────────────────────────────────────
-router.get('/staff/me', requireRole('SUPPORT', 'COMPLIANCE', 'FINANCE', 'SUPER_ADMIN'), async (req: AuthRequest, res) => {
-  return res.json(ok({
-    id: req.userId, name: (req as any).adminName, username: (req as any).adminPhone,
-    role: (req as any).adminRole, isStaff: (req as any).isStaff,
-  }));
-});
+// ── Current staff identity + what THIS staff may create ───────────────────────
+router.get('/staff/me', requireRole(...APPROVER_ROLES, 'FINANCE_STAFF', 'IT_STAFF', 'SUPPORT_STAFF', 'MARKETING_STAFF'),
+  async (req: AuthRequest, res) => {
+    const role = (req as any).adminRole;
+    return res.json(ok({
+      id: req.userId, name: (req as any).adminName, username: (req as any).adminPhone,
+      role, isStaff: (req as any).isStaff,
+      department: departmentOf(role),
+      canCreateRoles: creatableRoles(role),   // roles this person may add
+      canManageStaff: canManageStaff(role),    // edit role / delete (super-admin only)
+    }));
+  });
 
-// ── SUPER_ADMIN: manage staff ─────────────────────────────────────────────────
-router.get('/staff', requireRole('SUPER_ADMIN'), async (_req, res) => {
+// ── List staff. Heads see only their department; super-admin sees all. ─────────
+router.get('/staff', requireRole(...APPROVER_ROLES), async (req: AuthRequest, res) => {
+  const role = (req as any).adminRole;
   const rows = await prisma.$queryRawUnsafe<any[]>(
     `SELECT "id","username","name","role","isActive","lastLoginAt","createdAt" FROM "Staff" ORDER BY "createdAt" DESC`,
   ).catch(() => []);
-  return res.json(ok({ staff: rows }));
+  const dept = departmentOf(role);
+  const visible = isSuperAdmin(role) ? rows : rows.filter(s => departmentOf(s.role) === dept || s.id === req.userId);
+  return res.json(ok({ staff: visible }));
 });
 
-router.post('/staff', requireRole('SUPER_ADMIN'), async (req: AuthRequest, res) => {
+// ── Add staff. Super-admin → immediate. Head → queued for 3-admin approval. ────
+router.post('/staff', requireRole(...APPROVER_ROLES), async (req: AuthRequest, res) => {
+  const actorRole = (req as any).adminRole;
   const username = String(req.body?.username ?? '').toLowerCase().trim();
   const password = String(req.body?.password ?? '');
   const name     = String(req.body?.name ?? '').slice(0, 80);
-  const role     = String(req.body?.role ?? 'SUPPORT');
+  const role     = String(req.body?.role ?? '').toUpperCase();
   if (!/^[a-z0-9._-]{3,32}$/.test(username)) return res.status(400).json(fail('Username must be 3–32 chars: letters, numbers, . _ -'));
   if (password.length < 8) return res.status(400).json(fail('Password must be at least 8 characters'));
-  if (!ROLES.includes(role)) return res.status(400).json(fail('Invalid role'));
+
+  // Enforce who-can-create-whom
+  const allowed = creatableRoles(actorRole);
+  if (!allowed.includes(role)) {
+    return res.status(403).json(fail(`You can only create: ${allowed.join(', ') || 'no roles'}`));
+  }
 
   const exists = await prisma.$queryRawUnsafe<any[]>(`SELECT 1 FROM "Staff" WHERE "username" = $1`, username).catch(() => []);
   if (exists.length) return res.status(409).json(fail('Username already taken'));
 
-  const [row] = await prisma.$queryRawUnsafe<any[]>(
-    `INSERT INTO "Staff" ("username","passwordHash","name","role","createdBy") VALUES ($1,$2,$3,$4,$5) RETURNING "id"`,
-    username, hashPin(password), name || username, role, req.userId ?? null,
-  );
-  await audit(req, 'create_staff', row.id, { username, role });
-  return res.json(ok({ id: row.id, message: `Staff "${username}" created with role ${role}` }));
+  // Hash the password NOW so it never sits in plaintext (incl. in an approval row).
+  const passwordHash = hashPin(password);
+
+  try {
+    const r = await queueApproval({
+      action: 'add_staff',
+      payload: { username, passwordHash, name: name || username, role },
+      actorId: req.userId!, actorPhone: (req as any).adminPhone ?? null,
+    });
+    await audit(req, r.executed ? 'create_staff' : 'propose_staff', undefined, { username, role, ...r });
+    return res.json(ok(r));
+  } catch (e: any) {
+    return res.status(502).json(fail(e.message ?? 'Failed to add staff'));
+  }
 });
 
+// ── Edit role — SUPER_ADMIN only (incl. promoting another SUPER_ADMIN) ─────────
 router.post('/staff/:id/role', requireRole('SUPER_ADMIN'), async (req: AuthRequest, res) => {
-  const role = String(req.body?.role ?? '');
+  const role = String(req.body?.role ?? '').toUpperCase();
   if (!ROLES.includes(role)) return res.status(400).json(fail('Invalid role'));
   await prisma.$executeRawUnsafe(`UPDATE "Staff" SET "role" = $1 WHERE "id" = $2`, role, req.params.id);
   await audit(req, 'set_staff_role', req.params.id, { role });
@@ -108,6 +137,14 @@ router.post('/staff/:id/reset-password', requireRole('SUPER_ADMIN'), async (req:
   await prisma.$executeRawUnsafe(`UPDATE "Staff" SET "passwordHash" = $1 WHERE "id" = $2`, hashPin(password), req.params.id);
   await audit(req, 'reset_staff_password', req.params.id);
   return res.json(ok({ message: 'Password reset' }));
+});
+
+// ── Delete staff — SUPER_ADMIN only ───────────────────────────────────────────
+router.delete('/staff/:id', requireRole('SUPER_ADMIN'), async (req: AuthRequest, res) => {
+  if (req.params.id === req.userId) return res.status(400).json(fail('You cannot delete your own account.'));
+  await prisma.$executeRawUnsafe(`DELETE FROM "Staff" WHERE "id" = $1`, req.params.id);
+  await audit(req, 'delete_staff', req.params.id);
+  return res.json(ok({ message: 'Staff deleted' }));
 });
 
 export { router as staffRouter };

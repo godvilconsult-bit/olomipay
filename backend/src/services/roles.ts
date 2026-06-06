@@ -1,67 +1,77 @@
 /**
- * RBAC role taxonomy + normalization.
+ * Organisational RBAC for OlomiPay staff.
  *
- * Two naming systems coexist (both fully supported — nothing breaks):
- *   Legacy (in use):   SUPPORT · COMPLIANCE · FINANCE · SUPER_ADMIN
- *   Objective names:   VIEWER  · DEVELOPER  · FINANCIAL_CONTROLLER · OWNER
+ * Structure:
+ *   SUPER_ADMIN                      — full governance; only a super-admin can
+ *                                      create/edit/delete ANY staff, assign any
+ *                                      role, promote another SUPER_ADMIN, and
+ *                                      bypass approvals.
+ *   <DEPT>_HEAD  (the "four heads")  — FINANCE_HEAD, IT_HEAD, SUPPORT_HEAD,
+ *                                      MARKETING_HEAD. Each can ADD staff in
+ *                                      their OWN department (subject to 3-admin
+ *                                      approval). Cannot create heads/admins,
+ *                                      cannot edit roles or delete staff.
+ *   <DEPT>_STAFF                     — department workers. Cannot manage staff.
  *
- * normalizeRole() maps either spelling to a single canonical value so
- * requireRole() comparisons work regardless of which name was stored or
- * which name a route asks for.
+ * "Admins" (who can approve things) = SUPER_ADMIN + all *_HEAD.
  */
 
-export type CanonicalRole =
-  | 'VIEWER'
-  | 'DEVELOPER'
-  | 'FINANCIAL_CONTROLLER'
-  | 'OWNER';
+export const DEPARTMENTS = ['FINANCE', 'IT', 'SUPPORT', 'MARKETING'] as const;
+export type Department = typeof DEPARTMENTS[number];
 
-// Map every accepted spelling → canonical
-const ALIAS: Record<string, CanonicalRole> = {
-  // Viewers — read-only auditing
-  VIEWER:               'VIEWER',
-  SUPPORT:              'VIEWER',
-  READONLY:             'VIEWER',
-  // Technical developers — monitoring/debug, NO fund movement
-  DEVELOPER:            'DEVELOPER',
-  DEV:                  'DEVELOPER',
-  TECH:                 'DEVELOPER',
-  // Financial controllers — payments, settlements, reports
-  FINANCIAL_CONTROLLER: 'FINANCIAL_CONTROLLER',
-  FINANCE:              'FINANCIAL_CONTROLLER',
-  COMPLIANCE:           'FINANCIAL_CONTROLLER',
-  CONTROLLER:           'FINANCIAL_CONTROLLER',
-  // Owners — full governance
-  OWNER:                'OWNER',
-  SUPER_ADMIN:          'OWNER',
-  SUPERADMIN:           'OWNER',
+export const STAFF_ROLES = [
+  'SUPER_ADMIN',
+  'FINANCE_HEAD',   'FINANCE_STAFF',
+  'IT_HEAD',        'IT_STAFF',
+  'SUPPORT_HEAD',   'SUPPORT_STAFF',
+  'MARKETING_HEAD', 'MARKETING_STAFF',
+] as const;
+export type StaffRole = typeof STAFF_ROLES[number];
+
+/** Roles allowed to approve money-moving / staff-add requests. */
+export const APPROVER_ROLES = ['SUPER_ADMIN', 'FINANCE_HEAD', 'IT_HEAD', 'SUPPORT_HEAD', 'MARKETING_HEAD'];
+
+const up = (r?: string | null) => (r ?? '').trim().toUpperCase();
+
+// Legacy spellings → new roles (so old data / requireRole calls keep working)
+const ALIAS: Record<string, string> = {
+  OWNER: 'SUPER_ADMIN', SUPERADMIN: 'SUPER_ADMIN',
+  FINANCE: 'FINANCE_HEAD', FINANCIAL_CONTROLLER: 'FINANCE_HEAD', COMPLIANCE: 'FINANCE_HEAD',
+  SUPPORT: 'SUPPORT_HEAD', DEVELOPER: 'IT_HEAD', DEV: 'IT_HEAD', TECH: 'IT_HEAD',
 };
+const canon = (r?: string | null) => ALIAS[up(r)] ?? up(r);
 
-export function normalizeRole(role?: string | null): CanonicalRole | null {
-  if (!role) return null;
-  return ALIAS[role.trim().toUpperCase()] ?? null;
+export function isSuperAdmin(role?: string | null): boolean { return canon(role) === 'SUPER_ADMIN'; }
+export function isHead(role?: string | null): boolean { return /_HEAD$/.test(canon(role)); }
+export function isAdmin(role?: string | null): boolean { return isSuperAdmin(role) || isHead(role); }
+
+export function departmentOf(role?: string | null): Department | null {
+  const r = canon(role);
+  for (const d of DEPARTMENTS) if (r.startsWith(d + '_')) return d;
+  return null;
 }
 
-/** Does `userRole` satisfy any of the `required` roles? OWNER satisfies everything. */
+/** Which roles may `actorRole` create? */
+export function creatableRoles(actorRole?: string | null): string[] {
+  if (isSuperAdmin(actorRole)) return [...STAFF_ROLES];      // anything, incl. heads + super-admin
+  if (isHead(actorRole)) {
+    const d = departmentOf(actorRole);
+    return d ? [`${d}_STAFF`] : [];                          // own-department staff only
+  }
+  return [];                                                  // staff can create nobody
+}
+
+/** Only a super-admin can edit roles / delete staff / promote a super-admin. */
+export function canManageStaff(actorRole?: string | null): boolean { return isSuperAdmin(actorRole); }
+
+/**
+ * Does `userRole` satisfy any of the `required` roles? SUPER_ADMIN satisfies
+ * everything. Legacy spellings are aliased on both sides.
+ */
 export function roleSatisfies(userRole?: string | null, required: string[] = []): boolean {
-  const canon = normalizeRole(userRole);
-  if (!canon) return false;
-  if (canon === 'OWNER') return true; // owner bypasses
-  const want = required.map(normalizeRole).filter(Boolean) as CanonicalRole[];
-  return want.includes(canon);
-}
-
-/** Capabilities matrix — used for UI gating + server checks */
-export const CAPABILITIES: Record<CanonicalRole, string[]> = {
-  VIEWER:               ['read'],
-  DEVELOPER:            ['read', 'system_monitor', 'debug'],
-  FINANCIAL_CONTROLLER: ['read', 'send_payment', 'manage_settlements', 'view_reports', 'approve_payout'],
-  OWNER:                ['read', 'system_monitor', 'debug', 'send_payment', 'manage_settlements',
-                         'view_reports', 'approve_payout', 'manage_roles', 'manage_config', 'bulk_export'],
-};
-
-export function hasCapability(role: string | null | undefined, cap: string): boolean {
-  const canon = normalizeRole(role);
-  if (!canon) return false;
-  return CAPABILITIES[canon].includes(cap);
+  const u = canon(userRole);
+  if (!u) return false;
+  if (u === 'SUPER_ADMIN') return true;             // super-admin bypasses
+  const want = required.map(canon);
+  return want.includes(u);
 }

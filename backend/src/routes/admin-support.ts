@@ -4,7 +4,7 @@ import { prisma } from '../lib/prisma';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 import { deriveKeypairFromPhone, activateUserWallet, getBalance, platformSendUsdc } from '../services/stellar';
 import { encryptSecret, hashPin } from '../services/crypto';
-import { roleSatisfies } from '../services/roles';
+import { roleSatisfies, APPROVER_ROLES } from '../services/roles';
 import { queueApproval, executeApprovalAction, markExecuted, getAdminRole, isSuper } from '../services/approvals';
 // Centralized admin auth — accepts STAFF (username/password) tokens AND legacy
 // app-user-admin tokens, and populates req.userId/adminRole/adminPhone.
@@ -216,7 +216,7 @@ router.get('/approvals', requireAuth, requireAdmin, async (_req, res) => {
 // An approver signs off. Needs requiredApprovals distinct sign-offs (default 3)
 // before it executes; a SUPER_ADMIN overrides and executes in one step. The
 // maker can never approve their own request, and no admin can approve twice.
-router.post('/approvals/:id/approve', requireAuth, requireRole('FINANCE', 'SUPER_ADMIN'), async (req: AuthRequest, res) => {
+router.post('/approvals/:id/approve', requireAuth, requireRole(...APPROVER_ROLES), async (req: AuthRequest, res) => {
   const [appr] = await prisma.$queryRawUnsafe<any[]>(`SELECT * FROM "AdminApproval" WHERE "id"=$1`, req.params.id);
   if (!appr) return res.status(404).json(fail('Approval not found'));
   if (appr.status !== 'PENDING') return res.status(400).json(fail('Already decided'));
@@ -253,7 +253,7 @@ router.post('/approvals/:id/approve', requireAuth, requireRole('FINANCE', 'SUPER
   }
 });
 
-router.post('/approvals/:id/reject', requireAuth, requireRole('FINANCE', 'COMPLIANCE', 'SUPER_ADMIN'), async (req: AuthRequest, res) => {
+router.post('/approvals/:id/reject', requireAuth, requireRole(...APPROVER_ROLES), async (req: AuthRequest, res) => {
   await prisma.$executeRawUnsafe(`UPDATE "AdminApproval" SET "status"='REJECTED', "checkerId"=$1, "decidedAt"=NOW() WHERE "id"=$2 AND "status"='PENDING'`, req.userId!, req.params.id);
   await audit(req, 'reject_approval', req.params.id, 'approval');
   return res.json(ok({ message: 'Rejected' }));

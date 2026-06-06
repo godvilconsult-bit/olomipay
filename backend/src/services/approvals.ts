@@ -11,7 +11,7 @@
  */
 
 import { prisma } from '../lib/prisma';
-import { roleSatisfies } from './roles';
+import { roleSatisfies, APPROVER_ROLES } from './roles';
 import { platformSendUsdc, platformSendXlm } from './stellar';
 
 export const REQUIRED_APPROVALS = 3;
@@ -28,18 +28,18 @@ export async function getAdminRole(actorId: string): Promise<string | null> {
   return u?.adminRole ?? null;
 }
 
-/** How many OTHER admins can validly approve (FINANCE or SUPER_ADMIN/OWNER)? */
+/** How many OTHER admins can validly approve (any HEAD or SUPER_ADMIN)? */
 export async function validApproverCount(excludeId: string): Promise<number> {
-  // Eligible STAFF approvers
+  // Eligible STAFF approvers (heads + super-admin)
   const staff = await prisma.$queryRawUnsafe<any[]>(
     `SELECT "role" FROM "Staff" WHERE "isActive" = true AND "id" <> $1`, excludeId,
   ).catch(() => []);
-  const staffCount = staff.filter(a => roleSatisfies(a.role, ['FINANCE', 'SUPER_ADMIN'])).length;
+  const staffCount = staff.filter(a => roleSatisfies(a.role, APPROVER_ROLES)).length;
   // Plus legacy app-user admins
   const admins = await prisma.user.findMany({
     where: { isAdmin: true, id: { not: excludeId } }, select: { adminRole: true },
   }).catch(() => []);
-  const userCount = admins.filter(a => roleSatisfies(a.adminRole, ['FINANCE', 'SUPER_ADMIN'])).length;
+  const userCount = admins.filter(a => roleSatisfies(a.adminRole, APPROVER_ROLES)).length;
   return staffCount + userCount;
 }
 
@@ -73,6 +73,18 @@ const ACTION_HANDLERS: Record<string, Handler> = {
       stellarTxId: hash, toAddress: p.toAddress, memo: `Admin ${p.asset} send: ${p.memo ?? ''}`.slice(0, 60),
     }}).catch(() => {});
     return hash;
+  },
+
+  // Create a staff account (proposed by a department head, executed on approval).
+  // The password is already hashed in the payload — never store plaintext.
+  add_staff: async (p) => {
+    const exists = await prisma.$queryRawUnsafe<any[]>(`SELECT 1 FROM "Staff" WHERE "username" = $1`, p.username).catch(() => []);
+    if (exists.length) throw new Error('Username already taken');
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO "Staff" ("username","passwordHash","name","role","createdBy") VALUES ($1,$2,$3,$4,$5)`,
+      p.username, p.passwordHash, p.name ?? p.username, p.role, p.actorId ?? null,
+    );
+    return `staff:${p.username}`;
   },
 
   // Reverse a stuck/failed transaction (off-chain payout reversal handled by ops).
