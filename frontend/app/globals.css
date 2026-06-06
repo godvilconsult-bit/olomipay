@@ -116,7 +116,7 @@
 
   /* Full-width mobile card — soft branded shadow + hairline border (UI-kit polish) */
   .card {
-    @apply bg-white dark:bg-slate-800 rounded-3xl p-5
+    @apply bg-white dark:bg-slate-800 rounded-2xl p-3.5
            border border-slate-100 dark:border-white/5
            shadow-[0_8px_30px_-12px_rgba(30,58,138,0.18)];
   }
