@@ -190,6 +190,24 @@ export async function setupDatabase(): Promise<void> {
       );
     `);
 
+    // Account-lockout fields — lock after repeated failed logins.
+    await prisma.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "failedLoginCount" INT NOT NULL DEFAULT 0`).catch(() => {});
+    await prisma.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "lockedUntil" TIMESTAMP`).catch(() => {});
+
+    // Security events — failed logins, lockouts, suspicious activity (for the
+    // System Health / security view + alerting).
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "SecurityEvent" (
+        "id"        TEXT NOT NULL PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        "type"      TEXT NOT NULL,
+        "phone"     TEXT,
+        "detail"    TEXT,
+        "ip"        TEXT,
+        "createdAt" TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+    `);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "SecurityEvent_createdAt_idx" ON "SecurityEvent" ("createdAt")`).catch(() => {});
+
     // Native push (FCM/APNs) device tokens for the iOS/Android apps.
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "DeviceToken" (

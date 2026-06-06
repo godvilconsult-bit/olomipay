@@ -139,7 +139,7 @@ router.get('/transactions', requireAuth, requireAdmin, denyDepartment('MARKETING
 
 // ── GET /api/admin/fees ───────────────────────────────────────────────────────
 // Reads ACTUAL FEE transaction records — not estimates
-router.get('/fees', requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+router.get('/fees', requireAuth, requireAdmin, denyDepartment('MARKETING','SUPPORT','IT'), async (req: AuthRequest, res) => {
   const from = req.query.from as string | undefined;
   const to   = req.query.to   as string | undefined;
 

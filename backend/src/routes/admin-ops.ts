@@ -3,12 +3,62 @@ import crypto from 'crypto';
 import { PrismaClient } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { requireAuth, AuthRequest } from '../middleware/auth';
-import { getBalance, getFeeWalletPublic } from '../services/stellar';
+import { getBalance, getFeeWalletPublic, getAccountInfo, getTreasuryStatus } from '../services/stellar';
 import { requireAdmin } from '../services/adminAuth';
 
 const router  = Router();
 const ok   = (data: any) => ({ success: true,  data });
 const fail = (msg: string) => ({ success: false, error: msg });
+
+// ── GET /api/admin/system-health ──────────────────────────────────────────────
+// What's up / down + security signals. Visible to ALL staff (any admin role).
+router.get('/system-health', requireAuth, requireAdmin, async (_req, res) => {
+  const checks: any = {};
+
+  try { await prisma.$queryRawUnsafe('SELECT 1'); checks.database = { up: true }; }
+  catch (e: any) { checks.database = { up: false, error: e.message }; }
+
+  try {
+    const pub = process.env.STELLAR_PUBLIC_KEY ?? '';
+    const info = pub ? await getAccountInfo(pub).catch(() => null) : null;
+    checks.stellar = { up: !!info, network: process.env.STELLAR_NETWORK ?? 'testnet' };
+  } catch (e: any) { checks.stellar = { up: false, error: e.message }; }
+
+  checks.yellowcard = { configured: !!process.env.YELLOWCARD_API_KEY, env: process.env.YELLOWCARD_ENV ?? 'sandbox' };
+
+  try { const t = await getTreasuryStatus(); checks.gasTreasury = { up: t.healthy, xlm: t.xlm, estAccountsLeft: t.estAccountsLeft }; }
+  catch { checks.gasTreasury = { up: false }; }
+
+  checks.push   = { fcm: !!process.env.FCM_SERVICE_ACCOUNT };
+  checks.sentry = { enabled: !!process.env.SENTRY_DSN };
+  checks.alerts = { webhook: !!(process.env.SLACK_ALERT_WEBHOOK || process.env.OPS_ALERT_WEBHOOK) };
+
+  // Security signals (last 24h)
+  const since = new Date(Date.now() - 86_400_000);
+  const grouped = await prisma.$queryRawUnsafe<any[]>(
+    `SELECT "type", COUNT(*)::int AS c FROM "SecurityEvent" WHERE "createdAt" >= $1 GROUP BY "type"`, since,
+  ).catch(() => []);
+  const byType: any = {}; for (const r of grouped) byType[r.type] = r.c;
+  const recentLocks = await prisma.$queryRawUnsafe<any[]>(
+    `SELECT "phone","detail","ip","createdAt" FROM "SecurityEvent" WHERE "type"='account_locked' ORDER BY "createdAt" DESC LIMIT 20`,
+  ).catch(() => []);
+  const recentFailed = await prisma.$queryRawUnsafe<any[]>(
+    `SELECT "phone","ip","createdAt" FROM "SecurityEvent" WHERE "type"='failed_login' ORDER BY "createdAt" DESC LIMIT 25`,
+  ).catch(() => []);
+  // Repeated failures from one IP = possible attack
+  const ipCounts = await prisma.$queryRawUnsafe<any[]>(
+    `SELECT "ip", COUNT(*)::int AS c FROM "SecurityEvent" WHERE "type"='failed_login' AND "createdAt" >= $1 AND "ip" IS NOT NULL GROUP BY "ip" HAVING COUNT(*) >= 10 ORDER BY c DESC LIMIT 10`, since,
+  ).catch(() => []);
+  checks.security = {
+    failedLogins24h: byType.failed_login ?? 0,
+    lockouts24h:     byType.account_locked ?? 0,
+    suspiciousIps:   ipCounts,
+    recentLocks, recentFailed,
+  };
+
+  const allUp = checks.database.up && checks.stellar.up;
+  return res.json(ok({ status: allUp ? 'healthy' : 'degraded', server: 'up', ts: new Date().toISOString(), checks }));
+});
 async function audit(req: AuthRequest, action: string, targetId?: string, targetType?: string, detail?: any) {
   try {
     await prisma.$executeRawUnsafe(

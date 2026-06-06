@@ -190,17 +190,51 @@ router.post('/login', authLimiter, async (req, res) => {
 
   const { phone, pin } = parse.data;
 
+  const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0] ?? req.ip ?? null;
+  const logSec = (type: string, detail?: string) =>
+    prisma.$executeRawUnsafe(
+      `INSERT INTO "SecurityEvent" ("type","phone","detail","ip") VALUES ($1,$2,$3,$4)`,
+      type, phone, detail ?? null, ip,
+    ).catch(() => {});
+
   const user = await prisma.user.findUnique({ where: { phone } });
   if (!user) {
     // Timing-safe: still run bcrypt even on miss
     await verifyPin('000000', '$2b$12$invalidhashpadding000000000000000000000000000000000000');
+    logSec('failed_login', 'unknown phone');
     return res.status(401).json({ error: 'Invalid phone or PIN' });
+  }
+
+  // ── Account lockout: blocked while locked, locks after 5 failed attempts ──────
+  const LOCK_MINUTES = 30;
+  const MAX_ATTEMPTS = 5;
+  const lock = await prisma.$queryRawUnsafe<any[]>(
+    `SELECT "failedLoginCount","lockedUntil" FROM "User" WHERE "id" = $1`, user.id,
+  ).catch(() => []);
+  const now = Date.now();
+  const lockedUntilMs = lock[0]?.lockedUntil ? new Date(lock[0].lockedUntil).getTime() : 0;
+  if (lockedUntilMs > now) {
+    const mins = Math.ceil((lockedUntilMs - now) / 60_000);
+    return res.status(423).json({ error: `Account locked due to too many failed attempts. Try again in ${mins} minute(s).`, locked: true, minutes: mins });
   }
 
   const valid = await verifyPin(pin, user.pinHash);
   if (!valid) {
-    return res.status(401).json({ error: 'Invalid phone or PIN' });
+    const count = (lock[0]?.failedLoginCount ?? 0) + 1;
+    if (count >= MAX_ATTEMPTS) {
+      const until = new Date(now + LOCK_MINUTES * 60_000);
+      await prisma.$executeRawUnsafe(`UPDATE "User" SET "failedLoginCount" = 0, "lockedUntil" = $1 WHERE "id" = $2`, until, user.id);
+      logSec('account_locked', `locked for ${LOCK_MINUTES}m after ${MAX_ATTEMPTS} failed attempts`);
+      return res.status(423).json({ error: `Too many failed attempts. Your account is locked for ${LOCK_MINUTES} minutes.`, locked: true, minutes: LOCK_MINUTES });
+    }
+    await prisma.$executeRawUnsafe(`UPDATE "User" SET "failedLoginCount" = $1 WHERE "id" = $2`, count, user.id);
+    logSec('failed_login', `attempt ${count}/${MAX_ATTEMPTS}`);
+    const left = MAX_ATTEMPTS - count;
+    return res.status(401).json({ error: `Invalid phone or PIN. ${left} attempt(s) left before your account is locked for ${LOCK_MINUTES} minutes.` });
   }
+
+  // Success — clear any failed-attempt state
+  await prisma.$executeRawUnsafe(`UPDATE "User" SET "failedLoginCount" = 0, "lockedUntil" = NULL WHERE "id" = $1`, user.id).catch(() => {});
 
   const accessToken  = signAccessToken(user.id, phone);
   const refreshToken = signRefreshToken(user.id);
