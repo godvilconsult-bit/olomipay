@@ -42,8 +42,8 @@ export async function sendSms(to: string, message: string): Promise<boolean> {
 export function claimSmsMessage(senderPhone: string, amountUsdc: number, claimUrl: string): string {
   const amountTzs = Math.round(amountUsdc * 2600).toLocaleString();
   return (
-    `OlomiPay: ${senderPhone} amekutumia $${amountUsdc.toFixed(2)} USDC ` +
-    `(~TZS ${amountTzs}). Dai pesa yako hapa / Claim here: ${claimUrl} ` +
-    `(Inaisha baada ya masaa 72 / Expires in 72 hours)`
+    `OlomiPay: ${senderPhone} sent you $${amountUsdc.toFixed(2)} ` +
+    `(~TZS ${amountTzs}). Claim here: ${claimUrl} ` +
+    `(Expires in 72 hours)`
   );
 }

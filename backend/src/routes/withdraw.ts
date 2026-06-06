@@ -131,7 +131,7 @@ router.post('/bank', requireAuth, limiter, async (req: AuthRequest, res) => {
   // Check balance
   const bal = await getBalance(user.stellarPubKey);
   if (parseFloat(bal.usdc) < amountUsdc) {
-    return res.status(400).json(fail('Insufficient USDC balance / Salio haitoshi'));
+    return res.status(400).json(fail('Insufficient balance'));
   }
 
   const dbTx = await prisma.transaction.create({ data: {

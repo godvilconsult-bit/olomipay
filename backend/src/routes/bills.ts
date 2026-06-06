@@ -117,7 +117,7 @@ router.post('/pay', requireAuth, limiter, async (req: AuthRequest, res) => {
     }));
   } catch (e: any) {
     await prisma.billPayment.update({ where: { id: billPmt.id }, data: { status: 'FAILED' } });
-    return res.status(502).json(fail(e.message ?? 'Bill payment failed / Malipo hayakufanikiwa'));
+    return res.status(502).json(fail(e.message ?? 'Bill payment failed'));
   }
 });
 

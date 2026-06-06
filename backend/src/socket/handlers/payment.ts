@@ -35,10 +35,10 @@ export async function handleSendPayment(io: Server, socket: Socket, data: any) {
     }
 
     const sender = await prisma.user.findUnique({ where: { id: senderId } });
-    if (!sender) { socket.emit('payment_error', { error: 'Mtumiaji hakupatikana.' }); return; }
+    if (!sender) { socket.emit('payment_error', { error: 'User not found.' }); return; }
 
     if (!await verifyPin(pin, sender.pinHash)) {
-      socket.emit('payment_error', { error: 'Nambari ya siri si sahihi / Incorrect PIN' });
+      socket.emit('payment_error', { error: 'Incorrect PIN' });
       return;
     }
 
@@ -49,7 +49,7 @@ export async function handleSendPayment(io: Server, socket: Socket, data: any) {
     const buffer  = asset === 'XLM' ? 1.5 : 0;
     if (have < amt + buffer) {
       socket.emit('payment_error', {
-        error: `Salio halikutosha. Una ${asset === 'XLM' ? have.toFixed(2) + ' XLM' : '$' + have.toFixed(2)} / Insufficient balance.`,
+        error: `Insufficient balance. You have $${have.toFixed(2)}.`,
       });
       return;
     }
@@ -122,20 +122,20 @@ export async function handleSendPayment(io: Server, socket: Socket, data: any) {
 
     // ── Push notifications ──────────────────────────────────────────────────
     const senderName = sender.kycName ?? sender.phone.slice(-4);
-    const amount     = asset === 'XLM' ? `${netUsdc.toFixed(2)} XLM` : `$${netUsdc.toFixed(2)} USDC`;
+    const amount     = `$${netUsdc.toFixed(2)}`;
 
     // Receiver: money arrived
     sendPushToUser(recipientId, {
-      title: '💚 Umepokea pesa!',
-      body:  `${senderName} amekutumia ${amount} / sent you ${amount}`,
+      title: '💚 Money received',
+      body:  `${senderName} sent you ${amount}`,
       type:  'money_in',
       data:  { conversationId, type: 'payment', amount: netUsdc, from: senderName, stellarTxId: hash },
     }).catch(() => {});
 
     // Sender: confirm sent
     sendPushToUser(senderId, {
-      title: '✅ Pesa imetumwa',
-      body:  `Umetuma ${amount} kwa ${recipient.kycName ?? recipient.phone.slice(-4)}`,
+      title: '✅ Money sent',
+      body:  `You sent ${amount} to ${recipient.kycName ?? recipient.phone.slice(-4)}`,
       type:  'money_out',
       data:  { conversationId, type: 'payment_sent', amount: netUsdc, stellarTxId: hash },
     }).catch(() => {});
@@ -192,14 +192,14 @@ export async function handlePaymentRequest(io: Server, socket: Socket, data: any
     const requesterName = sender?.kycName ?? sender?.phone?.slice(-4) ?? 'Someone';
     for (const m of members) {
       sendPushToUser(m.userId, {
-        title: '💛 Ombi la malipo / Payment Request',
-        body:  `${requesterName} anaomba $${amountUsdc.toFixed(2)} USDC`,
+        title: '💛 Payment request',
+        body:  `${requesterName} is requesting $${amountUsdc.toFixed(2)}`,
         type:  'payment_request',
         data:  { conversationId, messageId: message.id, amount: amountUsdc, type: 'payment_request' },
       }).catch(() => {});
     }
   } catch (e: any) {
-    socket.emit('error', { message: 'Ombi la malipo halikufanikiwa.' });
+    socket.emit('error', { message: 'Payment request failed.' });
   }
 }
 
@@ -219,16 +219,16 @@ export async function handlePayRequest(io: Server, socket: Socket, data: any) {
     });
 
     if (!requestMsg || requestMsg.type !== 'PAYMENT_REQUEST') {
-      socket.emit('payment_error', { error: 'Ombi la malipo halipatikani.' });
+      socket.emit('payment_error', { error: 'Payment request not found.' });
       return;
     }
     if (requestMsg.paymentStatus !== 'PENDING') {
-      socket.emit('payment_error', { error: 'Ombi hili tayari limeshughulikiwa / Request already processed.' });
+      socket.emit('payment_error', { error: 'Request already processed.' });
       return;
     }
     // Can't pay your own request
     if (requestMsg.senderId === payerId) {
-      socket.emit('payment_error', { error: 'Huwezi kulipa ombi lako mwenyewe / Cannot pay your own request.' });
+      socket.emit('payment_error', { error: 'You cannot pay your own request.' });
       return;
     }
 
@@ -236,7 +236,7 @@ export async function handlePayRequest(io: Server, socket: Socket, data: any) {
     if (!payer) return;
 
     if (!await verifyPin(pin, payer.pinHash)) {
-      socket.emit('payment_error', { error: 'Nambari ya siri si sahihi / Incorrect PIN' });
+      socket.emit('payment_error', { error: 'Incorrect PIN' });
       return;
     }
 
@@ -249,7 +249,7 @@ export async function handlePayRequest(io: Server, socket: Socket, data: any) {
     const buffer  = asset === 'XLM' ? 1.5 : 0;
     if (have < grossUsdc + buffer) {
       socket.emit('payment_error', {
-        error: `Salio halikutosha. Una ${asset === 'XLM' ? have.toFixed(2) + ' XLM' : '$' + have.toFixed(2)} / Insufficient balance.`,
+        error: `Insufficient balance. You have $${have.toFixed(2)}.`,
       });
       return;
     }
@@ -299,20 +299,20 @@ export async function handlePayRequest(io: Server, socket: Socket, data: any) {
 
     // ── Push notifications ────────────────────────────────────────────────
     const payerName   = payer.kycName   ?? payer.phone.slice(-4);
-    const amount      = asset === 'XLM' ? `${netUsdc.toFixed(2)} XLM` : `$${netUsdc.toFixed(2)} USDC`;
+    const amount      = `$${netUsdc.toFixed(2)}`;
 
     // Requester: money received
     sendPushToUser(requestMsg.senderId, {
-      title: '💚 Ombi lako limelipwa! / Request paid!',
-      body:  `${payerName} akulipa ${amount}`,
+      title: '💚 Request paid!',
+      body:  `${payerName} paid you ${amount}`,
       type:  'money_in',
       data:  { conversationId: requestMsg.conversationId, amount: netUsdc, from: payerName, stellarTxId: hash },
     }).catch(() => {});
 
     // Payer: confirm
     sendPushToUser(payerId, {
-      title: '✅ Malipo yamefanikiwa',
-      body:  `Umelipa ${amount} kwa ${requestMsg.sender.kycName ?? requestMsg.sender.phone.slice(-4)}`,
+      title: '✅ Payment successful',
+      body:  `You paid ${amount} to ${requestMsg.sender.kycName ?? requestMsg.sender.phone.slice(-4)}`,
       type:  'money_out',
       data:  { conversationId: requestMsg.conversationId, amount: netUsdc, stellarTxId: hash },
     }).catch(() => {});
@@ -356,8 +356,8 @@ export async function handleRejectRequest(io: Server, socket: Socket, data: any)
     // Notify requester
     const rejecter = await prisma.user.findUnique({ where: { id: rejecterId }, select: { kycName: true, phone: true } });
     sendPushToUser(requestMsg.senderId, {
-      title: '❌ Ombi limekataliwa / Request declined',
-      body:  `${rejecter?.kycName ?? 'Mtu'} alikataa ombi lako la $${(requestMsg.amountUsdc ?? 0).toFixed(2)}`,
+      title: '❌ Request declined',
+      body:  `${rejecter?.kycName ?? 'Someone'} declined your request for $${(requestMsg.amountUsdc ?? 0).toFixed(2)}`,
       type:  'payment_request_rejected',
       data:  { conversationId: requestMsg.conversationId, messageId },
     }).catch(() => {});

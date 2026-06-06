@@ -121,7 +121,7 @@ export function initSocket(httpServer: HttpServer): Server {
 
     socket.on('send_payment', async (data) => {
       if (!rateCheck(paymentRates, userId, 5, 60_000)) {
-        socket.emit('error', { message: 'Malipo mengi sana. Subiri dakika moja.' });
+        socket.emit('error', { message: 'Too many requests. Please wait a minute.' });
         return;
       }
       await handleSendPayment(io, socket, data);

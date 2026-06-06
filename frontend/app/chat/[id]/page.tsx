@@ -146,7 +146,7 @@ function Bubble({
   if (msg.isDeleted) return (
     <div className={`flex ${isMine ? 'justify-end' : 'justify-start'} mb-0.5 px-3`}>
       <p className="italic text-xs text-slate-400 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-2xl">
-        Ujumbe umefutwa
+        Message deleted
       </p>
     </div>
   );
@@ -473,7 +473,7 @@ export default function ChatThread() {
         m.id === messageId ? { ...m, stellarTxId, paymentStatus, amountUsdc: netUsdc ?? m.amountUsdc } : m
       ));
       sounds.moneyIn();
-      toast.success('💚 Malipo yamefanikiwa! / Payment confirmed!');
+      toast.success('💚 Payment confirmed!');
       setAcceptModal(null);
       setAcceptLoading(false);
     });
@@ -483,7 +483,7 @@ export default function ChatThread() {
       setMessages(prev => prev.map(m =>
         m.id === messageId ? { ...m, paymentStatus } : m
       ));
-      toast.error('❌ Ombi limekataliwa / Request declined');
+      toast.error('❌ Request declined');
       setAcceptModal(null);
     });
 
@@ -502,13 +502,13 @@ export default function ChatThread() {
     // Money received from REST API (e.g. from /send page) — real-time toast
     const u9 = on('money_received', ({ amount, from }: any) => {
       sounds.moneyIn();
-      toast.success(`💚 Umepokea $${Number(amount).toFixed(2)} kutoka ${from}`);
+      toast.success(`💚 You received $${Number(amount).toFixed(2)} from ${from}`);
     });
 
     // Deposit confirmed
     const u10 = on('deposit_confirmed', ({ amountUsdc }: any) => {
       sounds.moneyIn();
-      toast.success(`💚 Amana imefanikiwa! $${Number(amountUsdc).toFixed(2)}`);
+      toast.success(`💚 Deposit confirmed! $${Number(amountUsdc).toFixed(2)}`);
     });
 
     return () => { uc(); u0(); u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); u11(); };

@@ -140,61 +140,61 @@ export async function sendPushToUser(userId: string, payload: NotificationPayloa
   await sendNativePush(userId, payload).catch(() => {});
 }
 
-// ── Pre-built notification templates (Swahili + English) ─────────────────────
+// ── Pre-built notification templates (English) ───────────────────────────────
 
 export const notify = {
   moneyReceived: (userId: string, amount: string, from: string) =>
     sendPushToUser(userId, {
-      title: 'Umepokea pesa! 💚',
-      body:  `Umepokea ${amount} kutoka ${from} / You received ${amount} from ${from}`,
+      title: 'Money received 💚',
+      body:  `You received ${amount} from ${from}`,
       type:  'money_in',
       data:  { amount, from },
     }),
 
   moneySent: (userId: string, amount: string, to: string) =>
     sendPushToUser(userId, {
-      title: 'Pesa imetumwa ✅',
-      body:  `Umetuma ${amount} kwa ${to} / You sent ${amount} to ${to}`,
+      title: 'Money sent ✅',
+      body:  `You sent ${amount} to ${to}`,
       type:  'money_out',
       data:  { amount, to },
     }),
 
   depositConfirmed: (userId: string, amountTzs: string, amountUsdc: string) =>
     sendPushToUser(userId, {
-      title: 'Amana imefanikiwa! ✅',
-      body:  `Amana yako ya ${amountTzs} (${amountUsdc} USDC) imefanikiwa / Deposit confirmed`,
+      title: 'Deposit confirmed ✅',
+      body:  `Your deposit of ${amountTzs} was added to your balance`,
       type:  'money_in',
-      data:  { amountTzs, amountUsdc },
+      data:  { amountTzs },
     }),
 
   lowBalance: (userId: string, balance: string) =>
     sendPushToUser(userId, {
-      title: 'Salio chini ⚠️',
-      body:  `Mkoba wako una ${balance} tu / Your balance is low: ${balance}`,
+      title: 'Low balance ⚠️',
+      body:  `Your balance is low: ${balance}`,
       type:  'low_balance',
       data:  { balance },
     }),
 
   yieldEarned: (userId: string, amount: string) =>
     sendPushToUser(userId, {
-      title: 'Faida ya akiba! 🌱',
-      body:  `Umepata faida ya ${amount} leo / You earned ${amount} in savings yield`,
+      title: 'Savings earnings 🌱',
+      body:  `You earned ${amount} today`,
       type:  'yield',
       data:  { amount },
     }),
 
   scheduledPaymentSent: (userId: string, amount: string, to: string) =>
     sendPushToUser(userId, {
-      title: 'Malipo ya kawaida ✅',
-      body:  `Malipo ya ${amount} yametumwa kwa ${to} / Scheduled payment sent`,
+      title: 'Scheduled payment sent ✅',
+      body:  `${amount} was sent to ${to}`,
       type:  'scheduled',
       data:  { amount, to },
     }),
 
   transactionFailed: (userId: string, reason: string) =>
     sendPushToUser(userId, {
-      title: 'Malipo hayakufanikiwa ❌',
-      body:  `${reason} / Transaction failed: ${reason}`,
+      title: 'Transaction failed ❌',
+      body:  reason,
       type:  'failed',
       data:  { reason },
     }),
@@ -205,10 +205,10 @@ export const notify = {
 
   billPaid: (userId: string, billerName: string, amount: string, token?: string) =>
     sendPushToUser(userId, {
-      title: `${billerName} imelipwa ✅`,
+      title: `${billerName} paid ✅`,
       body:  token
-        ? `Token yako: ${token} / Your token: ${token}`
-        : `Malipo ya ${amount} kwa ${billerName} yamefanikiwa`,
+        ? `Your token: ${token}`
+        : `${amount} paid to ${billerName}`,
       type:  'money_out',
       data:  { billerName, amount, token },
     }),

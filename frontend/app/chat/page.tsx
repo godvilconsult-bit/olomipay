@@ -136,13 +136,13 @@ export default function ChatPage() {
     // Global money events — show toasts even outside a chat window
     const u2 = on('money_received', ({ amount, from, asset }: any) => {
       toast.success(
-        `💚 Umepokea $${Number(amount).toFixed(2)} kutoka ${from}`,
+        `💚 You received $${Number(amount).toFixed(2)} from ${from}`,
         { duration: 6000 }
       );
     });
 
     const u3 = on('deposit_confirmed', ({ amountUsdc, currency, amountLocal }: any) => {
-      toast.success(`💚 Amana imefanikiwa! $${Number(amountUsdc).toFixed(2)}`, { duration: 6000 });
+      toast.success(`💚 Deposit confirmed! $${Number(amountUsdc).toFixed(2)}`, { duration: 6000 });
     });
 
     const u4 = on('money_sent', ({ amount, asset }: any) => {

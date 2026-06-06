@@ -67,7 +67,7 @@ router.post('/deposit', requireAuth, limiter, async (req: AuthRequest, res) => {
   // Check balance
   const bal = await getBalance(user.stellarPubKey);
   if (parseFloat(bal.usdc) < parse.data.amountUsdc) {
-    return res.status(400).json(fail('Insufficient USDC balance / Salio haitoshi'));
+    return res.status(400).json(fail('Insufficient balance'));
   }
 
   try {

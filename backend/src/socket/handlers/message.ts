@@ -84,7 +84,7 @@ export async function handleSendMessage(io: Server, socket: Socket, data: any) {
       if (!m.user.isOnline) {
         sendPushToUser(m.user.id, {
           title: socket.data.user?.kycName ?? 'OlomiPay',
-          body:  '🔒 Ujumbe mpya / New message',
+          body:  '🔒 New message',
           type:  'chat',
           data:  { conversationId, type: 'chat' },
         }).catch(() => {});
