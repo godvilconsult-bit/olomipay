@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Copy, LogOut, Shield, Camera, Wallet, RefreshCw, Edit2, Check, Wrench, LifeBuoy, Briefcase, History } from 'lucide-react';
+import { ArrowLeft, Copy, LogOut, Shield, Camera, Wallet, RefreshCw, Edit2, Check, Wrench, LifeBuoy, Briefcase, History, Settings as SettingsIcon } from 'lucide-react';
 import BottomNav from '../../components/BottomNav';
 import PinInput from '../../components/PinInput';
 import { auth, clearTokens } from '../../lib/api';
@@ -273,35 +273,16 @@ export default function ProfilePage() {
           </p>
         </div>
 
-        {/* ── Mobile Money → Olomi Wallet info ── */}
-        <div className="bg-gradient-to-r from-[#1a3a6b] to-[#1a56db] rounded-3xl p-5 text-white">
-          <div className="flex items-center gap-2 mb-2">
-            <img src="/logo.svg" alt="" className="w-6 h-6" />
-            <h3 className="font-bold">Mobile Money → Olomi Wallet</h3>
-          </div>
-          <p className="text-sm text-white/80 mb-3">
-            Deposit via Mobile Money and your money is instantly available in your Olomi Wallet. Send, save, or convert anytime.
-          </p>
-          <div className="space-y-2">
-            {[
-              'Go to Deposit → enter amount → pay via Mobile Money',
-              'Money is instantly credited to your Olomi Wallet',
-              'Send to anyone, save for interest, or convert currencies',
-            ].map((s, i) => (
-              <div key={i} className="flex items-center gap-2 bg-white/20 rounded-xl p-2.5 text-sm">
-                <span className="w-5 h-5 bg-white/30 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">{i+1}</span>
-                <span>{s}</span>
-              </div>
-            ))}
-          </div>
-          <button onClick={() => router.push('/deposit')}
-            className="mt-4 w-full bg-white text-primary font-bold py-3 rounded-2xl text-sm">
-            Deposit via Mobile Money →
-          </button>
-        </div>
-
         {/* ── Quick links ── */}
         <div className="bg-white dark:bg-slate-800 rounded-3xl divide-y divide-slate-100 dark:divide-slate-700">
+          <button onClick={() => router.push('/settings')}
+            className="w-full flex items-center gap-3 px-5 py-4 hover:bg-slate-50 dark:hover:bg-slate-700">
+            <SettingsIcon size={18} className="text-primary" />
+            <div className="flex-1 text-left">
+              <p className="font-medium text-sm">Settings</p>
+              <p className="text-xs text-slate-400">Account, privacy, notifications &amp; more</p>
+            </div>
+          </button>
           <button onClick={() => router.push('/business')}
             className="w-full flex items-center gap-3 px-5 py-4 hover:bg-slate-50 dark:hover:bg-slate-700">
             <Briefcase size={18} className="text-primary" />
