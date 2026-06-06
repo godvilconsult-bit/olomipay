@@ -30,6 +30,21 @@ export default function NativePush() {
       }
       if (perm.receive !== 'granted') return;
 
+      // Android 8+: notifications are SILENT unless delivered via a HIGH-importance
+      // channel. Create one (importance 5 = heads-up + default sound + vibrate).
+      if (Capacitor.getPlatform() === 'android') {
+        try {
+          await PushNotifications.createChannel({
+            id:          'olomipay_default',
+            name:        'OlomiPay alerts',
+            description: 'Money and chat notifications',
+            importance:  5,   // HIGH — pop-up + sound
+            visibility:  1,
+            vibration:   true,
+          });
+        } catch { /* older Android / already exists */ }
+      }
+
       // Send the device token to the backend so it can push to this phone
       await PushNotifications.addListener('registration', async (t: { value: string }) => {
         await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/register-device`, {

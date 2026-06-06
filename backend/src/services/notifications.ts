@@ -63,8 +63,16 @@ async function sendNativePush(userId: string, payload: NotificationPayload): Pro
       tokens:       rows.map(r => r.token),
       notification: { title: payload.title, body: payload.body },
       data,
-      android:      { priority: 'high' },
-      apns:         { payload: { aps: { sound: 'default' } } },
+      android: {
+        priority: 'high',
+        notification: {
+          sound:       'default',          // play a sound
+          defaultSound: true,
+          channelId:   'olomipay_default', // the HIGH-importance channel the app created
+          defaultVibrateTimings: true,
+        },
+      },
+      apns: { payload: { aps: { sound: 'default' } } },
     });
     await Promise.all(resp.responses.map((r: any, i: number) => {
       const code = r.error?.code ?? '';
