@@ -9,6 +9,26 @@ const PORT = process.env.PORT ?? 3001;
 
 app.set('trust proxy', 1);
 
+// ── Sentry (optional) — error tracking. No-op + no crash if not configured. ────
+let _sentry: any = null;
+try {
+  if (process.env.SENTRY_DSN) {
+    _sentry = require('@sentry/node');
+    _sentry.init({ dsn: process.env.SENTRY_DSN, tracesSampleRate: 0.1, environment: process.env.NODE_ENV ?? 'production' });
+    console.log('[sentry] backend error tracking enabled');
+  }
+} catch (e: any) { console.warn('[sentry] init skipped:', e?.message); }
+
+// Capture crashes that would otherwise go unnoticed
+process.on('unhandledRejection', (reason: any) => {
+  try { _sentry?.captureException(reason); } catch {}
+  console.error('[unhandledRejection]', reason?.message ?? reason);
+});
+process.on('uncaughtException', (err: any) => {
+  try { _sentry?.captureException(err); } catch {}
+  console.error('[uncaughtException]', err?.message ?? err);
+});
+
 // ── Observability — request-id tracing + latency metrics (mounted first) ──────
 import { observability, metricsSnapshot } from './services/observability';
 app.use(observability);
@@ -202,6 +222,12 @@ httpServer.listen(PORT, async () => {
     const { startReconciler } = await import('./services/reconciler');
     startReconciler();
   } catch(e: any) { console.error('[reconciler]', e.message); }
+
+  // Ops monitor — auto-alerts on gas-low / reconciliation shortfall
+  try {
+    const { startOpsMonitor } = await import('./services/opsMonitor');
+    startOpsMonitor();
+  } catch(e: any) { console.error('[ops-monitor]', e.message); }
 });
 
 export default app;

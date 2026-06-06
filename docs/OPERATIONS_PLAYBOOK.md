@@ -109,14 +109,25 @@ via approvals, rotate any shared secrets.
 
 ---
 
-## 6. Set up monitoring (do this once)
+## 6. Monitoring — built in, just add the env vars
 
-1. **Uptime**: create a free **UptimeRobot** (or BetterStack) monitor:
-   - `https://olomipay-production.up.railway.app/health` → expect 200, every 1–5 min.
-   - `https://olomipay-production.up.railway.app/ready` → expect 200 (catches DB outages).
-   - Alert to email/SMS/Slack.
-2. **Error tracking**: add **Sentry** to backend + frontend (catches crashes you'd otherwise miss). *(Ask and I'll wire it.)*
-3. **Treasury/reconciliation alerts**: check Operations + Wallets daily; the gas widget warns when low.
+**Auto-alerts (built in):** the backend runs an **ops monitor** every 20 min that
+raises an alert when the **gas treasury is low** or there's a **reconciliation
+shortfall**. Alerts go to a webhook + the super-admin's device, throttled. Enable by setting:
+- `SLACK_ALERT_WEBHOOK` = a Slack/Discord incoming webhook URL (alerts post there).
+- (Push to the super-admin works automatically once FCM is configured.)
+
+**Error tracking (built in):** Sentry initialises automatically when the DSN is set:
+- Backend: `SENTRY_DSN`
+- Frontend: `NEXT_PUBLIC_SENTRY_DSN`
+Both are no-ops if unset. Create a free Sentry project → paste the DSNs into Railway/Vercel.
+
+**Uptime (set up once):** create a free **UptimeRobot** (or BetterStack) monitor:
+- `https://olomipay-production.up.railway.app/health` → expect 200, every 1–5 min.
+- `https://olomipay-production.up.railway.app/ready` → expect 200 (catches DB outages).
+- Alert to email/SMS/Slack.
+
+**Daily eyeball:** still check Operations + Wallets; auto-alerts are the safety net, not a replacement.
 
 ---
 

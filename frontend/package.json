@@ -12,6 +12,7 @@
     "@capacitor-community/contacts": "^6.1.1",
     "@capacitor/core": "^6.2.1",
     "@capacitor/push-notifications": "^6.0.5",
+    "@sentry/browser": "^8.55.2",
     "@stellar/stellar-sdk": "^12.3.0",
     "axios": "^1.7.2",
     "browser-image-compression": "^2.0.2",
