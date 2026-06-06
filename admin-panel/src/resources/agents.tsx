@@ -31,6 +31,22 @@ export const AgentsList = () => {
     } finally { setBusy(''); }
   };
 
+  const editLimits = async (a: any) => {
+    const perTx = prompt(`Per-transaction limit (USD) for ${a.businessName}`, String(a.perTxLimitUsdc ?? 500));
+    if (perTx == null) return;
+    const daily = prompt(`Daily limit (USD) for ${a.businessName}`, String(a.dailyLimitUsdc ?? 2000));
+    if (daily == null) return;
+    setBusy(a.id);
+    try {
+      const r = await fetch(`${API}/api/agents/admin/${a.id}/limits`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok()}` },
+        body: JSON.stringify({ perTxLimitUsdc: Number(perTx), dailyLimitUsdc: Number(daily) }),
+      }).then(r => r.json());
+      if (r.success) { notify('Limits updated', { type: 'success' }); load(); }
+      else notify(r.error ?? 'Failed', { type: 'error' });
+    } finally { setBusy(''); }
+  };
+
   const btn = (bg: string): React.CSSProperties => ({ border: 0, borderRadius: 8, padding: '6px 12px', color: '#fff', background: bg, cursor: 'pointer', fontSize: 13, fontWeight: 600 });
 
   return (
@@ -41,7 +57,7 @@ export const AgentsList = () => {
       <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,.08)', overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead><tr style={{ background: '#f8fafc', textAlign: 'left' }}>
-            <th style={{ padding: 10 }}>Code</th><th>Business</th><th>City</th><th>Phone</th><th>Commission</th><th>Status</th><th>Actions</th>
+            <th style={{ padding: 10 }}>Code</th><th>Business</th><th>City</th><th>Phone</th><th>Commission</th><th>Limits (tx / day)</th><th>Status</th><th>Actions</th>
           </tr></thead>
           <tbody>
             {agents.map(a => (
@@ -51,15 +67,17 @@ export const AgentsList = () => {
                 <td>{a.city}</td>
                 <td>{a.phone}</td>
                 <td>${Number(a.commissionEarned ?? 0).toFixed(2)}</td>
+                <td>${Number(a.perTxLimitUsdc ?? 0).toFixed(0)} / ${Number(a.dailyLimitUsdc ?? 0).toFixed(0)}</td>
                 <td><span style={badge(a.status)}>{a.status}</span></td>
-                <td style={{ display: 'flex', gap: 6, padding: 10 }}>
+                <td style={{ display: 'flex', gap: 6, padding: 10, flexWrap: 'wrap' }}>
                   {a.status !== 'active'    && <button disabled={!!busy} style={btn('#16a34a')} onClick={() => setStatus(a.id, 'active')}>Approve</button>}
                   {a.status === 'active'    && <button disabled={!!busy} style={btn('#dc2626')} onClick={() => setStatus(a.id, 'suspended')}>Suspend</button>}
                   {a.status === 'suspended' && <button disabled={!!busy} style={btn('#16a34a')} onClick={() => setStatus(a.id, 'active')}>Reactivate</button>}
+                  <button disabled={!!busy} style={btn('#475569')} onClick={() => editLimits(a)}>Limits</button>
                 </td>
               </tr>
             ))}
-            {agents.length === 0 && <tr><td colSpan={7} style={{ padding: 20, textAlign: 'center', color: '#94a3b8' }}>No agents yet.</td></tr>}
+            {agents.length === 0 && <tr><td colSpan={8} style={{ padding: 20, textAlign: 'center', color: '#94a3b8' }}>No agents yet.</td></tr>}
           </tbody>
         </table>
       </div>

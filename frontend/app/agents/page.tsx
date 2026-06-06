@@ -176,7 +176,23 @@ function CashOutModal({ onClose, onDone }: { onClose: () => void; onDone: () => 
   const [req, setReq] = useState<any>(null);
   const [pin, setPin] = useState('');
   const [busy, setBusy] = useState(false);
+  const [remaining, setRemaining] = useState(0); // seconds until code expiry
   const amt = parseFloat(amount) || 0;
+
+  // Countdown to expiry; clears the request when it hits zero.
+  useEffect(() => {
+    if (!req?.expiresAt) return;
+    const tick = () => {
+      const s = Math.max(0, Math.round((new Date(req.expiresAt).getTime() - Date.now()) / 1000));
+      setRemaining(s);
+      if (s === 0) { setReq(null); toast.error('Code expired — please start again'); }
+    };
+    tick();
+    const t = setInterval(tick, 1000);
+    return () => clearInterval(t);
+  }, [req]);
+
+  const mmss = `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`;
 
   async function request() {
     setBusy(true);
@@ -188,7 +204,8 @@ function CashOutModal({ onClose, onDone }: { onClose: () => void; onDone: () => 
     setBusy(true);
     const r = await agentApi('/cash-out/confirm', 'POST', { transactionId: req.transactionId, pin });
     setBusy(false); setPin('');
-    if (r.success) { toast.success('Confirmed — collect your cash'); onDone(); } else toast.error(r.error ?? 'Failed');
+    if (r.success) { toast.success('Confirmed — collect your cash'); onDone(); }
+    else { toast.error(r.error ?? 'Failed'); setReq(null); }
   }
   return (
     <Sheet title="Get cash from an agent" onClose={onClose}>
@@ -204,6 +221,7 @@ function CashOutModal({ onClose, onDone }: { onClose: () => void; onDone: () => 
             <p className="text-xs text-slate-500">Show this code to {req.agent}</p>
             <p className="text-3xl font-bold tracking-widest text-emerald-700 dark:text-emerald-400 my-1">{req.code}</p>
             <p className="text-sm text-slate-500">You'll get {req.local?.toLocaleString()} {req.currency} ({formatUsdc(req.amountUsdc)})</p>
+            <p className={`text-xs mt-1 font-semibold ${remaining <= 60 ? 'text-rose-500' : 'text-slate-400'}`}>Expires in {mmss}</p>
           </div>
           <p className="text-sm text-slate-500">Enter PIN to release the money once the agent is ready</p>
           <PinInput value={pin} onChange={setPin} autoFocus />

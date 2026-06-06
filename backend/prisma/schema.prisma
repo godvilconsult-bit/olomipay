@@ -274,6 +274,8 @@ model Agent {
   phone           String
   commissionPct   Float    @default(0.5)
   commissionEarned Float   @default(0)
+  perTxLimitUsdc  Float    @default(500)
+  dailyLimitUsdc  Float    @default(2000)
   status          String   @default("pending") // pending | active | suspended
   createdAt       DateTime @default(now())
 
@@ -289,9 +291,10 @@ model AgentTransaction {
   localAmount   Float    @default(0)
   currency      String   @default("TZS")
   code          String?  // 6-digit confirmation code for cash-out
-  status        String   @default("PENDING") // PENDING | COMPLETED | CANCELLED
+  status        String   @default("PENDING") // PENDING | COMPLETED | CANCELLED | EXPIRED
   stellarTxId   String?
   commissionUsdc Float   @default(0)
+  expiresAt     DateTime?
   createdAt     DateTime @default(now())
 
   @@index([agentId])

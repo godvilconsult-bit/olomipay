@@ -31,6 +31,31 @@ const COUNTRY_CCY: Record<string, string> = {
   TZ: 'TZS', KE: 'KES', UG: 'UGX', GH: 'GHS', ZM: 'ZMW', NG: 'NGN', RW: 'RWF', SN: 'XOF',
 };
 
+const CASHOUT_CODE_TTL_MS = 10 * 60 * 1000; // pending cash-out codes expire in 10 minutes
+
+// Sum of an agent's COMPLETED volume (cash-in + cash-out) since midnight UTC.
+async function agentVolumeToday(agentId: string): Promise<number> {
+  const start = new Date(); start.setUTCHours(0, 0, 0, 0);
+  const agg = await prisma.agentTransaction.aggregate({
+    where: { agentId, status: 'COMPLETED', createdAt: { gte: start } },
+    _sum: { amountUsdc: true },
+  }).catch(() => ({ _sum: { amountUsdc: 0 } } as any));
+  return agg._sum.amountUsdc ?? 0;
+}
+
+// Per-transaction + daily-volume guard for an agent. Returns an error string or null.
+async function checkAgentLimits(agent: any, amountUsdc: number): Promise<string | null> {
+  if (amountUsdc > agent.perTxLimitUsdc) {
+    return `Amount exceeds the per-transaction limit of $${agent.perTxLimitUsdc.toFixed(2)}`;
+  }
+  const today = await agentVolumeToday(agent.id);
+  if (today + amountUsdc > agent.dailyLimitUsdc) {
+    const left = Math.max(0, agent.dailyLimitUsdc - today);
+    return `This exceeds the agent's daily limit. Remaining today: $${left.toFixed(2)}`;
+  }
+  return null;
+}
+
 async function localFor(amountUsdc: number, country: string): Promise<{ local: number; currency: string }> {
   const currency = COUNTRY_CCY[country] ?? 'TZS';
   try {
@@ -56,6 +81,12 @@ router.post('/apply', requireAuth, async (req: AuthRequest, res) => {
     phone:        z.string().min(6).max(20),
   }).safeParse(req.body);
   if (!parse.success) return res.status(400).json(fail(parse.error.errors[0].message));
+
+  const applicant = await prisma.user.findUnique({ where: { id: req.userId! } });
+  if (!applicant) return res.status(404).json(fail('User not found'));
+  if (applicant.kycStatus !== 'APPROVED') {
+    return res.status(403).json(fail('Complete identity verification (KYC) before applying to be an agent'));
+  }
 
   const existing = await prisma.agent.findUnique({ where: { userId: req.userId! } });
   if (existing) return res.status(400).json(fail('You already have an agent application'));
@@ -99,6 +130,9 @@ router.post('/cash-in', requireAuth, limiter, async (req: AuthRequest, res) => {
 
   const agent = await prisma.agent.findUnique({ where: { userId: req.userId! } });
   if (!agent || agent.status !== 'active') return res.status(403).json(fail('You are not an active agent'));
+
+  const limitErr = await checkAgentLimits(agent, parse.data.amountUsdc);
+  if (limitErr) return res.status(400).json(fail(limitErr));
 
   const agentUser = await prisma.user.findUnique({ where: { id: req.userId! } });
   if (!agentUser) return res.status(404).json(fail('Agent account not found'));
@@ -159,21 +193,31 @@ router.post('/cash-out/request', requireAuth, limiter, async (req: AuthRequest, 
   if (!agent || agent.status !== 'active') return res.status(404).json(fail('Agent not found or inactive'));
   if (agent.userId === req.userId!) return res.status(400).json(fail('Cannot cash-out to yourself'));
 
+  const limitErr = await checkAgentLimits(agent, parse.data.amountUsdc);
+  if (limitErr) return res.status(400).json(fail(limitErr));
+
   const user = await prisma.user.findUnique({ where: { id: req.userId! } });
   if (!user) return res.status(404).json(fail('User not found'));
   const bal = await getBalance(user.stellarPubKey);
   if (parseFloat(bal.usdc) < parse.data.amountUsdc) return res.status(400).json(fail('Insufficient balance'));
 
+  // Replace any earlier still-pending cash-out for this user (avoid stacking codes).
+  await prisma.agentTransaction.updateMany({
+    where: { userId: req.userId!, type: 'CASH_OUT', status: 'PENDING' },
+    data:  { status: 'EXPIRED', code: null },
+  }).catch(() => {});
+
   const { local, currency } = await localFor(parse.data.amountUsdc, agent.country);
   const code = genCode();
+  const expiresAt = new Date(Date.now() + CASHOUT_CODE_TTL_MS);
   const tx = await prisma.agentTransaction.create({ data: {
     agentId: agent.id, userId: req.userId!, type: 'CASH_OUT', status: 'PENDING',
-    amountUsdc: parse.data.amountUsdc, localAmount: local, currency, code,
+    amountUsdc: parse.data.amountUsdc, localAmount: local, currency, code, expiresAt,
   }});
   return res.json(ok({
     transactionId: tx.id, code, agent: agent.businessName,
-    amountUsdc: parse.data.amountUsdc, local, currency,
-    message: `Show code ${code} to the agent, then confirm with your PIN to release the money.`,
+    amountUsdc: parse.data.amountUsdc, local, currency, expiresAt,
+    message: `Show code ${code} to the agent, then confirm with your PIN within 10 minutes to release the money.`,
   }));
 });
 
@@ -190,9 +234,17 @@ router.post('/cash-out/confirm', requireAuth, limiter, async (req: AuthRequest, 
     where: { id: parse.data.transactionId, userId: req.userId!, type: 'CASH_OUT', status: 'PENDING' },
   });
   if (!tx) return res.status(404).json(fail('Cash-out request not found'));
+  if (tx.expiresAt && tx.expiresAt.getTime() < Date.now()) {
+    await prisma.agentTransaction.update({ where: { id: tx.id }, data: { status: 'EXPIRED', code: null } }).catch(() => {});
+    return res.status(410).json(fail('This cash-out code has expired. Please start again.'));
+  }
 
   const agent = await prisma.agent.findUnique({ where: { id: tx.agentId } });
   if (!agent || agent.status !== 'active') return res.status(404).json(fail('Agent unavailable'));
+
+  const limitErr = await checkAgentLimits(agent, tx.amountUsdc);
+  if (limitErr) return res.status(400).json(fail(limitErr));
+
   const agentUser = await prisma.user.findUnique({ where: { id: agent.userId } });
   if (!agentUser) return res.status(404).json(fail('Agent account not found'));
 
@@ -249,6 +301,21 @@ router.post('/admin/:id/status', requireRole('SUPPORT_HEAD', 'SUPER_ADMIN'), asy
   const parse = z.object({ status: z.enum(['active', 'suspended', 'pending']) }).safeParse(req.body);
   if (!parse.success) return res.status(400).json(fail('Invalid status'));
   const agent = await prisma.agent.update({ where: { id: req.params.id }, data: { status: parse.data.status } }).catch(() => null);
+  if (!agent) return res.status(404).json(fail('Agent not found'));
+  return res.json(ok({ agent }));
+});
+
+// Admin: adjust an agent's per-transaction and daily limits.
+router.post('/admin/:id/limits', requireRole('SUPPORT_HEAD', 'SUPER_ADMIN'), async (req, res) => {
+  const parse = z.object({
+    perTxLimitUsdc: z.number().min(0).max(100_000).optional(),
+    dailyLimitUsdc: z.number().min(0).max(1_000_000).optional(),
+  }).safeParse(req.body);
+  if (!parse.success) return res.status(400).json(fail(parse.error.errors[0].message));
+  const agent = await prisma.agent.update({
+    where: { id: req.params.id },
+    data:  { perTxLimitUsdc: parse.data.perTxLimitUsdc, dailyLimitUsdc: parse.data.dailyLimitUsdc },
+  }).catch(() => null);
   if (!agent) return res.status(404).json(fail('Agent not found'));
   return res.json(ok({ agent }));
 });

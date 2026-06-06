@@ -156,10 +156,14 @@ export async function setupDatabase(): Promise<void> {
         "phone" TEXT NOT NULL,
         "commissionPct" DOUBLE PRECISION NOT NULL DEFAULT 0.5,
         "commissionEarned" DOUBLE PRECISION NOT NULL DEFAULT 0,
+        "perTxLimitUsdc" DOUBLE PRECISION NOT NULL DEFAULT 500,
+        "dailyLimitUsdc" DOUBLE PRECISION NOT NULL DEFAULT 2000,
         "status" TEXT NOT NULL DEFAULT 'pending',
         "createdAt" TIMESTAMP NOT NULL DEFAULT NOW()
       );
       CREATE INDEX IF NOT EXISTS "Agent_country_status_idx" ON "Agent" ("country","status");
+      ALTER TABLE "Agent" ADD COLUMN IF NOT EXISTS "perTxLimitUsdc" DOUBLE PRECISION NOT NULL DEFAULT 500;
+      ALTER TABLE "Agent" ADD COLUMN IF NOT EXISTS "dailyLimitUsdc" DOUBLE PRECISION NOT NULL DEFAULT 2000;
 
       CREATE TABLE IF NOT EXISTS "AgentTransaction" (
         "id" TEXT NOT NULL PRIMARY KEY,
@@ -173,8 +177,10 @@ export async function setupDatabase(): Promise<void> {
         "status" TEXT NOT NULL DEFAULT 'PENDING',
         "stellarTxId" TEXT,
         "commissionUsdc" DOUBLE PRECISION NOT NULL DEFAULT 0,
+        "expiresAt" TIMESTAMP,
         "createdAt" TIMESTAMP NOT NULL DEFAULT NOW()
       );
+      ALTER TABLE "AgentTransaction" ADD COLUMN IF NOT EXISTS "expiresAt" TIMESTAMP;
       CREATE INDEX IF NOT EXISTS "AgentTransaction_agentId_idx" ON "AgentTransaction" ("agentId");
       CREATE INDEX IF NOT EXISTS "AgentTransaction_userId_idx" ON "AgentTransaction" ("userId");
     `);

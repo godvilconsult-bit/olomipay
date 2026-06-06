@@ -94,9 +94,19 @@ async function checkAutoSaveReminders(): Promise<void> {
   } catch { /* skip cycle */ }
 }
 
+// Expire pending agent cash-out codes past their TTL so stale codes can't be used.
+async function expireStaleCashouts(): Promise<void> {
+  try {
+    await prisma.agentTransaction.updateMany({
+      where: { type: 'CASH_OUT', status: 'PENDING', expiresAt: { lt: new Date() } },
+      data:  { status: 'EXPIRED', code: null },
+    });
+  } catch { /* skip cycle */ }
+}
+
 export function startOpsMonitor(): void {
   const RUN_EVERY = 20 * 60 * 1000; // every 20 minutes
-  const run = () => { checkGasTreasury(); checkReconciliation(); checkSecurity(); checkAutoSaveReminders(); };
+  const run = () => { checkGasTreasury(); checkReconciliation(); checkSecurity(); checkAutoSaveReminders(); expireStaleCashouts(); };
   setTimeout(run, 60_000);          // first run a minute after boot
   setInterval(run, RUN_EVERY);
   console.log('[ops-monitor] started — gas + reconciliation + security watch every 20m');
