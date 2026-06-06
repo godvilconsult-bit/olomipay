@@ -21,15 +21,8 @@ const router = Router();
 const ok   = (data: any) => ({ success: true,  data });
 const fail = (msg: string) => ({ success: false, error: msg });
 
-// ── Middleware: admin-only ────────────────────────────────────────────────────
-async function requireAdmin(req: AuthRequest, res: any, next: any) {
-  const user = await prisma.user.findUnique({
-    where:  { id: req.userId! },
-    select: { isAdmin: true },
-  });
-  if (!user?.isAdmin) return res.status(403).json(fail('Admin access required'));
-  next();
-}
+// Admin auth — centralized (accepts STAFF tokens + legacy app-user-admin).
+import { requireAdmin } from '../services/adminAuth';
 
 // ── GET /api/admin/stats ──────────────────────────────────────────────────────
 router.get('/stats', requireAuth, requireAdmin, async (_req, res) => {

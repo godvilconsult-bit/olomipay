@@ -6,32 +6,13 @@ import { deriveKeypairFromPhone, activateUserWallet, getBalance, platformSendUsd
 import { encryptSecret, hashPin } from '../services/crypto';
 import { roleSatisfies } from '../services/roles';
 import { queueApproval, executeApprovalAction, markExecuted, getAdminRole, isSuper } from '../services/approvals';
+// Centralized admin auth — accepts STAFF (username/password) tokens AND legacy
+// app-user-admin tokens, and populates req.userId/adminRole/adminPhone.
+import { requireAdmin, requireRole } from '../services/adminAuth';
 
 const router  = Router();
 const ok   = (data: any) => ({ success: true,  data });
 const fail = (msg: string) => ({ success: false, error: msg });
-
-// ── Admin guard (DB-backed) ─────────────────────────────────────────────────────
-async function requireAdmin(req: AuthRequest, res: any, next: any) {
-  const u = await prisma.user.findUnique({ where: { id: req.userId! }, select: { isAdmin: true, phone: true } });
-  if (!u?.isAdmin) return res.status(403).json(fail('Admin access required'));
-  (req as any).adminPhone = u.phone;
-  next();
-}
-
-// ── RBAC — gate by admin role (OWNER/SUPER_ADMIN bypasses everything) ───────────
-// Accepts BOTH naming systems via roles.ts alias map:
-//   Legacy: SUPPORT · COMPLIANCE · FINANCE · SUPER_ADMIN
-//   New:    VIEWER  · DEVELOPER  · FINANCIAL_CONTROLLER · OWNER
-function requireRole(...roles: string[]) {
-  return async (req: AuthRequest, res: any, next: any) => {
-    const u = await prisma.user.findUnique({ where: { id: req.userId! }, select: { isAdmin: true, adminRole: true } });
-    if (!u?.isAdmin) return res.status(403).json(fail('Admin access required'));
-    // roleSatisfies normalizes both stored role and required roles, OWNER bypasses
-    if (roleSatisfies(u.adminRole, roles)) return next();
-    return res.status(403).json(fail(`Requires role: ${roles.join(' or ')}`));
-  };
-}
 
 // ── Immutable audit — record every back-office action ───────────────────────────
 async function audit(req: AuthRequest, action: string, targetId?: string, targetType?: string, detail?: any) {

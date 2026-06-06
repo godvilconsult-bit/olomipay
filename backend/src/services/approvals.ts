@@ -18,17 +18,29 @@ export const REQUIRED_APPROVALS = 3;
 
 export const isSuper = (role?: string | null) => roleSatisfies(role, ['SUPER_ADMIN']);
 
-export async function getAdminRole(userId: string): Promise<string | null> {
-  const u = await prisma.user.findUnique({ where: { id: userId }, select: { adminRole: true } });
+export async function getAdminRole(actorId: string): Promise<string | null> {
+  // Staff account first (the going-forward admins), then legacy app-user-admin.
+  const staff = await prisma.$queryRawUnsafe<any[]>(
+    `SELECT "role" FROM "Staff" WHERE "id" = $1 AND "isActive" = true`, actorId,
+  ).catch(() => []);
+  if (staff[0]) return staff[0].role ?? null;
+  const u = await prisma.user.findUnique({ where: { id: actorId }, select: { adminRole: true } }).catch(() => null);
   return u?.adminRole ?? null;
 }
 
 /** How many OTHER admins can validly approve (FINANCE or SUPER_ADMIN/OWNER)? */
 export async function validApproverCount(excludeId: string): Promise<number> {
+  // Eligible STAFF approvers
+  const staff = await prisma.$queryRawUnsafe<any[]>(
+    `SELECT "role" FROM "Staff" WHERE "isActive" = true AND "id" <> $1`, excludeId,
+  ).catch(() => []);
+  const staffCount = staff.filter(a => roleSatisfies(a.role, ['FINANCE', 'SUPER_ADMIN'])).length;
+  // Plus legacy app-user admins
   const admins = await prisma.user.findMany({
     where: { isAdmin: true, id: { not: excludeId } }, select: { adminRole: true },
-  });
-  return admins.filter(a => roleSatisfies(a.adminRole, ['FINANCE', 'SUPER_ADMIN'])).length;
+  }).catch(() => []);
+  const userCount = admins.filter(a => roleSatisfies(a.adminRole, ['FINANCE', 'SUPER_ADMIN'])).length;
+  return staffCount + userCount;
 }
 
 // ── Action registry ──────────────────────────────────────────────────────────

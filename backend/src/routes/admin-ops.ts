@@ -4,17 +4,11 @@ import { PrismaClient } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 import { getBalance, getFeeWalletPublic } from '../services/stellar';
+import { requireAdmin } from '../services/adminAuth';
 
 const router  = Router();
 const ok   = (data: any) => ({ success: true,  data });
 const fail = (msg: string) => ({ success: false, error: msg });
-
-async function requireAdmin(req: AuthRequest, res: any, next: any) {
-  const u = await prisma.user.findUnique({ where: { id: req.userId! }, select: { isAdmin: true, phone: true } });
-  if (!u?.isAdmin) return res.status(403).json(fail('Admin access required'));
-  (req as any).adminPhone = u.phone;
-  next();
-}
 async function audit(req: AuthRequest, action: string, targetId?: string, targetType?: string, detail?: any) {
   try {
     await prisma.$executeRawUnsafe(

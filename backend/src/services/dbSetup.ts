@@ -174,6 +174,22 @@ export async function setupDatabase(): Promise<void> {
       );
     `);
 
+    // Staff accounts — back-office admins with username + password (SEPARATE
+    // from app users, who log in with phone + PIN). Created by the SUPER_ADMIN.
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "Staff" (
+        "id"           TEXT NOT NULL PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        "username"     TEXT NOT NULL UNIQUE,
+        "passwordHash" TEXT NOT NULL,
+        "name"         TEXT,
+        "role"         TEXT NOT NULL DEFAULT 'SUPPORT',
+        "isActive"     BOOLEAN NOT NULL DEFAULT true,
+        "createdBy"    TEXT,
+        "lastLoginAt"  TIMESTAMP,
+        "createdAt"    TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+    `);
+
     // Native push (FCM/APNs) device tokens for the iOS/Android apps.
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "DeviceToken" (
@@ -733,11 +749,36 @@ export async function setupDatabase(): Promise<void> {
 
     console.log('[db] All tables created successfully ✓');
 
-    // ── Seed admin user ───────────────────────────────────────────────────────
+    // ── Seed admin user + bootstrap super-admin staff ─────────────────────────
     await seedAdmin();
+    await seedSuperStaff();
 
   } catch (e: any) {
     console.error('[db] Setup error:', e.message);
+  }
+}
+
+// Bootstrap the first SUPER_ADMIN staff account so the owner can log in to the
+// admin panel with a username + password and create the rest of the staff.
+// Configure via SUPERADMIN_USERNAME / SUPERADMIN_PASSWORD (defaults provided —
+// CHANGE THE DEFAULT PASSWORD IMMEDIATELY in production).
+async function seedSuperStaff() {
+  try {
+    const username = (process.env.SUPERADMIN_USERNAME ?? 'superadmin').toLowerCase().trim();
+    const password = process.env.SUPERADMIN_PASSWORD ?? 'ChangeMe!2026';
+    const existing = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT "id" FROM "Staff" WHERE "username" = $1`, username,
+    );
+    if (existing.length) return; // already seeded
+    const { hashPin } = await import('./crypto');
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO "Staff" ("username","passwordHash","name","role","isActive")
+       VALUES ($1,$2,$3,'SUPER_ADMIN',true)`,
+      username, hashPin(password), 'Super Admin',
+    );
+    console.log(`[db] ✓ Seeded SUPER_ADMIN staff "${username}" — change the password after first login`);
+  } catch (e: any) {
+    console.error('[db] seedSuperStaff error:', e.message);
   }
 }
 

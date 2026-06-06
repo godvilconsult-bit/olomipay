@@ -7,6 +7,7 @@ import { isEncryptedKeyValid } from '../services/crypto';
 import { runReconciler, getReconcilerStatus } from '../services/reconciler';
 import { validateEnv } from '../services/envCheck';
 import { queueApproval } from '../services/approvals';
+import { requireAdmin } from '../services/adminAuth';
 
 const router = Router();
 const ok   = (data: any) => ({ success: true,  data });
@@ -15,13 +16,6 @@ const fail = (msg: string) => ({ success: false, error: msg });
 // Minutes after which a still-PENDING money transaction is considered "stuck".
 const STUCK_MINUTES = Number(process.env.SUPPORT_STUCK_MINUTES ?? 10);
 const MONEY_TYPES: any = ['DEPOSIT', 'WITHDRAWAL', 'SEND', 'RECEIVE'];
-
-async function requireAdmin(req: AuthRequest, res: any, next: any) {
-  const u = await prisma.user.findUnique({ where: { id: req.userId! }, select: { isAdmin: true, phone: true } });
-  if (!u?.isAdmin) return res.status(403).json(fail('Admin access required'));
-  (req as any).adminPhone = u.phone;
-  next();
-}
 async function audit(req: AuthRequest, action: string, targetId?: string, targetType?: string, detail?: any) {
   try {
     await prisma.$executeRawUnsafe(

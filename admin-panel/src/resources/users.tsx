@@ -24,15 +24,11 @@ export const UserList = () => (
 );
 
 // ── Support action buttons (Customer 360) ──────────────────────────────────────
-const ADMIN_ROLES = ['', 'SUPPORT', 'COMPLIANCE', 'FINANCE', 'SUPER_ADMIN'];
-
 function SupportActions() {
   const record  = useRecordContext();
   const refresh = useRefresh();
   const notify  = useNotify();
   const [pin, setPin] = useState('');
-  const [role, setRole] = useState<string>('');
-  useEffect(() => { setRole(record?.adminRole ?? ''); }, [record?.id]);
   if (!record) return null;
 
   const run = async (fn: () => Promise<any>, ok: string) => {
@@ -42,18 +38,7 @@ function SupportActions() {
 
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: '8px 0', alignItems: 'center' }}>
-      <button onClick={() => run(() => adminAction(`/users/${record.id}/role`, { isAdmin: !record.isAdmin }), 'Role updated')}>
-        {record.isAdmin ? 'Revoke admin' : 'Make admin'}
-      </button>
-      {/* Assign an RBAC role (SUPER_ADMIN only — backend enforces). Empty = none. */}
-      <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
-        <select value={role} onChange={e => setRole(e.target.value)} style={{ padding: '5px 8px', borderRadius: 6 }}>
-          {ADMIN_ROLES.map(r => <option key={r} value={r}>{r || 'no role'}</option>)}
-        </select>
-        <button onClick={() => run(() => adminAction(`/users/${record.id}/admin-role`, { role }), `Role set to ${role || 'none'}`)}>
-          Set role
-        </button>
-      </span>
+      {/* App users are NEVER made admins — admin access is via Staff accounts only. */}
       <button onClick={() => run(() => adminAction(`/users/${record.id}/block`), 'Account frozen')}>Freeze</button>
       <button onClick={() => run(() => adminAction(`/users/${record.id}/unblock`), 'Account unfrozen')}>Unfreeze</button>
       <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
