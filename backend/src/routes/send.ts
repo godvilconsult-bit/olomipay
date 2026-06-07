@@ -9,6 +9,7 @@ import { notify } from '../services/notifications';
 import { emitToUser } from '../socket';
 import { verifyPin } from '../services/crypto';
 import { evaluateSend, logRiskReview } from '../services/riskGate';
+import { checkTierLimit } from '../services/kycTiers';
 
 const router = Router();
 
@@ -98,6 +99,12 @@ router.post('/stellar', requireAuth, sendLimiter, async (req: AuthRequest, res) 
   }
   if (risk.decision === 'REVIEW') {
     logRiskReview(user.id, amount, risk).catch(() => {}); // flag but allow through
+  }
+
+  // ── Compliance tier limits (fail-closed on breach) ───────────────────────
+  if (asset === 'USDC') {
+    const lim = await checkTierLimit(user.id, amount, 'send');
+    if (!lim.ok) return res.status(403).json({ error: lim.error, code: 'TIER_LIMIT' });
   }
 
   const dbTx = await prisma.transaction.create({
@@ -230,6 +237,10 @@ router.post('/phone', requireAuth, sendLimiter, async (req: AuthRequest, res) =>
       const risk = await evaluateSend({ userId: user.id, amountUsdc: parse.data.amount, toAddress: recipient.stellarPubKey });
       if (risk.decision === 'BLOCK') { await logRiskReview(user.id, parse.data.amount, risk); return fail('Transaction blocked for security. Contact support.'); }
       if (risk.decision === 'REVIEW') logRiskReview(user.id, parse.data.amount, risk).catch(() => {});
+      if (parse.data.asset === 'USDC') {
+        const lim = await checkTierLimit(user.id, parse.data.amount, 'send');
+        if (!lim.ok) return fail(lim.error!);
+      }
       const memo = `To ${parse.data.toPhone}`;
       const hash = await contractTransfer({
         fromEncryptedSecret: user.stellarSecret,

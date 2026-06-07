@@ -129,6 +129,7 @@ model User {
   // Immutable public account number (OP-XXXX) — admin/audit source of truth + user-facing ID
   accountNo       String?   @unique
   kycStatus       KycStatus @default(PENDING)
+  kycLevel        Int       @default(0)
   kycName         String?
   kycIdType       String?
   kycIdNumber     String?

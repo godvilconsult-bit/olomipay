@@ -21,6 +21,7 @@ import { contractTransfer, getBalance } from '../services/stellar';
 import { verifyPin } from '../services/crypto';
 import { notify } from '../services/notifications';
 import { getRate } from '../services/yellowcard';
+import { checkTierLimit } from '../services/kycTiers';
 
 const router = Router();
 const limiter = rateLimit({ windowMs: 60_000, max: 10, message: { success: false, error: 'Too many requests' } });
@@ -244,6 +245,10 @@ router.post('/cash-out/confirm', requireAuth, limiter, async (req: AuthRequest, 
 
   const limitErr = await checkAgentLimits(agent, tx.amountUsdc);
   if (limitErr) return res.status(400).json(fail(limitErr));
+
+  // Customer-side compliance tier limit.
+  const lim = await checkTierLimit(req.userId!, tx.amountUsdc, 'agent_cashout');
+  if (!lim.ok) return res.status(403).json(fail(lim.error!));
 
   const agentUser = await prisma.user.findUnique({ where: { id: agent.userId } });
   if (!agentUser) return res.status(404).json(fail('Agent account not found'));

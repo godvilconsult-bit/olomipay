@@ -18,6 +18,7 @@ import { userSendUsdcToPlatform, getBalance } from '../services/stellar';
 import { verifyPin } from '../services/crypto';
 import { notify } from '../services/notifications';
 import { getChannelsForUI, calculateWithdrawFees, createWithdrawOrder } from '../services/yellowcard';
+import { checkTierLimit } from '../services/kycTiers';
 
 const router = Router();
 const limiter = rateLimit({ windowMs: 60_000, max: 5, message: { success: false, error: 'Too many requests' } });
@@ -103,6 +104,9 @@ router.post('/send', requireAuth, limiter, async (req: AuthRequest, res) => {
 
   const valid = await verifyPin(pin, user.pinHash);
   if (!valid) return res.status(403).json(fail('Incorrect PIN / PIN si sahihi'));
+
+  const lim = await checkTierLimit(req.userId!, amountUsdc, 'remittance');
+  if (!lim.ok) return res.status(403).json(fail(lim.error!));
 
   const bal = await getBalance(user.stellarPubKey);
   if (parseFloat(bal.usdc) < amountUsdc) return res.status(400).json(fail('Insufficient balance'));

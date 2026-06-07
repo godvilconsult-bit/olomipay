@@ -8,6 +8,7 @@ import { requireAuth, AuthRequest } from '../middleware/auth';
 import { userSendUsdcToPlatform, getBalance } from '../services/stellar';
 import { verifyPin } from '../services/crypto';
 import { notify } from '../services/notifications';
+import { checkTierLimit } from '../services/kycTiers';
 
 const router = Router();
 
@@ -106,6 +107,9 @@ router.post('/bank', requireAuth, limiter, async (req: AuthRequest, res) => {
 
   const valid = await verifyPin(pin, user.pinHash);
   if (!valid) return res.status(403).json(fail('Incorrect PIN'));
+
+  const lim = await checkTierLimit(req.userId!, amountUsdc, 'bank');
+  if (!lim.ok) return res.status(403).json(fail(lim.error!));
 
   // Get bank account details
   let bankDetails: { bankName: string; accountNumber: string; swiftCode: string; accountName: string };

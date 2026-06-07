@@ -35,7 +35,7 @@ export default function SettingsPage() {
       title: 'Account',
       rows: [
         { icon: User,   label: 'Profile',          sub: 'Name, photo & wallet ID', href: '/profile' },
-        { icon: Shield, label: 'KYC verification',  sub: 'Verify identity for higher limits', href: '/kyc' },
+        { icon: Shield, label: 'Limits & verification', sub: 'Your level, limits & how to raise them', href: '/limits' },
         { icon: Lock,   label: 'Security & PIN',    sub: 'Change PIN, account safety', href: '/profile' },
       ],
     },

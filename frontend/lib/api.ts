@@ -227,6 +227,11 @@ export const kyc = {
     apiFetch('/api/kyc/submit', { method: 'POST', body: JSON.stringify(data) }),
 
   status: () => apiFetch('/api/kyc/status'),
+
+  tier:  () => apiFetch('/api/kyc/tier'),
+
+  basic: (name: string) =>
+    apiFetch('/api/kyc/basic', { method: 'POST', body: JSON.stringify({ name }) }),
 };
 
 // ── Admin ─────────────────────────────────────────────────────────────────────

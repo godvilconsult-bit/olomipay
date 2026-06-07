@@ -60,6 +60,9 @@ export async function setupDatabase(): Promise<void> {
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "kycName" TEXT`,
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "kycIdType" TEXT`,
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "kycIdNumber" TEXT`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "kycLevel" INTEGER NOT NULL DEFAULT 0`,
+      // Existing approved users keep full personal limits (level 2).
+      `UPDATE "User" SET "kycLevel" = 2 WHERE "kycStatus" = 'APPROVED' AND "kycLevel" < 2`,
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "chatPublicKey" TEXT`,
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "chatSecretKeyEnc" TEXT`,
       `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "isOnline" BOOLEAN NOT NULL DEFAULT false`,
