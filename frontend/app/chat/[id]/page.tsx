@@ -40,8 +40,21 @@ const API = process.env.NEXT_PUBLIC_API_URL;
 function getToken() {
   return localStorage.getItem('olomipay_at') || (localStorage.getItem('olomipay_at') || localStorage.getItem('olomipay_rt')) || '';
 }
+// Decode a base64URL JWT segment. atob() alone throws on the '-'/'_' chars that
+// JWTs use → without this, getMyId() returned '' and EVERY message (incl. your
+// own) was treated as "not mine", rendering on the wrong side and duplicating.
+function b64urlDecode(seg: string): string {
+  let s = seg.replace(/-/g, '+').replace(/_/g, '/');
+  while (s.length % 4) s += '=';
+  const bin = atob(s);
+  try { return decodeURIComponent(bin.split('').map(c => '%' + c.charCodeAt(0).toString(16).padStart(2, '0')).join('')); }
+  catch { return bin; }
+}
 function getMyId(): string {
-  try { return JSON.parse(atob(getToken().split('.')[1]))?.userId ?? ''; } catch { return ''; }
+  try {
+    const seg = getToken().split('.')[1];
+    return seg ? (JSON.parse(b64urlDecode(seg))?.userId ?? '') : '';
+  } catch { return ''; }
 }
 async function api(path: string, method = 'GET', body?: any) {
   const r = await fetch(`${API}/api/chat${path}`, {
@@ -306,13 +319,16 @@ function Bubble({
             </p>
           </div>
         )}
-        <p className="text-[14.5px] leading-snug break-words whitespace-pre-wrap">{text}</p>
-        <div className={`flex items-center gap-1 -mt-0.5 ${isMine ? 'justify-end' : 'justify-start'}`}>
-          <span className={`text-[10px] ${isMine ? 'text-white/70' : 'text-slate-400'}`}>
-            {clockTime(msg.createdAt)}
-          </span>
+        {/* WhatsApp layout: text flows, and the last line reserves room (via the
+            invisible spacer) so the time + ticks sit bottom-right, on that line. */}
+        <p className="text-[14.5px] leading-snug break-words whitespace-pre-wrap">
+          {text}
+          <span aria-hidden className={`inline-block ${isMine ? 'w-[3.4rem]' : 'w-[2.6rem]'}`} />
+        </p>
+        <span className={`absolute bottom-1 right-2.5 inline-flex items-center gap-0.5 ${isMine ? 'text-white/70' : 'text-slate-400'}`}>
+          <span className="text-[10px] leading-none tabular-nums">{clockTime(msg.createdAt)}</span>
           {isMine && <Ticks status={tickStatus} />}
-        </div>
+        </span>
       </div>
     </div>
   );

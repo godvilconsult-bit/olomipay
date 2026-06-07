@@ -153,9 +153,12 @@ export default function ChatNotifier() {
       if (msg.conversationId === currentConvId) return;
       // Skip system messages
       if (msg.type === 'SYSTEM') return;
-      // Skip our own messages (optimistic)
+      // Skip our own messages (optimistic). Decode base64URL safely — plain
+      // atob() throws on JWT '-'/'_' chars, which would let own messages through.
       try {
-        const myId = JSON.parse(atob(token.split('.')[1]))?.userId;
+        let s = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+        while (s.length % 4) s += '=';
+        const myId = JSON.parse(atob(s))?.userId;
         if (msg.senderId === myId) return;
       } catch {}
 

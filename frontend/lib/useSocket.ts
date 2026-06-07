@@ -17,7 +17,12 @@ export function useSocket(token: string | null) {
 
     _socket = io(process.env.NEXT_PUBLIC_API_URL!, {
       auth:                  { token },
-      transports:            ['websocket', 'polling'],
+      // Start with HTTP long-polling (works through every proxy / Android
+      // WebView / restrictive mobile network) then transparently UPGRADE to
+      // WebSocket. websocket-first would silently fail to connect on networks
+      // that block the WS handshake → "messages don't get delivered on Android".
+      transports:            ['polling', 'websocket'],
+      upgrade:               true,
       reconnection:          true,
       reconnectionAttempts:  Infinity,   // NEVER give up — reconnect whenever the network returns
       reconnectionDelay:     1_000,
