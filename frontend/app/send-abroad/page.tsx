@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { ArrowLeft, Globe, CheckCircle2 } from 'lucide-react';
 import BottomNav from '../../components/BottomNav';
+import PageHeader from '../../components/PageHeader';
 import PinInput from '../../components/PinInput';
 import { formatUsdc } from '../../lib/utils';
 
@@ -70,13 +71,9 @@ export default function SendAbroadPage() {
 
   return (
     <div className="min-h-screen pb-24">
-      <div className="sticky top-0 z-40 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-5 py-4 flex items-center gap-3">
-        <button onClick={() => step === 'country' ? router.back() : setStep('country')} className="p-2 -ml-2 rounded-full hover:bg-slate-100 min-h-[44px] min-w-[44px] flex items-center justify-center">
-          <ArrowLeft size={20} />
-        </button>
-        <h1 className="text-lg font-semibold">Send abroad</h1>
-        <Globe size={18} className="ml-auto text-primary" />
-      </div>
+      <PageHeader eyebrow="Money" title="Send abroad"
+        onBack={() => step === 'country' ? router.back() : setStep('country')}
+        right={<Globe size={18} className="text-primary" />} />
 
       <div className="px-5 max-w-md mx-auto mt-4 space-y-3">
         {sandbox && step !== 'success' && (

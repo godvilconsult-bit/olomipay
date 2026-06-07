@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { ArrowLeft, Lock, TrendingUp, CheckCircle2, Trophy } from 'lucide-react';
 import BottomNav from '../../components/BottomNav';
+import PageHeader from '../../components/PageHeader';
 import PinInput from '../../components/PinInput';
 import { formatUsdc } from '../../lib/utils';
 
@@ -81,13 +82,8 @@ export default function StakePage() {
 
   return (
     <div className="min-h-screen pb-24">
-      <div className="sticky top-0 z-40 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-5 py-4 flex items-center gap-3">
-        <button onClick={() => step === 'select' ? router.back() : setStep('select')}
-          className="p-2 -ml-2 rounded-full hover:bg-slate-100 min-h-[44px] min-w-[44px] flex items-center justify-center">
-          <ArrowLeft size={20} />
-        </button>
-        <h1 className="text-lg font-semibold">Staking</h1>
-      </div>
+      <PageHeader eyebrow="Grow" title="Earn"
+        onBack={() => step === 'select' ? router.back() : setStep('select')} />
 
       <div className="px-5 max-w-md mx-auto mt-4 space-y-4">
         {/* Active position */}

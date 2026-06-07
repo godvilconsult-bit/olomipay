@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { ArrowLeft, Plus, Users, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 import BottomNav from '../../components/BottomNav';
+import PageHeader from '../../components/PageHeader';
 import { formatUsdc } from '../../lib/utils';
 
 async function chamaApi(path: string, method = 'GET', body?: any) {
@@ -56,16 +57,12 @@ export default function ChamaPage() {
 
   return (
     <div className="min-h-screen pb-24">
-      <div className="sticky top-0 z-40 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-5 py-4 flex items-center gap-3">
-        <button onClick={() => router.back()} className="p-2 -ml-2 rounded-full hover:bg-slate-100 min-h-[44px] min-w-[44px] flex items-center justify-center">
-          <ArrowLeft size={20} />
-        </button>
-        <h1 className="text-lg font-semibold flex-1">Chama Groups</h1>
+      <PageHeader eyebrow="Grow" title="Chama Groups" right={
         <button onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-1 text-sm text-primary font-medium min-h-[44px] px-2">
+          className="flex items-center gap-1 text-sm text-primary font-semibold px-1">
           <Plus size={16} /> New
         </button>
-      </div>
+      } />
 
       <div className="px-5 max-w-md mx-auto mt-4 space-y-4">
         {/* Info card */}

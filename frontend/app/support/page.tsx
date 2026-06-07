@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { ArrowLeft, Plus, Send, LifeBuoy } from 'lucide-react';
 import BottomNav from '../../components/BottomNav';
+import PageHeader from '../../components/PageHeader';
 import { support } from '../../lib/api';
 
 const CATEGORIES = [
@@ -77,20 +78,14 @@ export default function SupportPage() {
 
   return (
     <div className="min-h-screen pb-24">
-      <div className="sticky top-0 z-40 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-5 py-4 flex items-center gap-3">
-        <button onClick={() => view === 'list' ? router.back() : setView('list')}
-          className="p-2 -ml-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 min-h-[44px] min-w-[44px] flex items-center justify-center">
-          <ArrowLeft size={20} />
-        </button>
-        <h1 className="text-lg font-semibold flex-1">
-          {view === 'new' ? 'New request' : view === 'thread' ? (active?.subject ?? 'Ticket') : 'Help & support'}
-        </h1>
-        {view === 'list' && (
+      <PageHeader eyebrow="Account"
+        title={view === 'new' ? 'New request' : view === 'thread' ? (active?.subject ?? 'Ticket') : 'Help & support'}
+        onBack={() => view === 'list' ? router.back() : setView('list')}
+        right={view === 'list' ? (
           <button onClick={() => setView('new')} className="flex items-center gap-1.5 text-sm text-primary font-semibold bg-primary/10 px-3 py-1.5 rounded-xl">
             <Plus size={15} /> New
           </button>
-        )}
-      </div>
+        ) : undefined} />
 
       <div className="px-5 max-w-md mx-auto mt-4 space-y-4">
         {/* LIST */}

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { ArrowLeft, TrendingUp, Info, CheckCircle2 } from 'lucide-react';
 import BottomNav from '../../components/BottomNav';
+import PageHeader from '../../components/PageHeader';
 import PinInput from '../../components/PinInput';
 import { useWallet, invalidateWallet } from '../../lib/walletStore';
 import { formatUsdc } from '../../lib/utils';
@@ -63,15 +64,9 @@ export default function SavingsPage() {
 
   return (
     <div className="min-h-screen pb-24">
-      <div className="sticky top-0 z-40 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-5 py-4 flex items-center gap-3">
-        <button onClick={() => router.back()} className="p-2 -ml-2 rounded-full hover:bg-slate-100 min-h-[44px] min-w-[44px] flex items-center justify-center">
-          <ArrowLeft size={20} />
-        </button>
-        <h1 className="text-lg font-semibold">Savings</h1>
-        <span className="ml-auto text-xs bg-green-100 text-green-700 font-semibold px-2 py-1 rounded-full">
-          {APY}% APY
-        </span>
-      </div>
+      <PageHeader eyebrow="Grow" title="Savings" right={
+        <span className="text-xs bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-semibold px-2.5 py-1 rounded-full">{APY}% APY</span>
+      } />
 
       <div className="px-5 max-w-md mx-auto mt-4 space-y-4">
         {/* Savings balance card */}
