@@ -20,6 +20,7 @@ import toast from 'react-hot-toast';
 import { MessageCircle, DollarSign } from 'lucide-react';
 import { useSocket } from '../lib/useSocket';
 import { chatState } from '../lib/chatState';
+import { invalidateWallet } from '../lib/walletStore';
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
@@ -226,6 +227,7 @@ export default function ChatNotifier() {
     // ── Money received (from send page, not chat) ─────────────────────────
     const u3 = on('money_received', ({ amount, from, asset, conversationId }: any) => {
       playSound('payment');
+      invalidateWallet(); // refresh the shared balance everywhere
       const amtStr = `$${Number(amount).toFixed(2)}`;
       toast.custom(
         t => (
@@ -244,6 +246,7 @@ export default function ChatNotifier() {
     // ── Deposit confirmed ─────────────────────────────────────────────────
     const u4 = on('deposit_confirmed', ({ amountUsdc, amountLocal, currency }: any) => {
       playSound('payment');
+      invalidateWallet(); // money in → refresh the shared balance
       toast.custom(
         t => (
           <PaymentToast

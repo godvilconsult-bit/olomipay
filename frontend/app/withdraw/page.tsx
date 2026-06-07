@@ -7,6 +7,7 @@ import { ArrowLeft, CheckCircle2 } from 'lucide-react';
 import BottomNav from '../../components/BottomNav';
 import PinInput from '../../components/PinInput';
 import { mobile_money, wallet } from '../../lib/api';
+import { invalidateWallet } from '../../lib/walletStore';
 import { formatTzs, formatUsdc } from '../../lib/utils';
 
 type Step = 'amount' | 'pin' | 'success';
@@ -40,6 +41,7 @@ export default function WithdrawPage() {
       const res = await mobile_money.withdraw(amountUsdc, pin);
       setTxId(res.transactionId);
       setStep('success');
+      invalidateWallet();
     } catch (err: any) {
       toast.error(err.message ?? 'Withdrawal failed');
       setPin('');

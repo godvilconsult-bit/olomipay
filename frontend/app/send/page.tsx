@@ -8,6 +8,7 @@ import BottomNav from '../../components/BottomNav';
 import PinInput from '../../components/PinInput';
 import FeePreview from '../../components/FeePreview';
 import { send } from '../../lib/api';
+import { invalidateWallet } from '../../lib/walletStore';
 import { parseRecipient, parseAmount, calcFee, isValidStellarAddress } from '../../lib/utils';
 
 type Step = 'form' | 'pin' | 'success';
@@ -76,6 +77,7 @@ function SendPageInner() {
         setTxHash(result.hash ?? result.transactionId ?? '');
       }
       setStep('success');
+      invalidateWallet();
     } catch (err: any) {
       toast.error(err.message ?? 'Transfer failed');
       setPin('');

@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, RefreshCw, ArrowUp, Plus, QrCode } from 'lucide-react';
 import { formatUsdc, formatTzs } from '../lib/utils';
-import { wallet, mobile_money } from '../lib/api';
+import { useWallet } from '../lib/walletStore';
 
 interface Props {
   publicKey?:     string;
@@ -21,28 +21,9 @@ interface Props {
  */
 export default function BalanceCard({ userTag }: Props) {
   const router = useRouter();
-  const [usdc,       setUsdc]       = useState<string | null>(null);
-  const [tzsRate,    setTzsRate]    = useState<number>(2600);
-  const [hidden,     setHidden]     = useState(false);
-  const [loading,    setLoading]    = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const { usdcNum, tzsRate, loading, refreshing, refresh } = useWallet();
+  const [hidden, setHidden] = useState(false);
 
-  async function load(quiet = false) {
-    quiet ? setRefreshing(true) : setLoading(true);
-    try {
-      const [balRes, rateRes] = await Promise.all([
-        wallet.balance(),
-        mobile_money.rate().catch(() => ({ usdcToTzs: 2600 })),
-      ]);
-      setUsdc(balRes.balance.usdc);
-      setTzsRate(rateRes.usdcToTzs ?? 2600);
-    } catch { /* keep last known value */ }
-    finally { setLoading(false); setRefreshing(false); }
-  }
-
-  useEffect(() => { load(); }, []);
-
-  const usdcNum  = parseFloat(usdc ?? '0');
   const tzsEquiv = usdcNum * tzsRate;
   // Split the amount so we can de-emphasise the cents (fintech hero convention).
   const [whole, cents] = formatUsdc(usdcNum).replace(/^\$/, '').split('.');
@@ -72,7 +53,7 @@ export default function BalanceCard({ userTag }: Props) {
             )}
           </div>
           <div className="flex items-center gap-0.5">
-            <button onClick={() => load(true)} aria-label="Refresh balance"
+            <button onClick={() => refresh()} aria-label="Refresh balance"
               className="rounded-full p-2 text-white/70 hover:bg-white/10 active:scale-90 transition">
               <RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} />
             </button>

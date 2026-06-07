@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 import { ArrowLeft, TrendingUp, Info, CheckCircle2 } from 'lucide-react';
 import BottomNav from '../../components/BottomNav';
 import PinInput from '../../components/PinInput';
-import { wallet } from '../../lib/api';
+import { useWallet, invalidateWallet } from '../../lib/walletStore';
 import { formatUsdc } from '../../lib/utils';
 
 const APY = 4.5;
@@ -29,14 +29,13 @@ export default function SavingsPage() {
   const [tab,      setTab]      = useState<Tab>('overview');
   const [step,     setStep]     = useState<Step>('amount');
   const [position, setPosition] = useState<any>(null);
-  const [balance,  setBalance]  = useState('0');
+  const { usdc: balance }       = useWallet();
   const [amount,   setAmount]   = useState('');
   const [pin,      setPin]      = useState('');
   const [loading,  setLoading]  = useState(false);
 
   useEffect(() => {
     savingsApi('/balance').then(r => r.success && setPosition(r.data));
-    wallet.balance().then(r => setBalance(r.balance?.usdc ?? '0')).catch(() => {});
   }, []);
 
   const amountNum = parseFloat(amount) || 0;
@@ -46,7 +45,7 @@ export default function SavingsPage() {
     setLoading(true);
     const r = await savingsApi('/deposit', { amountUsdc: amountNum, pin });
     setLoading(false);
-    if (r.success) { setStep('success'); savingsApi('/balance').then(d => d.success && setPosition(d.data)); }
+    if (r.success) { setStep('success'); invalidateWallet(); savingsApi('/balance').then(d => d.success && setPosition(d.data)); }
     else toast.error(r.error ?? 'Failed');
     setPin('');
   }
@@ -55,7 +54,7 @@ export default function SavingsPage() {
     setLoading(true);
     const r = await savingsApi('/withdraw', { amountUsdc: amountNum, pin });
     setLoading(false);
-    if (r.success) { setStep('success'); savingsApi('/balance').then(d => d.success && setPosition(d.data)); }
+    if (r.success) { setStep('success'); invalidateWallet(); savingsApi('/balance').then(d => d.success && setPosition(d.data)); }
     else toast.error(r.error ?? 'Failed');
     setPin('');
   }

@@ -34,6 +34,13 @@ export default function DashboardPage() {
     })();
   }, []);
 
+  // Prefetch the screens reachable from this hub so taps open instantly.
+  useEffect(() => {
+    ['/send', '/deposit', '/scan', '/send-abroad', '/agents', '/insights',
+     '/bills', '/grow', '/business', '/history', '/support', '/notifications']
+      .forEach(href => { try { router.prefetch(href); } catch {} });
+  }, [router]);
+
   return (
     <div className="min-h-screen pb-24">
       {/* Header */}
