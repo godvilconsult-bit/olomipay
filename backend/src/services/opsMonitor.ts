@@ -10,6 +10,10 @@ import { prisma } from '../lib/prisma';
 import { sendOpsAlert } from './alerts';
 import { getTreasuryStatus, getBalance } from './stellar';
 
+const AGENT_LOW_FLOAT_USDC = 20;   // warn agents below this cash-out float
+const AGENT_VELOCITY_COUNT = 15;   // completed cash txns in 20 min from one agent
+const AGENT_CANCEL_RATIO   = 0.5;  // share of recent attempts that expired/cancelled
+
 async function checkGasTreasury(): Promise<void> {
   try {
     const t = await getTreasuryStatus();
@@ -69,6 +73,65 @@ async function checkSecurity(): Promise<void> {
   } catch { /* skip cycle */ }
 }
 
+// Agent network health: low cash-out float, transaction velocity, and a high
+// share of failed/abandoned attempts — all early signals of trouble or fraud.
+async function checkAgentHealth(): Promise<void> {
+  try {
+    const { notify } = await import('./notifications');
+    const since = new Date(Date.now() - 20 * 60 * 1000);
+
+    const agents = await prisma.agent.findMany({ where: { status: 'active' }, take: 100 }).catch(() => [] as any[]);
+    if (!agents.length) return;
+
+    // ── Velocity + abandonment per agent (DB-only, cheap) ──────────────────────
+    for (const a of agents) {
+      const recent = await prisma.agentTransaction.findMany({
+        where: { agentId: a.id, createdAt: { gte: since } },
+        select: { status: true },
+      }).catch(() => [] as any[]);
+      if (!recent.length) continue;
+
+      const completed = recent.filter(t => t.status === 'COMPLETED').length;
+      const dead      = recent.filter(t => t.status === 'EXPIRED' || t.status === 'CANCELLED').length;
+
+      if (completed >= AGENT_VELOCITY_COUNT) {
+        await sendOpsAlert({
+          key: `agent_velocity_${a.id}`, severity: 'warn', title: 'Agent high velocity',
+          message: `Agent ${a.code} (${a.businessName}) completed ${completed} cash transactions in 20 min — review for unusual activity.`,
+        });
+      }
+      if (recent.length >= 6 && dead / recent.length >= AGENT_CANCEL_RATIO) {
+        await sendOpsAlert({
+          key: `agent_abandon_${a.id}`, severity: 'warn', title: 'Agent failed-attempt spike',
+          message: `Agent ${a.code} (${a.businessName}): ${dead}/${recent.length} recent cash-outs expired/cancelled — possible scam attempts or operational issue.`,
+        });
+      }
+    }
+
+    // ── Low float (limit Stellar calls to a handful of active agents) ──────────
+    const userIds = agents.map(a => a.userId);
+    const users = await prisma.user.findMany({
+      where: { id: { in: userIds } }, select: { id: true, stellarPubKey: true },
+    }).catch(() => [] as any[]);
+    const pubByUser = new Map<string, string>(users.map((u: any) => [u.id, u.stellarPubKey] as [string, string]));
+
+    for (const a of agents.slice(0, 25)) {
+      const pub = pubByUser.get(a.userId);
+      if (!pub) continue;
+      const bal = await getBalance(pub).catch(() => null);
+      if (!bal) continue;
+      const float = parseFloat((bal as any).usdc ?? '0');
+      if (float < AGENT_LOW_FLOAT_USDC) {
+        await notify.lowBalance(a.userId, `$${float.toFixed(2)}`).catch(() => {});
+        await sendOpsAlert({
+          key: `agent_low_float_${a.id}`, severity: 'warn', title: 'Agent float low',
+          message: `Agent ${a.code} (${a.businessName}) float is $${float.toFixed(2)} — they may be unable to serve cash-ins.`,
+        });
+      }
+    }
+  } catch { /* skip cycle */ }
+}
+
 // Nudge users to fund their savings goals when an auto-save schedule is due.
 // (We never auto-debit without the user's PIN — we remind, they confirm.)
 async function checkAutoSaveReminders(): Promise<void> {
@@ -106,7 +169,7 @@ async function expireStaleCashouts(): Promise<void> {
 
 export function startOpsMonitor(): void {
   const RUN_EVERY = 20 * 60 * 1000; // every 20 minutes
-  const run = () => { checkGasTreasury(); checkReconciliation(); checkSecurity(); checkAutoSaveReminders(); expireStaleCashouts(); };
+  const run = () => { checkGasTreasury(); checkReconciliation(); checkSecurity(); checkAutoSaveReminders(); expireStaleCashouts(); checkAgentHealth(); };
   setTimeout(run, 60_000);          // first run a minute after boot
   setInterval(run, RUN_EVERY);
   console.log('[ops-monitor] started — gas + reconciliation + security watch every 20m');
