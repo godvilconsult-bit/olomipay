@@ -3,10 +3,14 @@
 /* Grow hub — one nav entry that tabs across Savings · Earn · Chama.
    Each tab shows the value prop + opens the full feature. */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { PiggyBank, TrendingUp, Users, ArrowRight } from 'lucide-react';
+import { PiggyBank, TrendingUp, Users, ArrowRight, Sparkles } from 'lucide-react';
 import BottomNav from '../../components/BottomNav';
+import { formatUsdc } from '../../lib/utils';
+
+const API = process.env.NEXT_PUBLIC_API_URL;
+const tok = () => (typeof window !== 'undefined' ? (localStorage.getItem('olomipay_at') || localStorage.getItem('olomipay_rt')) : '') || '';
 
 type Tab = 'savings' | 'earn' | 'chama';
 
@@ -42,8 +46,21 @@ const PANELS: Record<Tab, {
 export default function GrowPage() {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>('savings');
+  const [pos, setPos] = useState<{ principal: number; yieldEarned: number } | null>(null);
+  const [loaded, setLoaded] = useState(false);
   const p = PANELS[tab];
   const Icon = p.icon;
+
+  // Live savings position — makes the hub feel alive (not just marketing).
+  useEffect(() => {
+    fetch(`${API}/api/savings/balance`, { headers: { Authorization: `Bearer ${tok()}` } })
+      .then(r => r.json())
+      .then(r => { if (r.success) setPos({ principal: r.data.principal ?? 0, yieldEarned: r.data.yieldEarned ?? 0 }); })
+      .catch(() => {})
+      .finally(() => setLoaded(true));
+  }, []);
+
+  const growing = (pos?.principal ?? 0) + (pos?.yieldEarned ?? 0);
 
   return (
     <div className="min-h-screen pb-24">
@@ -54,6 +71,30 @@ export default function GrowPage() {
       </div>
 
       <div className="px-5 max-w-md mx-auto space-y-5">
+        {/* Live "you're growing" summary */}
+        {!loaded ? (
+          <div className="skeleton h-24 w-full rounded-[1.5rem]" />
+        ) : growing > 0 ? (
+          <div className="relative overflow-hidden rounded-[1.5rem] p-5 text-white
+                          bg-[linear-gradient(135deg,#065f46_0%,#0d9488_55%,#10b981_100%)]
+                          shadow-[0_20px_50px_-20px_rgba(16,185,129,0.55)]">
+            <div className="pointer-events-none absolute -top-12 -right-8 h-36 w-36 rounded-full bg-white/15 blur-2xl" />
+            <p className="relative z-10 text-xs font-medium uppercase tracking-[0.14em] text-white/70">You're growing</p>
+            <p className="relative z-10 mt-1 text-3xl font-bold tracking-tight tabular-nums">{formatUsdc(growing)}</p>
+            <p className="relative z-10 mt-1 flex items-center gap-1 text-sm text-white/85">
+              <Sparkles size={13} /> +{formatUsdc(pos!.yieldEarned)} earned so far 🌱
+            </p>
+          </div>
+        ) : (
+          <div className="card flex items-center gap-3">
+            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-500/15 text-emerald-500"><TrendingUp size={20} /></span>
+            <div className="flex-1">
+              <p className="font-semibold text-sm">Put your money to work</p>
+              <p className="text-xs text-slate-500">Start with any amount — it earns from day one.</p>
+            </div>
+          </div>
+        )}
+
         {/* Tabs */}
         <div className="flex gap-1 bg-slate-100 dark:bg-white/5 rounded-full p-1">
           {TABS.map(t => (
