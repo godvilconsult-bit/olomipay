@@ -433,7 +433,7 @@ export default function ChatPage() {
               {!query && (
                 <div className="mx-4 my-4 bg-primary/5 rounded-2xl p-4 text-center">
                   <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Can't find someone?</p>
-                  <p className="text-xs text-slate-400 mb-3">Invite them to join Tuma for free</p>
+                  <p className="text-xs text-slate-400 mb-3">Invite them to join OlomiPay for free</p>
                   <button onClick={shareInvite}
                     className="flex items-center gap-2 mx-auto bg-primary text-white text-sm font-semibold px-5 py-2.5 rounded-xl">
                     <Share2 size={14}/> Share invite link
@@ -465,8 +465,8 @@ function ContactRow({ contact, onChat }: { contact: TumaContact; onChat: () => v
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-sm truncate">{contact.savedName}</p>
         <p className="text-xs text-slate-400">
-          {contact.kycName && contact.kycName !== contact.savedName ? `Tuma: ${contact.kycName} · ` : ''}
-          {contact.isOnline ? '🟢 Online' : 'Tuma'}
+          {contact.kycName && contact.kycName !== contact.savedName ? `${contact.kycName} · ` : ''}
+          {contact.isOnline ? '🟢 Online' : 'On OlomiPay'}
         </p>
       </div>
       <span className="bg-green-500 text-white text-xs font-semibold px-3 py-1.5 rounded-full flex-shrink-0">Chat</span>

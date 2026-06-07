@@ -30,7 +30,7 @@ function JoinContent() {
           <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">👋</div>
           <h1 className="text-xl font-bold text-slate-800 mb-2">{inviter} invited you to OlomiPay!</h1>
           <p className="text-slate-500 text-sm leading-relaxed">
-            Tuma is the all-in-one app for sending money, chatting with friends, and running your business.
+            OlomiPay is the all-in-one app for sending money, chatting with friends, and running your business.
           </p>
         </div>
         <div className="space-y-2 mb-6 text-left">
