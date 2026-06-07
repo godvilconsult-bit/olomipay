@@ -73,6 +73,31 @@ function clockTime(date: string | Date): string {
   } catch { return ''; }
 }
 
+// ── Day grouping (WhatsApp-style date separators) ──────────────────────────────
+function dayKey(date: string | Date): string {
+  const d = new Date(date);
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+function dayLabel(date: string | Date): string {
+  const d = new Date(date);
+  const today = new Date();
+  const yest  = new Date(); yest.setDate(today.getDate() - 1);
+  if (dayKey(d) === dayKey(today)) return 'Today';
+  if (dayKey(d) === dayKey(yest))  return 'Yesterday';
+  const sameYear = d.getFullYear() === today.getFullYear();
+  return d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short', ...(sameYear ? {} : { year: 'numeric' }) });
+}
+function DateSeparator({ label }: { label: string }) {
+  return (
+    <div className="flex justify-center my-3">
+      <span className="rounded-full bg-white/70 dark:bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-500 dark:text-slate-300
+                       backdrop-blur-md border border-black/5 dark:border-white/10 shadow-sm">
+        {label}
+      </span>
+    </div>
+  );
+}
+
 // ── Payment bubble (PAYMENT or PAYMENT_REQUEST) ───────────────────────────────
 function PaymentBubble({
   msg, isMine, onAccept, onReject,
@@ -775,10 +800,14 @@ export default function ChatThread() {
           </div>
         ) : (
           <>
-            {messages.map(msg => {
+            {messages.map((msg, i) => {
               const isSel = selected.has(msg.id);
+              const prev = messages[i - 1];
+              const showDate = msg.createdAt && (!prev || dayKey(prev.createdAt) !== dayKey(msg.createdAt));
               return (
-                <div key={msg.id}
+                <div key={msg.id}>
+                {showDate && <DateSeparator label={dayLabel(msg.createdAt)} />}
+                <div
                   className={`relative transition-colors ${selectMode ? 'cursor-pointer' : ''} ${isSel ? 'bg-blue-500/10' : ''}`}
                   onClick={() => { if (selectMode) toggleSelect(msg.id); }}
                   onContextMenu={e => { e.preventDefault(); if (!selectMode && !msg.isDeleted) setMenuMsg(msg); }}
@@ -800,6 +829,7 @@ export default function ChatThread() {
                       onOpenImage={(url, name) => setLightbox({ url, name })}
                       onAccept={handleAccept} onReject={handleReject} />
                   </div>
+                </div>
                 </div>
               );
             })}
