@@ -69,8 +69,15 @@ const genCode = () => String(Math.floor(100000 + Math.random() * 900000));
 
 // ── GET /api/agents/me ────────────────────────────────────────────────────────
 router.get('/me', requireAuth, async (req: AuthRequest, res) => {
-  const agent = await prisma.agent.findUnique({ where: { userId: req.userId! } });
-  return res.json(ok({ agent }));
+  try {
+    const agent = await prisma.agent.findUnique({ where: { userId: req.userId! } });
+    return res.json(ok({ agent }));
+  } catch (e: any) {
+    // e.g. table not yet created on a fresh deploy — treat as "not an agent"
+    // so the page still loads instead of hanging on a thrown async error.
+    console.warn('[agents/me] lookup failed (returning null):', e.message);
+    return res.json(ok({ agent: null }));
+  }
 });
 
 // ── POST /api/agents/apply ────────────────────────────────────────────────────

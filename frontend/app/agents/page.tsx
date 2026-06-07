@@ -13,11 +13,21 @@ import { formatUsdc } from '../../lib/utils';
 
 async function agentApi(path: string, method = 'GET', body?: any) {
   const token = typeof window !== 'undefined' ? (localStorage.getItem('olomipay_at') || localStorage.getItem('olomipay_rt')) : null;
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/agents${path}`, {
-    method, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  return res.json();
+  // Abort after 15s so the UI can never hang on a slow/stuck request.
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 15_000);
+  try {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/agents${path}`, {
+      method, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: body ? JSON.stringify(body) : undefined,
+      signal: ctrl.signal,
+    });
+    return await res.json();
+  } catch {
+    return { success: false, error: 'Network error. Please try again.' };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export default function AgentsPage() {

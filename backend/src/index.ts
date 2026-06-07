@@ -1,4 +1,7 @@
 import express from 'express';
+// Routes async errors to the error-handling middleware instead of letting a
+// thrown `await` hang the request forever (Express 4 doesn't do this natively).
+import 'express-async-errors';
 import { createServer } from 'http';
 import cors from 'cors';
 import helmet from 'helmet';
