@@ -5,8 +5,9 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, TrendingUp, TrendingDown, ArrowRight, Sparkles } from 'lucide-react';
+import { TrendingUp, TrendingDown, ArrowRight, Sparkles } from 'lucide-react';
 import BottomNav from '../../components/BottomNav';
+import PageHeader from '../../components/PageHeader';
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 const getToken = () => localStorage.getItem('olomipay_at') || localStorage.getItem('olomipay_rt') || '';
@@ -28,15 +29,10 @@ export default function InsightsPage() {
 
   return (
     <div className="min-h-screen pb-24">
-      <div className="sticky top-0 z-40 px-4 pt-safe-top pt-4 pb-3 flex items-center gap-3 max-w-md mx-auto">
-        <button onClick={() => router.back()} className="p-1.5 -ml-1 rounded-full hover:bg-slate-100 dark:hover:bg-white/5">
-          <ArrowLeft size={20} />
-        </button>
-        <div>
-          <p className="ds-eyebrow !text-[10px] text-slate-400 flex items-center gap-1"><Sparkles size={11} /> Smart insights</p>
-          <h1 className="text-lg font-bold leading-tight">Your money{d?.month ? ` · ${d.month}` : ''}</h1>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow={<span className="flex items-center gap-1"><Sparkles size={11} /> Smart insights</span>}
+        title={`Your money${d?.month ? ` · ${d.month}` : ''}`}
+      />
 
       <div className="px-4 max-w-md mx-auto space-y-4 mt-1">
         {loading ? (

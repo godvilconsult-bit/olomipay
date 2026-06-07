@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Filter } from 'lucide-react';
 import BottomNav from '../../components/BottomNav';
+import PageHeader from '../../components/PageHeader';
 import TransactionItem from '../../components/TransactionItem';
 import { wallet } from '../../lib/api';
 
@@ -48,31 +48,24 @@ export default function HistoryPage() {
 
   return (
     <div className="min-h-screen pb-24">
-      <div className="sticky top-0 z-40 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800">
-        <div className="flex items-center gap-3 px-5 py-4">
-          <button onClick={() => router.back()} className="p-2 -ml-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 min-h-[44px] min-w-[44px] flex items-center justify-center">
-            <ArrowLeft size={20} />
-          </button>
-          <h1 className="text-lg font-semibold flex-1">Transaction history</h1>
-        </div>
-
+      <PageHeader eyebrow="Account" title="Activity">
         {/* Filter chips */}
-        <div className="flex gap-2 px-5 pb-3 overflow-x-auto scrollbar-none">
+        <div className="max-w-md mx-auto flex gap-2 px-4 pb-2.5 overflow-x-auto scrollbar-none">
           {FILTERS.map(f => (
             <button
               key={f.value}
               onClick={() => setFilter(f.value)}
-              className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors min-h-[36px] ${
+              className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-colors ${
                 filter === f.value
-                  ? 'chip-active'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                  ? 'bg-gradient-to-r from-blue-500 to-emerald-500 text-white shadow-sm'
+                  : 'bg-slate-200/70 dark:bg-white/10 text-slate-600 dark:text-slate-300'
               }`}
             >
               {f.label}
             </button>
           ))}
         </div>
-      </div>
+      </PageHeader>
 
       <div className="px-5 max-w-md mx-auto mt-4">
         {loading && txs.length === 0 ? (
