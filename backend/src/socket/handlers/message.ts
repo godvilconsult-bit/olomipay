@@ -69,6 +69,17 @@ export async function handleSendMessage(io: Server, socket: Socket, data: any) {
       include: { user: { select: { id: true, isOnline: true, kycName: true, phone: true } } },
     });
 
+    // Push title/body — sender name + a privacy-safe preview (no message content
+    // on the lock screen).
+    const senderName = message.sender?.kycName ?? socket.data.user?.kycName ?? 'OlomiPay';
+    const mt = String(message.type);
+    const preview =
+      mt === 'IMAGE'           ? '📷 Photo'
+      : mt === 'FILE'          ? '📎 File'
+      : mt === 'PAYMENT'       ? '💸 Sent you money'
+      : mt === 'PAYMENT_REQUEST' ? '💛 Requested money'
+      : '💬 New message';
+
     for (const m of members) {
       // Also emit directly to the recipient's personal room (user:<id>)
       // so they receive it even if not in the conversation room yet
@@ -80,15 +91,18 @@ export async function handleSendMessage(io: Server, socket: Socket, data: any) {
         s.join(conversationId);
       }
 
-      // Push notification for offline users
-      if (!m.user.isOnline) {
-        sendPushToUser(m.user.id, {
-          title: socket.data.user?.kycName ?? 'OlomiPay',
-          body:  '🔒 New message',
-          type:  'chat',
-          data:  { conversationId, type: 'chat' },
-        }).catch(() => {});
-      }
+      // ALWAYS send a push — so the recipient hears/sees it even when the app is
+      // backgrounded or the screen is locked (phone in pocket). "isOnline" only
+      // means the socket is connected, NOT that the app is in the foreground, so
+      // gating on it silently dropped pocket alerts. The service worker suppresses
+      // the banner when the app is actually focused (no double-notify while
+      // chatting); native FCM only surfaces in the tray when backgrounded.
+      sendPushToUser(m.user.id, {
+        title: senderName,
+        body:  preview,
+        type:  'chat',
+        data:  { conversationId, type: 'chat' },
+      }).catch(() => {});
     }
   } catch (e: any) {
     console.error('[socket:message]', e.message);

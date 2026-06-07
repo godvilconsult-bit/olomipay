@@ -42,7 +42,16 @@ self.addEventListener('push', (event) => {
   };
 
   event.waitUntil(
-    self.registration.showNotification(title, options)
+    (async () => {
+      // If the app is open AND focused/visible, let the in-app toast + sound
+      // handle it — don't also pop a system banner (avoids double-notify while
+      // actively chatting). When the phone is in the pocket (no focused window),
+      // we always show it with sound + vibration.
+      const clientsArr = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      const focused = clientsArr.some(c => c.focused || c.visibilityState === 'visible');
+      if (focused && type === 'chat') return;
+      await self.registration.showNotification(title, options);
+    })()
   );
 });
 
