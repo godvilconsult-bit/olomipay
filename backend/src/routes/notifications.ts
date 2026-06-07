@@ -3,11 +3,33 @@ import { z } from 'zod';
 import { PrismaClient } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { requireAuth, AuthRequest } from '../middleware/auth';
+import { pushStatus } from '../services/notifications';
 
 const router = Router();
 
 const ok  = (data: any) => ({ success: true,  data });
 const err = (msg: string, status = 400) => ({ success: false, error: msg, _status: status });
+
+// ── GET /api/notifications/status ────────────────────────────────────────────
+// Diagnostic: which background-push channels the server has configured, and
+// whether THIS user's device is registered to receive them. Visit while logged
+// in to instantly see why background notifications may not be arriving.
+router.get('/status', requireAuth, async (req: AuthRequest, res) => {
+  const ch = pushStatus();
+  const [devTokens, webSubs] = await Promise.all([
+    prisma.$queryRawUnsafe<any[]>(`SELECT COUNT(*)::int AS n FROM "DeviceToken" WHERE "userId" = $1`, req.userId!).catch(() => [{ n: 0 }]),
+    prisma.pushSubscription.count({ where: { userId: req.userId! } }).catch(() => 0),
+  ]);
+  const myDeviceTokens = devTokens?.[0]?.n ?? 0;
+  const willReceiveBackground =
+    (ch.nativeFcm && myDeviceTokens > 0) || (ch.webPush && (webSubs as number) > 0);
+  return res.json(ok({
+    channels:           ch,             // { nativeFcm, webPush } — server config
+    myDeviceTokens,                     // FCM tokens registered for this device
+    myWebSubscriptions: webSubs,        // web-push subscriptions for this user
+    willReceiveBackground,              // the bottom line
+  }));
+});
 
 // ── POST /api/notifications/subscribe ────────────────────────────────────────
 

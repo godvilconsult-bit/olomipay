@@ -25,6 +25,14 @@ export interface NotificationPayload {
   data?: Record<string, any>;
 }
 
+/** Which background-push channels are configured on this server. */
+export function pushStatus() {
+  return {
+    nativeFcm: !!fcm,
+    webPush:   !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY),
+  };
+}
+
 // ── Native push (FCM) for the iOS/Android apps ────────────────────────────────
 // Lazily initialised from FCM_SERVICE_ACCOUNT (the Firebase service-account JSON).
 // Wrapped so a missing package or missing env NEVER crashes the server — push
