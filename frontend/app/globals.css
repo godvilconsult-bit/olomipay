@@ -604,3 +604,29 @@ table { max-width: 100%; }
 
 /* Prevent any element from forcing the page wider than the viewport */
 #__next, main, section, header, footer { max-width: 100%; }
+
+/* ── Landing page (/) animations — moved out of an inline <style> so SSR and
+   client markup match exactly (prevents a React hydration mismatch). ── */
+@keyframes olo-aurora { 0%,100%{transform:translate(0,0) scale(1)} 33%{transform:translate(6%,-4%) scale(1.1)} 66%{transform:translate(-5%,5%) scale(.95)} }
+@keyframes olo-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-14px)} }
+@keyframes olo-gradient { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
+@keyframes olo-rise { from{transform:translateY(0)} to{transform:translateY(-50%)} }
+@keyframes olo-pulse { 0%{box-shadow:0 0 0 0 rgba(52,211,153,.55)} 70%{box-shadow:0 0 0 7px rgba(52,211,153,0)} 100%{box-shadow:0 0 0 0 rgba(52,211,153,0)} }
+.olo-aurora { animation: olo-aurora 20s ease-in-out infinite; }
+.olo-float  { animation: olo-float 6s ease-in-out infinite; }
+.olo-rise   { animation: olo-rise linear infinite; }
+.olo-pulse-dot { animation: olo-pulse 2s ease-out infinite; }
+.olo-gradient-text {
+  background: linear-gradient(110deg,#3b82f6,#22d3ee,#22c55e,#3b82f6);
+  background-size: 250% 250%;
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  animation: olo-gradient 6s ease infinite;
+}
+.olo-glow { position: relative; }
+.olo-glow::before {
+  content:''; position:absolute; inset:-2px; border-radius:inherit;
+  background:linear-gradient(110deg,#3b82f6,#22c55e,#22d3ee); filter:blur(14px); opacity:.5; z-index:-1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .olo-aurora, .olo-float, .olo-rise, .olo-pulse-dot, .olo-gradient-text { animation: none; }
+}
