@@ -47,7 +47,16 @@ try {
   console.warn('[fcm] init failed — native push disabled:', e?.message);
 }
 
-async function sendNativePush(userId: string, payload: NotificationPayload): Promise<void> {
+async function unreadBadge(userId: string): Promise<number> {
+  try {
+    const c = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT COUNT(*)::int AS n FROM "Notification" WHERE "userId" = $1 AND "isRead" = false`, userId,
+    );
+    return c?.[0]?.n ?? 0;
+  } catch { return 0; }
+}
+
+async function sendNativePush(userId: string, payload: NotificationPayload, badge: number): Promise<void> {
   if (!fcm) return;
   const rows = await prisma.$queryRawUnsafe<any[]>(
     `SELECT "token" FROM "DeviceToken" WHERE "userId" = $1`, userId,
@@ -57,16 +66,6 @@ async function sendNativePush(userId: string, payload: NotificationPayload): Pro
   const data: Record<string, string> = {};
   for (const [k, v] of Object.entries(payload.data ?? {})) data[k] = String(v);
   data.type = payload.type;
-
-  // Unread count → shown as the app-icon badge / notification count, so the user
-  // sees how many messages/alerts are waiting before opening the app.
-  let badge = 0;
-  try {
-    const c = await prisma.$queryRawUnsafe<any[]>(
-      `SELECT COUNT(*)::int AS n FROM "Notification" WHERE "userId" = $1 AND "isRead" = false`, userId,
-    );
-    badge = c?.[0]?.n ?? 0;
-  } catch { /* ignore */ }
 
   try {
     const resp = await fcm.sendEachForMulticast({
@@ -111,6 +110,10 @@ export async function sendPushToUser(userId: string, payload: NotificationPayloa
     },
   });
 
+  // Unread count → app-icon badge so the user sees how many are waiting before
+  // opening the app (used by both web Badging API and native FCM).
+  const badge = await unreadBadge(userId);
+
   // 2. Send Web Push to all registered subscriptions
   const subs = await prisma.pushSubscription.findMany({ where: { userId } });
 
@@ -119,6 +122,7 @@ export async function sendPushToUser(userId: string, payload: NotificationPayloa
     body:  payload.body,
     icon:  '/icon-192.svg',
     badge: '/icon-192.svg',
+    badgeCount: badge,
     data:  payload.data,
   });
 
@@ -137,7 +141,7 @@ export async function sendPushToUser(userId: string, payload: NotificationPayloa
   );
 
   // 3. Native push to the iOS/Android apps (FCM). No-op if FCM isn't configured.
-  await sendNativePush(userId, payload).catch(() => {});
+  await sendNativePush(userId, payload, badge).catch(() => {});
 }
 
 // ── Pre-built notification templates (English) ───────────────────────────────

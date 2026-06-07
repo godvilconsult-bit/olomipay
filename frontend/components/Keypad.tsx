@@ -8,6 +8,8 @@
  *   onDigit(d)   — called with '0'..'9' when a number is pressed
  *   onBackspace  — called when ⌫ is pressed
  */
+import { tapHaptic } from '../lib/haptics';
+
 export default function Keypad({
   onDigit, onBackspace,
 }: {
@@ -22,7 +24,7 @@ export default function Keypad({
           key={i}
           type="button"
           disabled={!k}
-          onClick={() => (k === '⌫' ? onBackspace() : k && onDigit(k))}
+          onClick={() => { if (!k) return; tapHaptic(); k === '⌫' ? onBackspace() : onDigit(k); }}
           style={{
             padding: '14px 0', borderRadius: 14,
             border: '1px solid rgba(255,255,255,.08)',

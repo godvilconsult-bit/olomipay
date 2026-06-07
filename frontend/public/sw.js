@@ -16,8 +16,15 @@ self.addEventListener('push', (event) => {
   try { payload = event.data.json(); }
   catch { payload = { title: 'OlomiPay', body: event.data.text(), data: {} }; }
 
-  const { title, body, icon, data = {} } = payload;
+  const { title, body, icon, data = {}, badgeCount } = payload;
   const type = data.type ?? 'general';
+
+  // Reflect the waiting count on the app icon — even while the app is closed.
+  try {
+    if (typeof badgeCount === 'number' && self.navigator && self.navigator.setAppBadge) {
+      badgeCount > 0 ? self.navigator.setAppBadge(badgeCount) : self.navigator.clearAppBadge?.();
+    }
+  } catch { /* unsupported */ }
 
   // Pick vibration pattern and badge colour by notification type
   const vibrate = type === 'money_in' || type === 'payment_received'
