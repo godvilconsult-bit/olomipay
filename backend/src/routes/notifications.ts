@@ -10,6 +10,14 @@ const router = Router();
 const ok  = (data: any) => ({ success: true,  data });
 const err = (msg: string, status = 400) => ({ success: false, error: msg, _status: status });
 
+// ── GET /api/notifications/config ────────────────────────────────────────────
+// Public, no secrets — just whether each background-push channel is configured
+// on the server. Open in any browser to diagnose: nativeFcm/webPush = false
+// means that channel's env vars aren't set, so background pushes can't be sent.
+router.get('/config', (_req, res) => {
+  res.json(ok(pushStatus()));
+});
+
 // ── GET /api/notifications/status ────────────────────────────────────────────
 // Diagnostic: which background-push channels the server has configured, and
 // whether THIS user's device is registered to receive them. Visit while logged
