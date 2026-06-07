@@ -55,10 +55,26 @@ try {
   console.warn('[fcm] init failed — native push disabled:', e?.message);
 }
 
-async function unreadBadge(userId: string): Promise<number> {
+/**
+ * Total UNREAD MESSAGES across all of a user's conversations — the WhatsApp-style
+ * number for the app-icon badge. A message is unread if it's from someone else,
+ * not deleted, in a conversation the user belongs to, and has no read-receipt
+ * from this user.
+ */
+export async function unreadMessageTotal(userId: string): Promise<number> {
   try {
     const c = await prisma.$queryRawUnsafe<any[]>(
-      `SELECT COUNT(*)::int AS n FROM "Notification" WHERE "userId" = $1 AND "isRead" = false`, userId,
+      `SELECT COUNT(*)::int AS n
+         FROM "Message" m
+         JOIN "ConversationMember" cm
+           ON cm."conversationId" = m."conversationId" AND cm."userId" = $1
+        WHERE m."senderId" <> $1
+          AND m."isDeleted" = false
+          AND NOT EXISTS (
+            SELECT 1 FROM "MessageReceipt" r
+             WHERE r."messageId" = m."id" AND r."userId" = $1
+          )`,
+      userId,
     );
     return c?.[0]?.n ?? 0;
   } catch { return 0; }
@@ -118,9 +134,9 @@ export async function sendPushToUser(userId: string, payload: NotificationPayloa
     },
   });
 
-  // Unread count → app-icon badge so the user sees how many are waiting before
-  // opening the app (used by both web Badging API and native FCM).
-  const badge = await unreadBadge(userId);
+  // Unread MESSAGES → app-icon badge so the user sees how many are waiting
+  // before opening the app (used by both web Badging API and native FCM).
+  const badge = await unreadMessageTotal(userId);
 
   // 2. Send Web Push to all registered subscriptions
   const subs = await prisma.pushSubscription.findMany({ where: { userId } });

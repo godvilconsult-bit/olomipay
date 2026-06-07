@@ -136,6 +136,28 @@ export default function ChatNotifier() {
     if (path === '/chat') chatState.clear();
   }, [path]);
 
+  // Keep the unread badge authoritative: the server pushes the exact count on
+  // every new message / read, and we re-sync on every (re)connect so a dropped
+  // socket never leaves a stale app-icon badge.
+  useEffect(() => {
+    if (!token) return;
+    const resync = () => {
+      fetch(`${API}/api/chat/conversations`, { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => r.json())
+        .then(r => {
+          if (r.success) {
+            const total = (r.data.conversations ?? []).reduce((s: number, c: any) => s + (c.unreadCount ?? 0), 0);
+            chatState.setUnread(total);
+          }
+        }).catch(() => {});
+    };
+    const uBadge = on('badge_update', ({ count }: any) => {
+      if (typeof count === 'number') chatState.setUnread(count);
+    });
+    const uConn = on('connect', resync);
+    return () => { uBadge(); uConn(); };
+  }, [on, token]);
+
   // Socket event handlers
   useEffect(() => {
     if (!token) return;

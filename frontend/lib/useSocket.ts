@@ -35,6 +35,15 @@ export function useSocket(token: string | null) {
     _socket.on('disconnect', (r) => console.log('[socket] disconnected:', r));
     _socket.on('connect_error', (e) => console.error('[socket] error:', e.message));
 
+    // Reconnect INSTANTLY when the user brings the app to the foreground or the
+    // network returns — don't wait out the reconnection backoff. This is what
+    // makes pulling the phone from a pocket feel instant and avoids a stale
+    // "offline" state.
+    const kick = () => { if (_socket && !_socket.connected) _socket.connect(); };
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') kick(); });
+    window.addEventListener('online', kick);
+    window.addEventListener('focus', kick);
+
     // Cleanup: don't disconnect — keep alive app-wide
     return () => {};
   }, [token]);

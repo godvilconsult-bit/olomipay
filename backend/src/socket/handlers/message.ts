@@ -1,7 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import { PrismaClient }   from '@prisma/client';
 import { prisma } from '../../lib/prisma';
-import { sendPushToUser } from '../../services/notifications';
+import { sendPushToUser, unreadMessageTotal } from '../../services/notifications';
 
 
 async function verifyMembership(userId: string, conversationId: string): Promise<boolean> {
@@ -103,6 +103,12 @@ export async function handleSendMessage(io: Server, socket: Socket, data: any) {
         type:  'chat',
         data:  { conversationId, type: 'chat' },
       }).catch(() => {});
+
+      // Live badge sync — update the app-icon count on any of the recipient's
+      // open sessions immediately (the push carries the count for closed apps).
+      unreadMessageTotal(m.user.id)
+        .then(count => io.to(`user:${m.user.id}`).emit('badge_update', { count }))
+        .catch(() => {});
     }
   } catch (e: any) {
     console.error('[socket:message]', e.message);

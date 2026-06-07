@@ -1,6 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import { PrismaClient } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
+import { unreadMessageTotal } from '../../services/notifications';
 
 
 export async function handleMarkRead(io: Server, socket: Socket, data: any) {
@@ -41,6 +42,10 @@ export async function handleMarkRead(io: Server, socket: Socket, data: any) {
     // Tell senders their messages were read (blue ticks)
     const messageIds = unread.map(m => m.id);
     socket.to(conversationId).emit('messages_read', { messageIds, readBy: userId });
+
+    // Update the reader's app-icon badge across all their devices.
+    const count = await unreadMessageTotal(userId);
+    io.to(`user:${userId}`).emit('badge_update', { count });
 
   } catch (e: any) {
     console.error('[socket:markRead]', e.message);

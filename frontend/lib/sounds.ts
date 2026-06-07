@@ -74,11 +74,21 @@ export const sounds = {
     note(c, E6, 0.22, 0.18, { type: 'sine',     gain: 0.22 });
   },
 
-  /** 💬 Incoming chat message — light, pleasant two-note chime. */
+  /**
+   * 💬 Incoming chat message — the OlomiPay signature chime. A bright,
+   * friendly two-note "ti-ding" that resolves UPWARD (G→C, a perfect fourth)
+   * with a soft bell under-layer and a high shimmer. Deliberately distinct and
+   * consistent so users recognise it instantly as "a message on OlomiPay".
+   */
   message(): void {
     const c = ctx(); if (!c) return;
-    note(c, E6, 0,    0.10, { type: 'sine', gain: 0.22 });
-    note(c, A5, 0.10, 0.16, { type: 'sine', gain: 0.20 });
+    // First note — clear bell ping
+    note(c, G5,    0,    0.12, { type: 'sine',     gain: 0.22 });
+    note(c, G5 * 2, 0,   0.10, { type: 'sine',     gain: 0.06 }); // octave shimmer
+    // Resolve upward — the recognisable lift
+    note(c, C6,    0.11, 0.26, { type: 'sine',     gain: 0.24 });
+    note(c, C6,    0.11, 0.26, { type: 'triangle', gain: 0.08 }); // warm body
+    note(c, C6 * 2, 0.12, 0.16, { type: 'sine',    gain: 0.05 }); // high sparkle
   },
 };
 
