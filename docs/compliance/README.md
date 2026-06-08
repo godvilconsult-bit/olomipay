@@ -18,6 +18,14 @@ custody model, and compliance controls — accurately and without overstatement.
 | 05 | [AML / KYC & Compliance Controls](05-aml-kyc-compliance.md) | Identity tiers, limits, transaction monitoring, reporting, lockouts. |
 | 06 | [Security & Data Protection](06-security.md) | Encryption, access control, infra security, incident response, audit. |
 | 07 | [Yellow Card Integration](07-yellowcard-integration.md) | Exactly how we use the partner API; the on/off-ramp flows. |
+| 08 | [Wallet Key Hardening Plan](08-key-hardening-plan.md) | KMS/HSM-backed signer plan — removes the single-master-key risk. |
+
+## PDF versions
+Ready-to-send PDFs are in [`pdf/`](pdf/): one per document plus a combined
+**`OlomiPay-Compliance-Pack.pdf`**. Regenerate after edits with:
+```
+python docs/compliance/build_pdfs.py   # needs: pip install markdown xhtml2pdf
+```
 
 ## How to use this pack
 1. Fill the **[ ]** placeholders (legal entity name, registration numbers,
