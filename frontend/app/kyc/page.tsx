@@ -73,7 +73,10 @@ export default function KycPage() {
   }
 
   const approved  = status === 'APPROVED';
-  const submitted = status === 'SUBMITTED' || status === 'PENDING';
+  // Only SUBMITTED means "awaiting review". PENDING is the default/not-started
+  // state for a brand-new user — they must still see the upload form.
+  const submitted = status === 'SUBMITTED';
+  const rejected  = status === 'REJECTED';
 
   return (
     <div className="min-h-screen pb-24">
@@ -102,6 +105,12 @@ export default function KycPage() {
           </div>
         ) : (
           <>
+            {rejected && (
+              <div className="card bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800">
+                <p className="text-sm font-semibold text-rose-700 dark:text-rose-400">Your previous verification wasn't accepted</p>
+                <p className="text-xs text-rose-600/80 mt-0.5">Please re-upload clear photos of your ID and a selfie, then submit again.</p>
+              </div>
+            )}
             <div className="card bg-gradient-to-br from-[#1a3a6b] to-[#1a56db] text-white">
               <div className="flex items-center gap-2 text-white/80 text-sm"><ShieldCheck size={16} /> Verify to unlock more</div>
               <p className="text-sm text-white/90 mt-1.5">Confirm your identity to raise your limits and use cash agents, bank withdrawals and more.</p>
