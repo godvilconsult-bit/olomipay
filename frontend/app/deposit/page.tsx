@@ -153,6 +153,23 @@ export default function DepositPage() {
     } finally { setLoading(false); }
   }
 
+  // Open the Fonbnk hosted widget — it runs KYC + mobile-money collection and
+  // delivers USDC straight to the user's wallet. Pre-fills amount if entered.
+  const [fonbnkBusy, setFonbnkBusy] = useState(false);
+  async function openFonbnk() {
+    setFonbnkBusy(true);
+    try {
+      const amt = parseInt(amount.replace(/,/g, ''), 10) || 0;
+      const qs  = amt >= 500 ? `?amount=${amt}` : '';
+      const r   = await fetch(`${API}/api/fonbnk/widget-url${qs}`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      }).then(r => r.json());
+      if (r.success && r.data?.url) window.open(r.data.url, '_blank', 'noopener');
+      else toast.error(r.error ?? 'Instant top-up is not available yet');
+    } catch { toast.error('Could not open the top-up window'); }
+    finally { setFonbnkBusy(false); }
+  }
+
   // ── QR URI to show ─────────────────────────────────────────────────────────
   const qrUri = receiveData?.usdcQrUri;
 
@@ -216,6 +233,21 @@ export default function DepositPage() {
             {t.label}
           </button>
         ))}
+      </div>
+
+      {/* Instant top-up via the Fonbnk hosted widget (mobile money / card) */}
+      <div className="max-w-md mx-auto px-4 pt-4">
+        <button onClick={openFonbnk} disabled={fonbnkBusy}
+          className="w-full flex items-center gap-3 rounded-2xl p-4 text-left text-white
+                     bg-[linear-gradient(135deg,#0b2150,#1a56db)] shadow-[0_14px_30px_-14px_rgba(26,86,219,0.6)]
+                     active:scale-[0.99] transition disabled:opacity-60">
+          <span className="w-11 h-11 rounded-xl bg-white/15 flex items-center justify-center flex-shrink-0"><Zap size={22} /></span>
+          <span className="flex-1 min-w-0">
+            <span className="block font-semibold">{fonbnkBusy ? 'Opening...' : 'Add money instantly'}</span>
+            <span className="block text-xs text-white/70">Mobile money - delivered straight to your balance</span>
+          </span>
+          <ExternalLink size={18} className="text-white/70 flex-shrink-0" />
+        </button>
       </div>
 
       {/* ── Tab: Receive / QR Code ──────────────────────────────────────────── */}
