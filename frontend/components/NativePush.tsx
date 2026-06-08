@@ -31,17 +31,23 @@ export default function NativePush() {
       if (perm.receive !== 'granted') return;
 
       // Android 8+: notifications are SILENT unless delivered via a HIGH-importance
-      // channel. Create one (importance 5 = heads-up + default sound + vibrate).
+      // channel, and a channel's SOUND is locked at creation — so to switch to our
+      // signature marimba tone we use a NEW channel id ('olomipay_messages_v1').
+      // The sound file lives at android/.../res/raw/marimba.mp3 → referenced as
+      // 'marimba' (no extension).
       if (Capacitor.getPlatform() === 'android') {
         try {
           await PushNotifications.createChannel({
-            id:          'olomipay_default',
-            name:        'OlomiPay alerts',
-            description: 'Money and chat notifications',
-            importance:  5,   // HIGH — pop-up + sound
+            id:          'olomipay_messages_v1',
+            name:        'OlomiPay messages',
+            description: 'Chat and money notifications',
+            importance:  5,          // HIGH — heads-up pop-up
             visibility:  1,
+            sound:       'marimba',  // res/raw/marimba.mp3 — our symbolic tone
             vibration:   true,
           });
+          // Tidy up the old default-sound channel so users don't see two.
+          await PushNotifications.deleteChannel?.({ id: 'olomipay_default' }).catch(() => {});
         } catch { /* older Android / already exists */ }
       }
 

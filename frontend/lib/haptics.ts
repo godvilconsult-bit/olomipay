@@ -12,3 +12,11 @@ export function tapHaptic(ms = 8): void {
     if (nav && typeof nav.vibrate === 'function') nav.vibrate(ms);
   } catch { /* ignore */ }
 }
+
+/** A celebratory double-pulse for a completed action (e.g. signed in). */
+export function successHaptic(): void {
+  try {
+    const nav: any = typeof navigator !== 'undefined' ? navigator : null;
+    if (nav && typeof nav.vibrate === 'function') nav.vibrate([18, 60, 35]);
+  } catch { /* ignore */ }
+}

@@ -99,13 +99,14 @@ async function sendNativePush(userId: string, payload: NotificationPayload, badg
       android: {
         priority: 'high',
         notification: {
-          sound:        'default',          // play a sound
-          defaultSound: true,
-          channelId:    'olomipay_default', // the HIGH-importance channel the app created
+          sound:        'marimba',              // res/raw/marimba.mp3 — signature tone
+          channelId:    'olomipay_messages_v1', // HIGH-importance channel w/ that sound
           defaultVibrateTimings: true,
-          notificationCount: badge,         // number badge on the app icon
+          notificationCount: badge,             // number badge on the app icon
         },
       },
+      // iOS: keep default until marimba.caf is bundled in the iOS app, so iOS
+      // never goes silent. (Android plays res/raw/marimba.mp3 above.)
       apns: { payload: { aps: { sound: 'default', badge } } },
     });
     await Promise.all(resp.responses.map((r: any, i: number) => {

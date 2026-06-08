@@ -13,6 +13,7 @@ import toast from 'react-hot-toast';
 import { ArrowLeft, ArrowRight, Phone } from 'lucide-react';
 import Keypad from '../../../components/Keypad';
 import { auth, setTokens } from '../../../lib/api';
+import { successHaptic } from '../../../lib/haptics';
 
 function fmtPhone(d: string): string {
   const a = d.slice(0, 3), b = d.slice(3, 6), c = d.slice(6, 9);
@@ -70,6 +71,7 @@ export default function LoginPage() {
     try {
       const data = await auth.login(phoneFull, pin);
       setTokens(data.accessToken, data.refreshToken);
+      successHaptic();
       toast.success('Welcome back!');
       const nextUrl = new URLSearchParams(window.location.search).get('next');
       router.push(nextUrl && nextUrl.startsWith('/') ? nextUrl : '/dashboard');

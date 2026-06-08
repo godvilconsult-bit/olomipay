@@ -12,6 +12,7 @@ import toast from 'react-hot-toast';
 import { ArrowLeft, ArrowRight, Phone, User } from 'lucide-react';
 import Keypad from '../../../components/Keypad';
 import { auth, setTokens } from '../../../lib/api';
+import { successHaptic } from '../../../lib/haptics';
 
 type Step = 'phone' | 'name' | 'pin' | 'confirm';
 
@@ -78,6 +79,7 @@ export default function RegisterPage() {
     try {
       const data = await auth.register(phoneFull, pin, name);
       setTokens(data.accessToken, data.refreshToken);
+      successHaptic();
       toast.success(`Welcome to OlomiPay, ${name || 'friend'}! 🎉`);
       router.push('/dashboard');
     } catch (err: any) {
