@@ -19,6 +19,7 @@ custody model, and compliance controls — accurately and without overstatement.
 | 06 | [Security & Data Protection](06-security.md) | Encryption, access control, infra security, incident response, audit. |
 | 07 | [Yellow Card Integration](07-yellowcard-integration.md) | Exactly how we use the partner API; the on/off-ramp flows. |
 | 08 | [Wallet Key Hardening Plan](08-key-hardening-plan.md) | KMS/HSM-backed signer plan — removes the single-master-key risk. |
+| 09 | [Key-Compromise Response Runbook](09-key-compromise-runbook.md) | Step-by-step incident response incl. the sweep-migration procedure. |
 
 ## PDF versions
 Ready-to-send PDFs are in [`pdf/`](pdf/): one per document plus a combined

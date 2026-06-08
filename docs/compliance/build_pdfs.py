@@ -71,4 +71,4 @@ combined = ('<html><head><style>' + CSS + '</style></head><body>' + cover +
             FOOTER + '</body></html>')
 render(combined, os.path.join(OUT, 'OlomiPay-Compliance-Pack.pdf'))
 print('  rendered OlomiPay-Compliance-Pack.pdf (combined)')
-print('Done →', OUT)
+print('Done ->', OUT)

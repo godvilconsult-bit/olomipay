@@ -35,6 +35,20 @@ const r2 = process.env.R2_ACCOUNT_ID
   : null;
 const KYC_BUCKET = process.env.R2_KYC_BUCKET ?? process.env.R2_BUCKET_NAME;
 
+// Compliance access trail: record which staff member viewed which user's
+// identity documents (and when/from where). Best-effort, never blocks.
+async function auditKycAccess(req: any, action: string, targetUserId: string, detail?: any) {
+  try {
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO "AdminAuditLog" ("adminId","adminPhone","action","targetId","targetType","detail","ip")
+       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      req.userId ?? null, req.adminPhone ?? null, action, targetUserId, 'kyc_document',
+      detail ? JSON.stringify(detail).slice(0, 1000) : null,
+      (req.headers['x-forwarded-for'] as string)?.split(',')[0] ?? req.ip ?? null,
+    );
+  } catch { /* never block */ }
+}
+
 // ── POST /api/kyc/document ────────────────────────────────────────────────────
 // Upload one KYC document (kind = ID_FRONT | ID_BACK | SELFIE). Replaces any
 // previous file of the same kind for this user. Marks KYC as SUBMITTED.
@@ -91,6 +105,9 @@ router.get('/admin/:userId/documents', requireRole(...COMPLIANCE_ROLES), async (
 router.get('/admin/document/:docId', requireRole(...COMPLIANCE_ROLES), async (req, res) => {
   const doc = await prisma.kycDocument.findUnique({ where: { id: req.params.docId } }).catch(() => null);
   if (!doc) return res.status(404).json({ error: 'Not found' });
+
+  // Record the access (who viewed which user's ID doc) before streaming it.
+  await auditKycAccess(req, 'kyc_document_viewed', doc.userId, { docId: doc.id, kind: doc.kind });
 
   try {
     res.setHeader('Content-Type', doc.mimeType || 'application/octet-stream');

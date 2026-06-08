@@ -17,8 +17,39 @@ let _sentry: any = null;
 try {
   if (process.env.SENTRY_DSN) {
     _sentry = require('@sentry/node');
-    _sentry.init({ dsn: process.env.SENTRY_DSN, tracesSampleRate: 0.1, environment: process.env.NODE_ENV ?? 'production' });
-    console.log('[sentry] backend error tracking enabled');
+    _sentry.init({
+      dsn: process.env.SENTRY_DSN,
+      tracesSampleRate: 0.1,
+      environment: process.env.NODE_ENV ?? 'production',
+      // Never let secrets / PII reach the error tracker. Strip the most
+      // sensitive fields and redact anything that looks like a Stellar secret,
+      // a key blob, a JWT, or a PIN before the event leaves the process.
+      beforeSend(event: any) {
+        try {
+          const SENSITIVE = /(secret|password|pin|token|authorization|encryption|derivation|private|mnemonic|seed|apikey|api_key)/i;
+          const redact = (obj: any, depth = 0): any => {
+            if (!obj || depth > 6) return obj;
+            if (typeof obj === 'string') {
+              return obj
+                .replace(/S[A-Z2-7]{55}/g, '[STELLAR_SECRET_REDACTED]')      // Stellar secret keys
+                .replace(/\b[0-9a-f]{24}:[0-9a-f]{32}:[0-9a-f]+\b/gi, '[KEY_BLOB_REDACTED]') // iv:tag:data
+                .replace(/eyJ[\w-]+\.[\w-]+\.[\w-]+/g, '[JWT_REDACTED]');     // JWTs
+            }
+            if (Array.isArray(obj)) return obj.map(v => redact(v, depth + 1));
+            if (typeof obj === 'object') {
+              for (const k of Object.keys(obj)) {
+                obj[k] = SENSITIVE.test(k) ? '[REDACTED]' : redact(obj[k], depth + 1);
+              }
+            }
+            return obj;
+          };
+          if (event.request) { delete event.request.cookies; delete event.request.headers?.authorization; redact(event.request); }
+          redact(event.extra); redact(event.contexts); redact(event.exception);
+        } catch { /* never block error reporting */ }
+        return event;
+      },
+    });
+    console.log('[sentry] backend error tracking enabled (with secret scrubbing)');
   }
 } catch (e: any) { console.warn('[sentry] init skipped:', e?.message); }
 
