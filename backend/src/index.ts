@@ -140,6 +140,7 @@ async function loadRoutes() {
   try { const { staffRouter }         = await import('./routes/staff');         app.use('/api/admin',         staffRouter);         } catch(e: any) { console.error('[route] staff failed:', e.message); }
   try { const { insightsRouter }      = await import('./routes/insights');      app.use('/api/insights',      insightsRouter);      } catch(e: any) { console.error('[route] insights failed:', e.message); }
   try { const { remitRouter }         = await import('./routes/remit');         app.use('/api/remit',         remitRouter);         } catch(e: any) { console.error('[route] remit failed:', e.message); }
+  try { const { fonbnkRouter }        = await import('./routes/fonbnk');        app.use('/api/fonbnk',        fonbnkRouter);        } catch(e: any) { console.error('[route] fonbnk failed:', e.message); }
   try { const { agentsRouter }        = await import('./routes/agents');        app.use('/api/agents',        agentsRouter);        } catch(e: any) { console.error('[route] agents failed:', e.message); }
   try { const { supportRouter }       = await import('./routes/support');       app.use('/api/support',       supportRouter);       } catch(e: any) { console.error('[route] support failed:', e.message); }
   try { const { savingsRouter }       = await import('./routes/savings');       app.use('/api/savings',       savingsRouter);       } catch(e: any) { console.error('[route] savings failed:', e.message); }
