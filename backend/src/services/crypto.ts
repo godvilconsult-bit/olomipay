@@ -10,19 +10,20 @@
  */
 
 import crypto from 'crypto';
+import { getSecret } from './secrets';
 
-const SERVER_SECRET = process.env.ENCRYPTION_KEY!;
-// Optional previous key, used ONLY for decryption during an ENCRYPTION_KEY rotation.
-// Set ENCRYPTION_KEY_PREVIOUS=<old key> alongside the new ENCRYPTION_KEY so existing
-// encrypted wallet keys keep decrypting; new writes always use the current key. Remove
-// it after the transition window. (See SECRET_ROTATION.md.)
-const SERVER_SECRET_PREVIOUS = process.env.ENCRYPTION_KEY_PREVIOUS;
+// The at-rest encryption secret is sourced through the central secrets provider
+// (managed store → env fallback), read at call-time so it picks up the value
+// loaded at boot. Optional previous key is used ONLY for decryption during an
+// ENCRYPTION_KEY rotation window.
+const serverSecret         = (): string => getSecret('ENCRYPTION_KEY') ?? '';
+const serverSecretPrevious = (): string | undefined => getSecret('ENCRYPTION_KEY_PREVIOUS');
 const ALGORITHM = 'aes-256-gcm';
 
-function deriveKey(pin: string, phone: string, serverSecret: string = SERVER_SECRET): Buffer {
+function deriveKey(pin: string, phone: string, srvSecret: string = serverSecret()): Buffer {
   // PBKDF2 with server secret mixed in as salt material
   const salt = crypto.createHash('sha256')
-    .update(phone + serverSecret)
+    .update(phone + srvSecret)
     .digest();
   return crypto.pbkdf2Sync(pin, salt, 310_000, 32, 'sha512');
 }
@@ -79,8 +80,8 @@ export function decryptSecret(encryptedPayload: string, pin: string, phone: stri
     throw new WalletKeyError();
   }
 
-  const attempt = (serverSecret: string): string => {
-    const key = deriveKey(pin, phone, serverSecret);
+  const attempt = (srvSecret: string): string => {
+    const key = deriveKey(pin, phone, srvSecret);
     const decipher = crypto.createDecipheriv(ALGORITHM, key, Buffer.from(ivHex, 'hex'));
     decipher.setAuthTag(Buffer.from(tagHex, 'hex'));
     const decrypted = Buffer.concat([
@@ -91,12 +92,13 @@ export function decryptSecret(encryptedPayload: string, pin: string, phone: stri
   };
 
   try {
-    return attempt(SERVER_SECRET);
+    return attempt(serverSecret());
   } catch {
     // During an ENCRYPTION_KEY rotation, fall back to the previous key so existing
     // blobs keep working. Callers re-encrypt under the current key on the next PIN use.
-    if (SERVER_SECRET_PREVIOUS) {
-      try { return attempt(SERVER_SECRET_PREVIOUS); } catch { /* fall through */ }
+    const prev = serverSecretPrevious();
+    if (prev) {
+      try { return attempt(prev); } catch { /* fall through */ }
     }
     // Wrong PIN (auth-tag mismatch) or corrupt data — caller decides messaging.
     throw new WalletKeyError('WALLET_KEY_UNREADABLE');

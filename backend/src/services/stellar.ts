@@ -7,6 +7,7 @@
 
 import * as StellarSdk from '@stellar/stellar-sdk';
 import { decryptSecret } from './crypto';
+import { getSecret } from './secrets';
 
 // ── Network config ─────────────────────────────────────────────────────────────
 
@@ -241,13 +242,16 @@ import crypto from 'crypto';
  * wallet → strands funds). It defaults to ENCRYPTION_KEY so existing infra works,
  * but set a dedicated WALLET_DERIVATION_SECRET in production and never rotate it.
  */
-const DERIVATION_SECRET =
-  process.env.WALLET_DERIVATION_SECRET ?? process.env.ENCRYPTION_KEY ?? '';
+// Sourced through the central secrets provider (managed store → env fallback),
+// read at call-time so it reflects the value loaded at boot.
+const derivationSecret = (): string =>
+  getSecret('WALLET_DERIVATION_SECRET') ?? getSecret('ENCRYPTION_KEY') ?? '';
 
 export function deriveKeypairFromPhone(phone: string): { publicKey: string; secretKey: string } {
-  if (!DERIVATION_SECRET) throw new Error('WALLET_DERIVATION_SECRET / ENCRYPTION_KEY not configured');
+  const secret = derivationSecret();
+  if (!secret) throw new Error('WALLET_DERIVATION_SECRET / ENCRYPTION_KEY not configured');
   const seed = crypto
-    .createHmac('sha256', DERIVATION_SECRET)
+    .createHmac('sha256', secret)
     .update('olomipay-wallet-v1:' + phone.trim())
     .digest(); // exactly 32 bytes — a valid ed25519 raw seed
   const kp = StellarSdk.Keypair.fromRawEd25519Seed(seed);

@@ -62,6 +62,25 @@
 - Signer enforces **policy** (per-user/tier limits re-checked, allow-listed
   operations) and **audit-logs** every signature.
 
+**Phase 1 is implemented (code):** the app now sources its sensitive secrets
+through a single provider (`services/secrets.ts`) with an env fallback, so the
+master secret can be moved out of plain platform env into a managed store
+**without any code change**. To activate **Infisical** (free tier):
+1. Create an Infisical project; in its `prod` environment add
+   `WALLET_DERIVATION_SECRET`, `ENCRYPTION_KEY`, `JWT_SECRET`,
+   `JWT_REFRESH_SECRET` (and any others you want vaulted).
+2. Create a **Machine Identity (Universal Auth)** with read access to the project.
+3. Set these env vars on the backend (Railway):
+   `INFISICAL_CLIENT_ID`, `INFISICAL_CLIENT_SECRET`, `INFISICAL_PROJECT_ID`,
+   `INFISICAL_ENV=prod` (and `INFISICAL_API_URL` only if self-hosting).
+4. Deploy; confirm the boot log shows `[secrets] loaded N secret(s) from
+   managed store (prod)`.
+5. **Then remove** the migrated secrets from plain Railway env — the app now
+   reads them from Infisical, with access logged there.
+> ⚠️ Do **not** remove `WALLET_DERIVATION_SECRET` / `ENCRYPTION_KEY` from env
+> until you've confirmed Infisical is serving them (the boot log + a working
+> login/transfer), or wallets won't derive.
+
 **Phase 2 — KMS/HSM-backed key custody (2–4 weeks)**
 - Store the master secret in **KMS**; the signer obtains it only via KMS
   decrypt at boot, or derives/signs through KMS so the raw key never egresses.

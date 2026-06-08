@@ -225,6 +225,13 @@ const httpServer = createServer(app);
 httpServer.listen(PORT, async () => {
   console.log(`Tuma API v4.2.0 on :${PORT}`);
 
+  // Load secrets from the managed store (Infisical) into the cache BEFORE any
+  // crypto/signing happens. No-op + env fallback if not configured.
+  try {
+    const { loadSecrets } = await import('./services/secrets');
+    await loadSecrets();
+  } catch (e: any) { console.error('[boot] secrets load error:', e?.message); }
+
   // Validate critical secrets/config before doing anything. Fails closed on mainnet.
   try {
     const { assertEnvOrWarn } = await import('./services/envCheck');

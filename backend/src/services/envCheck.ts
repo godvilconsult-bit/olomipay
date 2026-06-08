@@ -37,7 +37,10 @@ export interface EnvReport {
 }
 
 export function validateEnv(): EnvReport {
-  const env = process.env;
+  // Use the merged secrets view (managed store + env) so secrets that have been
+  // migrated out of plain env into the vault still validate.
+  const { secretsSnapshot } = require('./secrets');
+  const env = secretsSnapshot() as Record<string, string | undefined>;
   // Gate strictly on the Stellar network (real funds) — NOT on NODE_ENV. Railway sets
   // NODE_ENV=production even on testnet, and we must never kill a working testnet deploy.
   const isMainnet = env.STELLAR_NETWORK === 'mainnet';
