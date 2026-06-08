@@ -115,7 +115,7 @@ export default function DashboardPage() {
         {/* KYC banner */}
         {!loading && user?.kycStatus === 'PENDING' && (
           <div
-            onClick={() => router.push('/profile')}
+            onClick={() => router.push('/kyc')}
             className="card bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 cursor-pointer active:scale-[0.98] transition-transform"
           >
             <p className="text-sm font-medium text-amber-700 dark:text-amber-400">

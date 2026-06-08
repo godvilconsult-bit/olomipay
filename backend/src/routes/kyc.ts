@@ -1,5 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import multer from 'multer';
+import crypto from 'crypto';
+import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { PrismaClient } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { requireAuth, AuthRequest } from '../middleware/auth';
@@ -7,6 +10,105 @@ import { TIERS, tierFor, checkTierLimit } from '../services/kycTiers';
 import { requireRole } from '../services/adminAuth';
 
 const router = Router();
+
+// KYC documents are SENSITIVE (government IDs). They are stored in a PRIVATE
+// object-storage key (never a public URL) and only streamed back to authorised
+// compliance staff. Falls back to base64-in-DB when object storage isn't set.
+const KYC_KINDS = ['ID_FRONT', 'ID_BACK', 'SELFIE'] as const;
+const COMPLIANCE_ROLES = ['SUPPORT_HEAD', 'FINANCE_HEAD', 'SUPER_ADMIN'];
+
+const kycUpload = multer({
+  storage: multer.memoryStorage(),
+  limits:  { fileSize: 12 * 1024 * 1024 }, // 12MB
+  fileFilter: (_req, file, cb) => cb(null, /^image\/(jpe?g|png|webp|heic|heif)$/i.test(file.mimetype)),
+});
+
+const r2 = process.env.R2_ACCOUNT_ID
+  ? new S3Client({
+      region: 'auto',
+      endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+      credentials: {
+        accessKeyId:     process.env.R2_ACCESS_KEY_ID!,
+        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
+      },
+    })
+  : null;
+const KYC_BUCKET = process.env.R2_KYC_BUCKET ?? process.env.R2_BUCKET_NAME;
+
+// ── POST /api/kyc/document ────────────────────────────────────────────────────
+// Upload one KYC document (kind = ID_FRONT | ID_BACK | SELFIE). Replaces any
+// previous file of the same kind for this user. Marks KYC as SUBMITTED.
+router.post('/document', requireAuth, kycUpload.single('file'), async (req: AuthRequest, res) => {
+  const kind = String(req.body?.kind ?? '').toUpperCase();
+  if (!KYC_KINDS.includes(kind as any)) return res.status(400).json({ error: 'Invalid document kind' });
+  if (!req.file) return res.status(400).json({ error: 'No file' });
+
+  const mimeType = req.file.mimetype;
+  let storageKey: string | null = null;
+  let dataUrl:    string | null = null;
+
+  try {
+    if (r2 && KYC_BUCKET) {
+      storageKey = `kyc/${req.userId}/${kind}-${crypto.randomBytes(8).toString('hex')}`;
+      await r2.send(new PutObjectCommand({ Bucket: KYC_BUCKET, Key: storageKey, Body: req.file.buffer, ContentType: mimeType }));
+    } else {
+      // No object storage configured → keep private in DB (admin-only retrieval).
+      dataUrl = `data:${mimeType};base64,${req.file.buffer.toString('base64')}`;
+    }
+  } catch (e: any) {
+    return res.status(502).json({ error: 'Upload failed' });
+  }
+
+  // One row per (user, kind) — replace older one.
+  await prisma.kycDocument.deleteMany({ where: { userId: req.userId!, kind } }).catch(() => {});
+  await prisma.kycDocument.create({ data: { userId: req.userId!, kind, storageKey, dataUrl, mimeType } });
+  await prisma.user.update({ where: { id: req.userId! }, data: { kycStatus: 'SUBMITTED' } }).catch(() => {});
+
+  return res.json({ success: true });
+});
+
+// ── GET /api/kyc/admin/:userId/documents ─────────────────────────────────────
+// Compliance staff: list a user's KYC details + document metadata (not the bytes).
+router.get('/admin/:userId/documents', requireRole(...COMPLIANCE_ROLES), async (req, res) => {
+  const user = await prisma.user.findUnique({
+    where: { id: req.params.userId },
+    select: { id: true, phone: true, accountNo: true, kycStatus: true, kycLevel: true, kycName: true, kycIdType: true, kycIdNumber: true },
+  }).catch(() => null);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  const docs = await prisma.kycDocument.findMany({
+    where: { userId: req.params.userId },
+    select: { id: true, kind: true, mimeType: true, uploadedAt: true },
+    orderBy: { uploadedAt: 'desc' },
+  }).catch(() => []);
+
+  return res.json({ success: true, data: { user, documents: docs } });
+});
+
+// ── GET /api/kyc/admin/document/:docId ───────────────────────────────────────
+// Compliance staff: stream the actual document bytes (for review / handing to
+// authorities during a dispute). Authenticated; never a public URL.
+router.get('/admin/document/:docId', requireRole(...COMPLIANCE_ROLES), async (req, res) => {
+  const doc = await prisma.kycDocument.findUnique({ where: { id: req.params.docId } }).catch(() => null);
+  if (!doc) return res.status(404).json({ error: 'Not found' });
+
+  try {
+    res.setHeader('Content-Type', doc.mimeType || 'application/octet-stream');
+    res.setHeader('Cache-Control', 'private, no-store');
+    if (doc.storageKey && r2 && KYC_BUCKET) {
+      const obj = await r2.send(new GetObjectCommand({ Bucket: KYC_BUCKET, Key: doc.storageKey }));
+      (obj.Body as any).pipe(res);
+      return;
+    }
+    if (doc.dataUrl) {
+      const b64 = doc.dataUrl.split(',')[1] ?? '';
+      return res.end(Buffer.from(b64, 'base64'));
+    }
+    return res.status(404).json({ error: 'No file' });
+  } catch (e: any) {
+    return res.status(502).json({ error: 'Could not load document' });
+  }
+});
 
 // ── POST /api/kyc/admin/:userId/level ─────────────────────────────────────────
 // Compliance/super-admin sets a user's KYC level (approve to Verified=2, grant

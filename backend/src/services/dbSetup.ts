@@ -131,6 +131,19 @@ export async function setupDatabase(): Promise<void> {
     `);
 
     await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "KycDocument" (
+        "id" TEXT NOT NULL PRIMARY KEY,
+        "userId" TEXT NOT NULL,
+        "kind" TEXT NOT NULL,
+        "storageKey" TEXT,
+        "dataUrl" TEXT,
+        "mimeType" TEXT NOT NULL DEFAULT 'image/jpeg',
+        "uploadedAt" TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS "KycDocument_userId_idx" ON "KycDocument" ("userId");
+    `);
+
+    await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "SavingsGoal" (
         "id" TEXT NOT NULL PRIMARY KEY,
         "userId" TEXT NOT NULL,

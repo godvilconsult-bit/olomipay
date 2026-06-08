@@ -248,6 +248,18 @@ model SavingsPosition {
   user         User      @relation(fields: [userId], references: [id])
 }
 
+model KycDocument {
+  id         String   @id @default(cuid())
+  userId     String
+  kind       String   // ID_FRONT | ID_BACK | SELFIE
+  storageKey String?  // private R2 object key
+  dataUrl    String?  @db.Text // base64 fallback when object storage isn't configured
+  mimeType   String   @default("image/jpeg")
+  uploadedAt DateTime @default(now())
+
+  @@index([userId])
+}
+
 model SavingsGoal {
   id             String    @id @default(cuid())
   userId         String

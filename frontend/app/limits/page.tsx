@@ -91,7 +91,7 @@ export default function LimitsPage() {
               </div>
             )}
             {level === 1 && (
-              <button onClick={() => router.push('/profile')} className="card w-full flex items-center gap-3 text-left border border-primary/30">
+              <button onClick={() => router.push('/kyc')} className="card w-full flex items-center gap-3 text-left border border-primary/30">
                 <ShieldCheck className="text-primary" />
                 <div className="flex-1">
                   <p className="font-semibold text-sm">Verify your ID to go Verified</p>

@@ -172,6 +172,73 @@ function CaseNotes() {
   );
 }
 
+// ── KYC documents (compliance review / dispute evidence) ──────────────────────
+function KycDocuments() {
+  const record = useRecordContext();
+  const [info, setInfo] = useState<any>(null);
+  const [docs, setDocs] = useState<any[]>([]);
+  const [urls, setUrls] = useState<Record<string, string>>({});
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!record?.id) return;
+    fetch(`${API}/api/kyc/admin/${record.id}/documents`, { headers: { Authorization: `Bearer ${atok()}` } })
+      .then(r => r.json())
+      .then(r => { if (r.success) { setInfo(r.data.user); setDocs(r.data.documents ?? []); } })
+      .catch(() => {})
+      .finally(() => setLoaded(true));
+  }, [record?.id]);
+
+  // Fetch each document with auth → object URL (images can't carry auth headers).
+  useEffect(() => {
+    let revoked: string[] = [];
+    (async () => {
+      for (const d of docs) {
+        try {
+          const r = await fetch(`${API}/api/kyc/admin/document/${d.id}`, { headers: { Authorization: `Bearer ${atok()}` } });
+          if (!r.ok) continue;
+          const blob = await r.blob();
+          const url = URL.createObjectURL(blob);
+          revoked.push(url);
+          setUrls(u => ({ ...u, [d.id]: url }));
+        } catch { /* skip */ }
+      }
+    })();
+    return () => { revoked.forEach(u => URL.revokeObjectURL(u)); };
+  }, [docs]);
+
+  const label: Record<string, string> = { ID_FRONT: 'ID — front', ID_BACK: 'ID — back', SELFIE: 'Selfie + ID' };
+
+  if (!loaded) return <span style={{ color: '#94a3b8' }}>Loading…</span>;
+
+  return (
+    <div style={{ display: 'grid', gap: 12 }}>
+      {info && (
+        <div style={{ fontSize: 13, color: '#334155' }}>
+          <b>Status:</b> {info.kycStatus} · <b>Level:</b> {info.kycLevel ?? 0} ·{' '}
+          <b>Name:</b> {info.kycName ?? '—'} · <b>ID:</b> {info.kycIdType ?? '—'} {info.kycIdNumber ?? ''}
+        </div>
+      )}
+      {docs.length === 0 ? (
+        <span style={{ color: '#94a3b8', fontSize: 13 }}>No documents uploaded.</span>
+      ) : (
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          {docs.map(d => (
+            <div key={d.id} style={{ width: 180 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>{label[d.kind] ?? d.kind}</div>
+              {urls[d.id]
+                ? <img src={urls[d.id]} alt={d.kind} style={{ width: '100%', borderRadius: 8, border: '1px solid #e2e8f0' }} />
+                : <div style={{ height: 120, background: '#f1f5f9', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 12 }}>Loading…</div>}
+              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>{new Date(d.uploadedAt).toLocaleString()}</div>
+              {urls[d.id] && <a href={urls[d.id]} download={`${d.kind}.jpg`} style={{ fontSize: 12, color: '#1a56db' }}>⬇ Download</a>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export const UserShow = () => (
   <Show actions={<TopToolbar><SupportActions /></TopToolbar>}>
     <SimpleShowLayout>
@@ -186,6 +253,7 @@ export const UserShow = () => (
       <FunctionField label="Wallet recoverable" render={(r: any) => r._full?.walletDeterministic ? '✓ deterministic (recoverable)' : '⚠ legacy address'} />
       <FunctionField label="Balance" render={(r: any) => r._full ? `$${parseFloat(r._full.balance?.usdc ?? 0).toFixed(2)} · ${parseFloat(r._full.balance?.xlm ?? 0).toFixed(2)} XLM` : '—'} />
       <DateField source="createdAt" label="Joined" showTime />
+      <FunctionField label="KYC documents" render={() => <KycDocuments />} />
       <FunctionField label="Transactions" render={() => <UserTransactions />} />
       <FunctionField label="Diagnosis" render={() => <Diagnose />} />
       <FunctionField label="Case notes" render={() => <CaseNotes />} />
