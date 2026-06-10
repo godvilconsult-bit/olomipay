@@ -65,6 +65,19 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 const httpServer = createServer(app);
 httpServer.listen(PORT, async () => {
   console.log(`JIKO CONNECT API on :${PORT}`);
+
+  // Ensure the DB schema matches prisma/schema.prisma. Runs here (not just in
+  // start.sh) because some deploy targets override the container start command
+  // and skip the script. `db push` is idempotent — a no-op when already in sync.
+  if (process.env.DATABASE_URL) {
+    try {
+      const { execSync } = await import('child_process');
+      console.log('[schema] prisma db push…');
+      execSync('npx prisma db push --accept-data-loss --skip-generate', { stdio: 'inherit', timeout: 120_000 });
+      console.log('[schema] in sync');
+    } catch (e: any) { console.error('[schema] db push failed:', e?.message); }
+  }
+
   await loadRoutes();
   try {
     const { initSocket } = await import('./socket');
