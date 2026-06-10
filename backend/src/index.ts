@@ -71,6 +71,10 @@ httpServer.listen(PORT, async () => {
     initSocket(httpServer);
     console.log('[socket] initialized');
   } catch (e: any) { console.error('[socket] failed:', e.message); }
+  try {
+    const { seedIfEmpty } = await import('./services/seedData');
+    await seedIfEmpty();
+  } catch (e: any) { console.error('[seed]', e.message); }
 });
 
 export default app;

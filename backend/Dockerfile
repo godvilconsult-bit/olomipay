@@ -23,6 +23,10 @@ COPY . .
 RUN npx prisma generate
 RUN npm run build
 
+# Slim the runtime image: drop dev deps (tsx, typescript, @types, embedded-postgres)
+# but keep prisma + @prisma/client so start.sh can run `prisma db push`.
+RUN npm prune --omit=dev
+
 # Make startup script executable
 RUN chmod +x start.sh
 
