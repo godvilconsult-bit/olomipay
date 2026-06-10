@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { ArrowLeft, BadgeCheck, Minus, Plus, Star, MapPin } from 'lucide-react';
+import { ArrowLeft, BadgeCheck, Minus, Plus, Star, MapPin, Phone, Smartphone, Banknote } from 'lucide-react';
 import { vendors, addresses, orders } from '../../../lib/api';
 import { useT } from '../../../lib/i18n';
+import { localPhone } from '../../../lib/utils';
 import { Card, Button, Spinner, Money, cn } from '../../../components/ui';
 
 export default function VendorPage() {
@@ -15,6 +16,7 @@ export default function VendorPage() {
   const [vendor, setVendor] = useState<any>(null);
   const [addrs, setAddrs]   = useState<any[]>([]);
   const [cart, setCart]     = useState<Record<string, number>>({});
+  const [pay, setPay]       = useState<'MOBILE' | 'CASH' | ''>('');
   const [placing, setPlacing] = useState(false);
 
   useEffect(() => {
@@ -32,19 +34,22 @@ export default function VendorPage() {
   const typeLabel = (ty: string) => ty === 'REFILL' ? t('Refill', 'Kujaza') : ty === 'CYLINDER' ? t('New cylinder', 'Mtungi mpya') : t('Accessory', 'Kifaa');
 
   async function place() {
-    if (!defaultAddr) return toast.error(t('Add an address first (go to Home, tap GPS)', 'Ongeza anwani kwanza (rudi nyumbani, bonyeza GPS)'));
+    if (!defaultAddr) return toast.error(t('Add an address first (Home → GPS)', 'Ongeza anwani kwanza (Nyumbani → GPS)'));
     if (items.length === 0) return toast.error(t('Select items', 'Chagua bidhaa'));
+    if (!pay) return toast.error(t('Choose how to pay', 'Chagua njia ya malipo'));
     setPlacing(true);
     try {
       const r = await orders.place({ supplierId: id, addressId: defaultAddr.id, items: items.map(([inventoryId, qty]) => ({ inventoryId, qty })) });
-      toast.success(t('Order sent to vendor!', 'Oda imetumwa kwa muuzaji!'));
-      router.replace(`/order/${r.order.id}`);
+      const oid = r.order.id;
+      await orders.pay(oid, pay === 'CASH' ? { provider: 'CASH' } : {});
+      toast.success(pay === 'CASH' ? t('Order placed — pay cash on delivery', 'Oda imewekwa — lipa cash ukipokea') : t('Order placed — check your phone to pay', 'Oda imewekwa — angalia simu kulipa'));
+      router.replace(`/order/${oid}`);
     } catch (e: any) { toast.error(e?.message ?? t("Couldn't place order", 'Imeshindikana kuagiza')); }
     finally { setPlacing(false); }
   }
 
   return (
-    <div className="min-h-screen bg-sand pb-28">
+    <div className="min-h-screen bg-sand pb-44">
       <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-black/5 bg-sand/90 px-4 py-3 backdrop-blur">
         <button onClick={() => router.back()} className="grid h-9 w-9 place-items-center rounded-xl bg-black/5"><ArrowLeft size={18} /></button>
         <div className="min-w-0">
@@ -56,7 +61,17 @@ export default function VendorPage() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-md space-y-2.5 px-5 pt-4">
+      <div className="mx-auto max-w-md space-y-3 px-5 pt-4">
+        {/* vendor contact + payment methods */}
+        <Card className="!p-3">
+          <a href={`tel:${vendor.phone}`} className="flex items-center gap-2 text-sm font-semibold text-flame"><Phone size={15} /> {localPhone(vendor.phone)}</a>
+          <div className="mt-2 flex items-center gap-2 text-xs text-ink/60">
+            <span>{t('Accepts', 'Inakubali')}:</span>
+            {vendor.acceptsMobile !== false && <span className="inline-flex items-center gap-1 rounded-full bg-leaf/10 px-2 py-0.5 text-leaf-dark"><Smartphone size={12} /> {t('Mobile money', 'Pesa za simu')}</span>}
+            {vendor.acceptsCash !== false && <span className="inline-flex items-center gap-1 rounded-full bg-black/5 px-2 py-0.5"><Banknote size={12} /> {t('Cash', 'Cash')}</span>}
+          </div>
+        </Card>
+
         {inv.length === 0 && <p className="py-10 text-center text-sm text-ink/50">{t('This vendor has no products right now.', 'Muuzaji huyu hana bidhaa kwa sasa.')}</p>}
         {inv.map((i) => {
           const qty = cart[i.id] ?? 0; const out = i.stock <= 0;
@@ -79,11 +94,18 @@ export default function VendorPage() {
         })}
       </div>
 
+      {/* sticky checkout */}
       {total > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-black/5 bg-white/95 px-5 py-3 backdrop-blur">
-          <div className="mx-auto flex max-w-md items-center gap-3">
-            <div className="flex-1"><div className="text-xs text-ink/50">{t('Items total (excl. delivery)', 'Jumla ya bidhaa (bila usafiri)')}</div><Money value={total} className="text-lg" /></div>
-            <Button variant="primary" loading={placing} onClick={place} className="px-7">{t('Order now', 'Agiza sasa')}</Button>
+        <div className="fixed inset-x-0 bottom-0 z-30 space-y-2 border-t border-black/5 bg-white/95 px-5 py-3 backdrop-blur">
+          <div className="mx-auto max-w-md">
+            <div className="mb-2 flex items-center gap-2">
+              {vendor.acceptsMobile !== false && <button onClick={() => setPay('MOBILE')} className={cn('flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2.5 text-sm font-semibold', pay === 'MOBILE' ? 'bg-grad-leaf text-white' : 'bg-black/5 text-ink/70')}><Smartphone size={15} /> {t('Mobile money', 'Pesa za simu')}</button>}
+              {vendor.acceptsCash !== false && <button onClick={() => setPay('CASH')} className={cn('flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2.5 text-sm font-semibold', pay === 'CASH' ? 'bg-ink text-white' : 'bg-black/5 text-ink/70')}><Banknote size={15} /> {t('Cash', 'Cash')}</button>}
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex-1"><div className="text-xs text-ink/50">{t('Gas total (rider fee confirmed later)', 'Jumla ya gesi (ada ya dereva baadaye)')}</div><Money value={total} className="text-lg" /></div>
+              <Button variant="primary" loading={placing} onClick={place} className="px-6">{t('Order & pay', 'Agiza & lipa')}</Button>
+            </div>
           </div>
         </div>
       )}

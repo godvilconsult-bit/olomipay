@@ -139,6 +139,7 @@ export const orders = {
   list:    () => apiFetch('/api/orders'),
   get:     (id: string) => apiFetch(`/api/orders/${id}`),
   cancel:  (id: string) => apiFetch(`/api/orders/${id}/cancel`, { method: 'POST' }),
+  confirmFee: (id: string) => apiFetch(`/api/orders/${id}/confirm-fee`, { method: 'POST' }),
   complete:(id: string) => apiFetch(`/api/orders/${id}/complete`, { method: 'POST' }),
   review:  (id: string, body: { supplierRating?: number; riderRating?: number; comment?: string }) =>
     apiFetch(`/api/orders/${id}/review`, { method: 'POST', body: JSON.stringify(body) }),
@@ -147,14 +148,16 @@ export const orders = {
 };
 
 export const jobs = {
-  online:    (lat?: number, lng?: number) => apiFetch('/api/jobs/online', { method: 'POST', body: JSON.stringify({ lat, lng }) }),
-  offline:   () => apiFetch('/api/jobs/offline', { method: 'POST' }),
-  available: (lat?: number, lng?: number) => apiFetch(`/api/jobs/available${lat != null ? `?lat=${lat}&lng=${lng}` : ''}`),
-  claim:     (orderId: string) => apiFetch(`/api/jobs/${orderId}/claim`, { method: 'POST' }),
-  pick:      (orderId: string) => apiFetch(`/api/jobs/${orderId}/pick`, { method: 'POST' }),
-  deliver:   (orderId: string, otp: string) => apiFetch(`/api/jobs/${orderId}/deliver`, { method: 'POST', body: JSON.stringify({ otp }) }),
-  active:    () => apiFetch('/api/jobs/active'),
-  earnings:  () => apiFetch('/api/jobs/earnings'),
+  online:      (lat?: number, lng?: number) => apiFetch('/api/jobs/online', { method: 'POST', body: JSON.stringify({ lat, lng }) }),
+  offline:     () => apiFetch('/api/jobs/offline', { method: 'POST' }),
+  offers:      () => apiFetch('/api/jobs/offers'),
+  acceptOffer: (orderId: string) => apiFetch(`/api/jobs/${orderId}/accept-offer`, { method: 'POST' }),
+  declineOffer:(orderId: string) => apiFetch(`/api/jobs/${orderId}/decline-offer`, { method: 'POST' }),
+  pick:        (orderId: string) => apiFetch(`/api/jobs/${orderId}/pick`, { method: 'POST' }),
+  deliver:     (orderId: string, otp: string) => apiFetch(`/api/jobs/${orderId}/deliver`, { method: 'POST', body: JSON.stringify({ otp }) }),
+  active:      () => apiFetch('/api/jobs/active'),
+  earnings:    () => apiFetch('/api/jobs/earnings'),
+  setProfile:  (body: { photoUrl?: string; plateNo?: string; vehicleType?: string }) => apiFetch('/api/jobs/profile', { method: 'PUT', body: JSON.stringify(body) }),
 };
 
 export const suppliers = {
@@ -163,9 +166,11 @@ export const suppliers = {
   inventory: () => apiFetch('/api/suppliers/inventory'),
   setInventory: (body: { productId: string; price: number; stock: number; isAvailable?: boolean }) =>
     apiFetch('/api/suppliers/inventory', { method: 'POST', body: JSON.stringify(body) }),
-  orders:    () => apiFetch('/api/suppliers/orders'),
-  accept:    (id: string) => apiFetch(`/api/suppliers/${id}/accept`, { method: 'POST' }),
-  reject:    (id: string) => apiFetch(`/api/suppliers/${id}/reject`, { method: 'POST' }),
+  orders:      () => apiFetch('/api/suppliers/orders'),
+  accept:      (id: string) => apiFetch(`/api/suppliers/${id}/accept`, { method: 'POST' }),
+  reject:      (id: string) => apiFetch(`/api/suppliers/${id}/reject`, { method: 'POST' }),
+  ridersNearby:() => apiFetch('/api/suppliers/riders/nearby'),
+  assignRider: (orderId: string, riderId: string) => apiFetch(`/api/suppliers/${orderId}/assign-rider`, { method: 'POST', body: JSON.stringify({ riderId }) }),
   restockList: () => apiFetch('/api/suppliers/restock'),
   restock:   (body: { productId?: string; distributor?: string; qty: number; note?: string }) =>
     apiFetch('/api/suppliers/restock', { method: 'POST', body: JSON.stringify(body) }),

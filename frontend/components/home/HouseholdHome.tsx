@@ -2,26 +2,36 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import toast from 'react-hot-toast';
-import { MapPin, Star, BadgeCheck, Search, Navigation, Package } from 'lucide-react';
+import { MapPin, Star, BadgeCheck, Search, Navigation, Package, List, Map as MapIcon } from 'lucide-react';
 import { vendors, orders, addresses, JikoUser } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 import { AppHeader } from '../AppHeader';
 import { RoleNav } from '../RoleNav';
-import { Card, Pill, Spinner, EmptyState, Money, Badge } from '../ui';
+import { Card, Pill, Spinner, EmptyState, Money, Badge, Button, cn } from '../ui';
 
+const Map = dynamic(() => import('../Map'), { ssr: false });
 const DAR = { lat: -6.7924, lng: 39.2083 };
+
+function dist(km: number, t: (e: string, s: string) => string): string {
+  if (km < 1) return `${Math.round(km * 1000)} m`;
+  return `${km.toFixed(1)} km · ${Math.round(km * 1000).toLocaleString()} m`;
+}
 
 export function HouseholdHome({ user }: { user: JikoUser }) {
   const { t } = useT();
-  const [coords, setCoords]   = useState(DAR);
-  const [brands, setBrands]   = useState<string[]>([]);
-  const [sizes, setSizes]     = useState<number[]>([]);
-  const [filter, setFilter]   = useState<{ type?: string; brand?: string; sizeKg?: number }>({ type: 'REFILL' });
-  const [vlist, setVlist]     = useState<any[] | null>(null);
-  const [addrs, setAddrs]     = useState<any[]>([]);
-  const [recent, setRecent]   = useState<any[]>([]);
+  const router = useRouter();
+  const [coords, setCoords] = useState(DAR);
+  const [brands, setBrands] = useState<string[]>([]);
+  const [sizes, setSizes]   = useState<number[]>([]);
+  const [filter, setFilter] = useState<{ type: string; brand: string; sizeKg: string }>({ type: 'REFILL', brand: '', sizeKg: '' });
+  const [vlist, setVlist]   = useState<any[] | null>(null);
+  const [addrs, setAddrs]   = useState<any[]>([]);
+  const [recent, setRecent] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
+  const [view, setView]     = useState<'list' | 'map'>('list');
 
   const TYPES = [
     { v: 'REFILL', l: t('Refill', 'Refill') },
@@ -34,21 +44,16 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
     vendors.products().then((r) => { setBrands(r.brands ?? []); setSizes(r.sizes ?? []); }).catch(() => {});
     addresses.list().then((r) => setAddrs(r.addresses ?? [])).catch(() => {});
     orders.list().then((r) => setRecent((r.orders ?? []).slice(0, 3))).catch(() => {});
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (p) => setCoords({ lat: p.coords.latitude, lng: p.coords.longitude }),
-        () => {}, { timeout: 6000 },
-      );
-    }
+    if (navigator.geolocation) navigator.geolocation.getCurrentPosition((p) => setCoords({ lat: p.coords.latitude, lng: p.coords.longitude }), () => {}, { timeout: 6000 });
   }, []);
 
   const search = useCallback(async () => {
     setSearching(true);
-    try { const r = await vendors.search({ ...coords, ...filter, radiusKm: 20 }); setVlist(r.vendors ?? []); }
-    catch { setVlist([]); } finally { setSearching(false); }
+    try {
+      const r = await vendors.search({ lat: coords.lat, lng: coords.lng, type: filter.type, brand: filter.brand || undefined, sizeKg: filter.sizeKg ? Number(filter.sizeKg) : undefined, radiusKm: 25 });
+      setVlist(r.vendors ?? []);
+    } catch { setVlist([]); } finally { setSearching(false); }
   }, [coords, filter]);
-
-  useEffect(() => { search(); }, [search]);
 
   async function useMyLocation() {
     if (!navigator.geolocation) return toast.error(t('GPS unavailable', 'GPS haipatikani'));
@@ -56,14 +61,13 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
       const lat = p.coords.latitude, lng = p.coords.longitude;
       setCoords({ lat, lng });
       if (!defaultAddr) {
-        try {
-          await addresses.create({ label: t('Home', 'Nyumbani'), lat, lng, region: user.region ?? 'Dar es Salaam', isDefault: true });
-          const r = await addresses.list(); setAddrs(r.addresses ?? []);
-          toast.success(t('Address saved', 'Anwani imehifadhiwa'));
-        } catch {}
-      }
+        try { await addresses.create({ label: t('Home', 'Nyumbani'), lat, lng, region: user.region ?? 'Dar es Salaam', isDefault: true }); const r = await addresses.list(); setAddrs(r.addresses ?? []); toast.success(t('Address saved', 'Anwani imehifadhiwa')); } catch {}
+      } else { toast.success(t('Location updated', 'Eneo limesasishwa')); }
     }, () => toast.error(t("Couldn't get location", 'Imeshindwa kupata eneo')));
   }
+
+  const markers = (vlist ?? []).filter((v) => v.lat != null).map((v) => ({ lat: v.lat, lng: v.lng, kind: 'vendor' as const, label: v.businessName, id: v.supplierId }))
+    .concat([{ lat: coords.lat, lng: coords.lng, kind: 'me' as const, label: t('You', 'Wewe'), id: '' }]);
 
   return (
     <div className="min-h-screen pb-24">
@@ -80,25 +84,35 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
           <button onClick={useMyLocation} className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-xl bg-flame/10 text-flame"><Navigation size={17} /></button>
         </Card>
 
-        {/* filters — wrap so nothing overlaps */}
-        <div className="space-y-2">
-          <div className="flex flex-wrap gap-2">
-            {TYPES.map((ty) => <Pill key={ty.v} active={filter.type === ty.v} onClick={() => setFilter((f) => ({ ...f, type: ty.v }))}>{ty.l}</Pill>)}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Pill active={!filter.brand} onClick={() => setFilter((f) => ({ ...f, brand: undefined }))}>{t('All brands', 'Brand zote')}</Pill>
-            {brands.map((b) => <Pill key={b} active={filter.brand === b} onClick={() => setFilter((f) => ({ ...f, brand: b }))}>{b}</Pill>)}
-          </div>
+        {/* type chips */}
+        <div className="flex gap-2">
+          {TYPES.map((ty) => <Pill key={ty.v} active={filter.type === ty.v} onClick={() => setFilter((f) => ({ ...f, type: ty.v }))}>{ty.l}</Pill>)}
+        </div>
+
+        {/* brand + size dropdowns */}
+        <div className={cn('grid gap-2', filter.type === 'ACCESSORY' ? 'grid-cols-1' : 'grid-cols-2')}>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-ink/50">{t('Brand', 'Brand')}</span>
+            <select value={filter.brand} onChange={(e) => setFilter((f) => ({ ...f, brand: e.target.value }))} className="w-full rounded-xl border border-black/15 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-flame">
+              <option value="">{t('All brands', 'Brand zote')}</option>
+              {brands.map((b) => <option key={b} value={b}>{b}</option>)}
+            </select>
+          </label>
           {filter.type !== 'ACCESSORY' && (
-            <div className="flex flex-wrap gap-2">
-              <Pill active={!filter.sizeKg} onClick={() => setFilter((f) => ({ ...f, sizeKg: undefined }))}>{t('All sizes', 'Saizi zote')}</Pill>
-              {sizes.map((s) => <Pill key={s} active={filter.sizeKg === s} onClick={() => setFilter((f) => ({ ...f, sizeKg: s }))}>{s}kg</Pill>)}
-            </div>
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-ink/50">{t('Size', 'Saizi')}</span>
+              <select value={filter.sizeKg} onChange={(e) => setFilter((f) => ({ ...f, sizeKg: e.target.value }))} className="w-full rounded-xl border border-black/15 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-flame">
+                <option value="">{t('All sizes', 'Saizi zote')}</option>
+                {sizes.map((s) => <option key={s} value={s}>{s} kg</option>)}
+              </select>
+            </label>
           )}
         </div>
 
-        {/* recent orders */}
-        {recent.length > 0 && (
+        <Button variant="primary" className="w-full" loading={searching} onClick={search}><Search size={17} /> {t('Search vendors', 'Tafuta wauzaji')}</Button>
+
+        {/* recent orders (before any search) */}
+        {vlist === null && recent.length > 0 && (
           <div>
             <div className="mb-2 flex items-center justify-between">
               <h2 className="text-sm font-bold text-ink/70">{t('Your recent orders', 'Oda zako za hivi karibuni')}</h2>
@@ -108,14 +122,8 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
               {recent.map((o) => (
                 <Link key={o.id} href={`/order/${o.id}`}>
                   <Card className="flex items-center justify-between !p-3">
-                    <div className="min-w-0">
-                      <div className="text-sm font-semibold">{o.orderNo}</div>
-                      <div className="truncate text-xs text-ink/50">{o.supplier?.businessName}</div>
-                    </div>
-                    <div className="flex-shrink-0 text-right">
-                      <Money value={o.total} className="text-sm" />
-                      <div className="mt-1"><Badge status={o.status} /></div>
-                    </div>
+                    <div className="min-w-0"><div className="text-sm font-semibold">{o.orderNo}</div><div className="truncate text-xs text-ink/50">{o.supplier?.businessName}</div></div>
+                    <div className="flex-shrink-0 text-right"><Money value={o.total} className="text-sm" /><div className="mt-1"><Badge status={o.status} /></div></div>
                   </Card>
                 </Link>
               ))}
@@ -123,39 +131,46 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
           </div>
         )}
 
-        {/* vendors */}
-        <div>
-          <h2 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-ink/70"><Search size={15} /> {t('Vendors near you', 'Wauzaji walio karibu')}</h2>
-          {searching && vlist === null ? <Spinner /> :
-            !vlist || vlist.length === 0 ? <EmptyState icon={<Package size={36} />} title={t('No vendor with stock nearby', 'Hakuna muuzaji mwenye stock karibu')} sub={t('Try another brand or size, or widen the area.', 'Jaribu brand au saizi nyingine, au panua eneo.')} /> :
-            <div className="space-y-3">
-              {vlist.map((v) => (
-                <Link key={v.supplierId} href={`/vendor/${v.supplierId}`}>
-                  <Card>
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <span className="truncate font-bold">{v.businessName}</span>
-                          {v.isVerified && <BadgeCheck size={15} className="flex-shrink-0 text-leaf" />}
-                        </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-ink/50">
-                          <span className="inline-flex items-center gap-0.5"><Star size={12} className="fill-ember text-ember" /> {v.rating ? v.rating.toFixed(1) : t('New', 'Mpya')}</span>
-                          <span>·</span><span>{v.distanceKm} km</span>
-                          <span>·</span><span>~{v.etaMin} {t('min', 'dak')}</span>
-                        </div>
-                      </div>
-                      {v.featured && <span className="flex-shrink-0 rounded-full bg-ember/15 px-2 py-0.5 text-[10px] font-bold text-ember">{t('FEATURED', 'FEATURED')}</span>}
-                    </div>
-                    <div className="mt-3 flex items-center justify-between border-t border-black/5 pt-3">
-                      <span className="text-xs text-ink/50">{t('From', 'Kuanzia')}</span>
-                      <Money value={v.fromPrice ?? 0} className="text-flame" />
-                    </div>
-                  </Card>
-                </Link>
-              ))}
+        {/* results */}
+        {vlist !== null && (
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <h2 className="text-sm font-bold text-ink/70">{vlist.length} {t('vendors near you', 'wauzaji karibu')}</h2>
+              <div className="flex items-center rounded-full bg-black/5 p-0.5 text-xs font-bold">
+                <button onClick={() => setView('list')} className={cn('flex items-center gap-1 rounded-full px-2.5 py-1', view === 'list' ? 'bg-flame text-white' : 'text-ink/50')}><List size={13} /> {t('List', 'Orodha')}</button>
+                <button onClick={() => setView('map')} className={cn('flex items-center gap-1 rounded-full px-2.5 py-1', view === 'map' ? 'bg-flame text-white' : 'text-ink/50')}><MapIcon size={13} /> {t('Map', 'Ramani')}</button>
+              </div>
             </div>
-          }
-        </div>
+
+            {vlist.length === 0 ? <EmptyState icon={<Package size={36} />} title={t('No vendor with stock nearby', 'Hakuna muuzaji mwenye stock karibu')} sub={t('Try another brand or size, or widen the area.', 'Jaribu brand au saizi nyingine.')} /> :
+              view === 'map' ? (
+                <Card className="!p-1.5"><Map markers={markers} height={340} onMarkerClick={(id) => id && router.push(`/vendor/${id}`)} /></Card>
+              ) : (
+                <div className="space-y-3">
+                  {vlist.map((v) => (
+                    <Link key={v.supplierId} href={`/vendor/${v.supplierId}`}>
+                      <Card>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5"><span className="truncate font-bold">{v.businessName}</span>{v.isVerified && <BadgeCheck size={15} className="flex-shrink-0 text-leaf" />}</div>
+                            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-ink/50">
+                              <span className="inline-flex items-center gap-0.5"><Star size={12} className="fill-ember text-ember" /> {v.rating ? v.rating.toFixed(1) : t('New', 'Mpya')}</span>
+                              <span>·</span><span className="inline-flex items-center gap-0.5"><MapPin size={11} /> {dist(v.distanceKm, t)}</span>
+                              <span>·</span><span>~{v.etaMin} {t('min', 'dak')}</span>
+                            </div>
+                          </div>
+                          {v.featured && <span className="flex-shrink-0 rounded-full bg-ember/15 px-2 py-0.5 text-[10px] font-bold text-ember">{t('FEATURED', 'FEATURED')}</span>}
+                        </div>
+                        <div className="mt-3 flex items-center justify-between border-t border-black/5 pt-3">
+                          <span className="text-xs text-ink/50">{t('From', 'Kuanzia')}</span><Money value={v.fromPrice ?? 0} className="text-flame" />
+                        </div>
+                      </Card>
+                    </Link>
+                  ))}
+                </div>
+              )}
+          </div>
+        )}
       </div>
       <RoleNav role="HOUSEHOLD" />
     </div>

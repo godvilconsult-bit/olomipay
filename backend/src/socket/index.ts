@@ -99,9 +99,13 @@ export function initSocket(httpServer: HttpServer): Server {
         const d = await prisma.delivery.update({
           where: { id: deliveryId },
           data:  { riderLat: lat, riderLng: lng, lastLocationAt: new Date() },
-          select: { order: { select: { householdId: true } } },
+          select: { order: { select: { householdId: true, supplier: { select: { userId: true } } } } },
         }).catch(() => null);
-        if (d?.order) emitToUser(d.order.householdId, 'delivery:location', { deliveryId, lat, lng });
+        if (d?.order) {
+          // Both the household AND the supplier watch the rider live.
+          emitToUser(d.order.householdId, 'delivery:location', { deliveryId, lat, lng });
+          if (d.order.supplier?.userId) emitToUser(d.order.supplier.userId, 'delivery:location', { deliveryId, lat, lng });
+        }
       }
     });
 

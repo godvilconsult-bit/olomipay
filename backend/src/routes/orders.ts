@@ -12,7 +12,7 @@ const router = Router();
 const orderInclude = {
   items:    true,
   payment:  true,
-  delivery: { include: { rider: { select: { id: true, name: true, phone: true, riderProfile: { select: { vehicleType: true, plateNo: true, rating: true } } } } } },
+  delivery: { include: { rider: { select: { id: true, name: true, phone: true, profilePicUrl: true, riderProfile: { select: { vehicleType: true, plateNo: true, rating: true } } } } } },
   supplier: { select: { id: true, businessName: true, phone: true, lat: true, lng: true, region: true } },
   address:  true,
   review:   true,
@@ -79,7 +79,8 @@ router.post('/', requireRole('HOUSEHOLD'), async (req: AuthRequest, res) => {
         commissionPct:    money.commissionPct,
         commissionAmount: money.commissionAmount,
         items:   { create: lineItems },
-        payment: { create: { amount: money.total, status: 'PENDING' } },
+        // Gas is paid upfront (mobile/cash); the rider fee is confirmed + settled later.
+        payment: { create: { amount: money.itemsTotal, status: 'PENDING' } },
       },
       include: orderInclude,
     });
@@ -136,6 +137,21 @@ router.post('/:id/cancel', requireRole('HOUSEHOLD'), async (req: AuthRequest, re
   });
 
   emitToUser(order.supplier.userId, 'order:cancelled', { orderId: order.id });
+  res.json({ ok: true });
+});
+
+// ── POST /api/orders/:id/confirm-fee ─ household agrees to the rider fee ──────────
+router.post('/:id/confirm-fee', requireRole('HOUSEHOLD'), async (req: AuthRequest, res) => {
+  const order = await prisma.order.findFirst({ where: { id: req.params.id, householdId: req.userId }, include: { delivery: true, supplier: true } });
+  if (!order) return res.status(404).json({ error: 'Order not found' });
+  if (order.status !== 'RIDER_ACCEPTED') return res.status(409).json({ error: 'No fee awaiting confirmation' });
+
+  await prisma.order.update({ where: { id: order.id }, data: { status: 'FEE_CONFIRMED' } });
+  if (order.delivery?.riderId) {
+    emitToUser(order.delivery.riderId, 'fee:confirmed', { orderId: order.id });
+    await notify(order.delivery.riderId, { title: 'Fee confirmed — proceed 🏍️', body: `Household confirmed TZS ${order.deliveryFee.toLocaleString()}. Collect and deliver.`, type: 'order', data: { orderId: order.id } });
+  }
+  emitToUser(order.supplier.userId, 'order:tracking', { orderId: order.id });
   res.json({ ok: true });
 });
 

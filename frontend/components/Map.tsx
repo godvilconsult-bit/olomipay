@@ -6,22 +6,23 @@ import L from 'leaflet';
 export interface MapMarker {
   lat: number;
   lng: number;
-  kind: 'rider' | 'dest' | 'vendor';
+  kind: 'rider' | 'dest' | 'vendor' | 'me';
   label?: string;
+  id?: string;
 }
 
-const EMOJI: Record<MapMarker['kind'], string> = { rider: '🏍️', dest: '📍', vendor: '🏪' };
+const EMOJI: Record<MapMarker['kind'], string> = { rider: '🏍️', dest: '📍', vendor: '🏪', me: '🟢' };
 
 function icon(kind: MapMarker['kind']) {
   return L.divIcon({
     className: '',
-    html: `<div style="font-size:24px;line-height:1;filter:drop-shadow(0 2px 3px rgba(0,0,0,.4))">${EMOJI[kind]}</div>`,
-    iconSize: [24, 24],
-    iconAnchor: [12, 22],
+    html: `<div style="font-size:26px;line-height:1;filter:drop-shadow(0 2px 3px rgba(0,0,0,.45))">${EMOJI[kind]}</div>`,
+    iconSize: [26, 26],
+    iconAnchor: [13, 24],
   });
 }
 
-export default function Map({ markers, height = 200 }: { markers: MapMarker[]; height?: number }) {
+export default function Map({ markers, height = 200, onMarkerClick }: { markers: MapMarker[]; height?: number; onMarkerClick?: (id: string) => void }) {
   const elRef    = useRef<HTMLDivElement>(null);
   const mapRef   = useRef<L.Map | null>(null);
   const layerRef = useRef<L.LayerGroup | null>(null);
@@ -42,12 +43,14 @@ export default function Map({ markers, height = 200 }: { markers: MapMarker[]; h
     layer.clearLayers();
     const pts: [number, number][] = [];
     for (const m of markers.filter((x) => typeof x.lat === 'number' && typeof x.lng === 'number')) {
-      L.marker([m.lat, m.lng], { icon: icon(m.kind) }).addTo(layer);
+      const mk = L.marker([m.lat, m.lng], { icon: icon(m.kind) }).addTo(layer);
+      if (m.label) mk.bindTooltip(m.label, { direction: 'top', offset: [0, -20] });
+      if (m.id && onMarkerClick) mk.on('click', () => onMarkerClick(m.id!));
       pts.push([m.lat, m.lng]);
     }
     if (pts.length === 1) map.setView(pts[0], 15);
     else if (pts.length > 1) map.fitBounds(L.latLngBounds(pts).pad(0.4));
-  }, [markers]);
+  }, [markers, onMarkerClick]);
 
-  return <div ref={elRef} style={{ height, width: '100%', borderRadius: 16, overflow: 'hidden', zIndex: 0 }} className="border border-black/5" />;
+  return <div ref={elRef} style={{ height, width: '100%', borderRadius: 16, overflow: 'hidden', zIndex: 0 }} className="border border-black/10" />;
 }

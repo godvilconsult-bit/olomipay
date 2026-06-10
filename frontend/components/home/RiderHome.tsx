@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
+import dynamic from 'next/dynamic';
 import toast from 'react-hot-toast';
-import { Power, Bike, MapPin, Package, Star, CheckCircle2, Navigation } from 'lucide-react';
+import { Power, Bike, MapPin, Package, Star, CheckCircle2, Navigation, Phone, Camera, Clock } from 'lucide-react';
 import { jobs, getAccessToken, JikoUser } from '../../lib/api';
 import { useSocket } from '../../lib/useSocket';
 import { useT } from '../../lib/i18n';
@@ -10,6 +11,9 @@ import { localPhone } from '../../lib/utils';
 import { AppHeader } from '../AppHeader';
 import { RoleNav } from '../RoleNav';
 import { Card, Button, Spinner, EmptyState, Money, Stat, cn } from '../ui';
+import type { MapMarker } from '../Map';
+
+const Map = dynamic(() => import('../Map'), { ssr: false });
 
 export function RiderHome({ user }: { user: JikoUser }) {
   const { t } = useT();
@@ -18,15 +22,15 @@ export function RiderHome({ user }: { user: JikoUser }) {
   const [online, setOnline] = useState(user.riderProfile?.status === 'ONLINE' || user.riderProfile?.status === 'ON_JOB');
   const [earn, setEarn]     = useState<any>(null);
   const [active, setActive] = useState<any>(null);
-  const [feed, setFeed]     = useState<any[]>([]);
+  const [offers, setOffers] = useState<any[]>([]);
+  const [photo, setPhoto]   = useState<string | null>(user.profilePicUrl ?? null);
   const [otp, setOtp]       = useState('');
   const [busy, setBusy]     = useState(false);
   const coordsRef = useRef<{ lat: number; lng: number } | null>(null);
 
   const refresh = useCallback(async () => {
-    const [e, a] = await Promise.all([jobs.earnings().catch(() => null), jobs.active().catch(() => ({ delivery: null }))]);
-    setEarn(e); setActive(a?.delivery ?? null);
-    if (!a?.delivery) { const c = coordsRef.current; const f = await jobs.available(c?.lat, c?.lng).catch(() => ({ jobs: [] })); setFeed(f.jobs ?? []); }
+    const [e, a, o] = await Promise.all([jobs.earnings().catch(() => null), jobs.active().catch(() => ({ delivery: null })), jobs.offers().catch(() => ({ offers: [] }))]);
+    setEarn(e); setActive(a?.delivery ?? null); setOffers(o.offers ?? []);
   }, []);
   useEffect(() => { refresh(); }, [refresh]);
 
@@ -34,40 +38,44 @@ export function RiderHome({ user }: { user: JikoUser }) {
     if (!navigator.geolocation) return;
     const id = navigator.geolocation.watchPosition(
       (p) => { coordsRef.current = { lat: p.coords.latitude, lng: p.coords.longitude };
-        if (online && active) emit('rider:location', { lat: p.coords.latitude, lng: p.coords.longitude, deliveryId: active.id }); },
+        if (online && active && ['FEE_CONFIRMED', 'PICKED'].includes(active.order?.status)) emit('rider:location', { lat: p.coords.latitude, lng: p.coords.longitude, deliveryId: active.id }); },
       () => {}, { enableHighAccuracy: true, maximumAge: 5000 },
     );
     return () => navigator.geolocation.clearWatch(id);
   }, [online, active, emit]);
 
   useEffect(() => {
-    const offNew   = on('job:new',   (j: any) => setFeed((f) => f.find((x) => x.orderId === j.orderId) ? f : [{ ...j, deliveryId: j.deliveryId }, ...f]));
-    const offTaken = on('job:taken', (j: any) => setFeed((f) => f.filter((x) => x.orderId !== j.orderId)));
-    return () => { offNew?.(); offTaken?.(); };
-  }, [on]);
+    const offs = ['job:offered', 'fee:confirmed', 'order:cancelled'].map((e) => on(e, (d: any) => { if (e === 'job:offered') toast(`🏍️ ${t('New pickup offer', 'Ofa mpya ya kazi')}`, { icon: '🔥' }); refresh(); }));
+    return () => offs.forEach((o) => o?.());
+  }, [on, refresh, t]);
 
   async function toggleOnline() {
     try {
-      if (online) { await jobs.offline(); emit('rider:status', { status: 'OFFLINE' }); setOnline(false); setFeed([]); }
+      if (online) { await jobs.offline(); emit('rider:status', { status: 'OFFLINE' }); setOnline(false); }
       else { const c = coordsRef.current; await jobs.online(c?.lat, c?.lng); emit('rider:status', { status: 'ONLINE' }); setOnline(true); await refresh(); }
     } catch { toast.error(t('Failed', 'Imeshindikana')); }
   }
-  async function claim(orderId: string) {
-    setBusy(true);
-    try { await jobs.claim(orderId); toast.success(t('Job taken!', 'Umechukua kazi!')); setFeed([]); await refresh(); }
-    catch (e: any) { toast.error(e?.message ?? t('Job already taken', 'Kazi imeshachukuliwa')); setFeed((f) => f.filter((x) => x.orderId !== orderId)); }
-    finally { setBusy(false); }
-  }
-  async function pick() { setBusy(true); try { await jobs.pick(active.orderId); await refresh(); } finally { setBusy(false); } }
+  async function accept(orderId: string) { setBusy(true); try { await jobs.acceptOffer(orderId); toast.success(t('Accepted — fee sent to household', 'Umekubali — ada imetumwa kwa kaya')); await refresh(); } catch (e: any) { toast.error(e?.message ?? t('Failed', 'Imeshindikana')); } finally { setBusy(false); } }
+  async function decline(orderId: string) { setBusy(true); try { await jobs.declineOffer(orderId); await refresh(); } finally { setBusy(false); } }
+  async function pick() { setBusy(true); try { await jobs.pick(active.orderId); await refresh(); } catch (e: any) { toast.error(e?.message ?? t('Failed', 'Imeshindikana')); } finally { setBusy(false); } }
   async function deliver() {
     if (otp.length < 3) return toast.error(t('Enter the confirmation code', 'Weka namba ya uthibitisho'));
     setBusy(true);
     try { const r = await jobs.deliver(active.orderId, otp); toast.success(`${t('Well done! You earned', 'Hongera! Umepata')} TZS ${r.earned?.toLocaleString()}`); setOtp(''); await refresh(); }
     catch (e: any) { toast.error(e?.message ?? t('Wrong code', 'Namba si sahihi')); } finally { setBusy(false); }
   }
+  function onPhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0]; if (!f) return;
+    const reader = new FileReader();
+    reader.onload = async () => { const url = String(reader.result); setPhoto(url); try { await jobs.setProfile({ photoUrl: url }); toast.success(t('Photo updated', 'Picha imewekwa')); } catch { toast.error(t('Failed', 'Imeshindikana')); } };
+    reader.readAsDataURL(f);
+  }
 
   if (!earn) return <Spinner />;
   const o = active?.order;
+  const status = o?.status;
+  const destUrl = active?.order?.address ? `https://www.google.com/maps/dir/?api=1&destination=${active.order.address.lat},${active.order.address.lng}` : '#';
+  const destMarkers: MapMarker[] = active?.order?.address ? [{ lat: active.order.address.lat, lng: active.order.address.lng, kind: 'dest', label: t('Destination', 'Unakoenda') }] : [];
 
   return (
     <div className="min-h-screen pb-24">
@@ -75,8 +83,15 @@ export function RiderHome({ user }: { user: JikoUser }) {
         right={<span className={cn('rounded-full px-2.5 py-1 text-xs font-bold', online ? 'bg-leaf/15 text-leaf-dark' : 'bg-black/10 text-ink/50')}>{online ? 'ONLINE' : 'OFFLINE'}</span>} />
 
       <div className="mx-auto max-w-md space-y-4 px-5 pt-4">
-        <button onClick={toggleOnline} className={cn('flex w-full items-center justify-center gap-2 rounded-ds-xl py-4 text-base font-bold shadow-ds-btn transition active:scale-[.99]', online ? 'bg-black/80 text-white' : 'bg-grad-leaf text-white')}>
-          <Power size={20} /> {online ? t('Go offline', 'Maliza kazi (Offline)') : t('Go online — receive jobs', 'Anza kupokea kazi (Online)')}
+        {/* profile / photo */}
+        <Card className="flex items-center gap-3 !p-3">
+          {photo ? <img src={photo} alt="" className="h-12 w-12 rounded-full object-cover" /> : <span className="grid h-12 w-12 place-items-center rounded-full bg-flame/15 font-bold text-flame">{(user.name ?? '?').slice(0, 2).toUpperCase()}</span>}
+          <div className="flex-1 min-w-0"><div className="font-semibold">{user.name}</div><div className="text-xs text-ink/50">{user.riderProfile?.plateNo ?? user.riderProfile?.vehicleType} · {localPhone(user.phone)}</div></div>
+          <label className="flex cursor-pointer items-center gap-1 rounded-xl bg-black/5 px-3 py-2 text-xs font-semibold"><Camera size={14} /> {photo ? t('Update', 'Badili') : t('Add photo', 'Weka picha')}<input type="file" accept="image/*" capture="user" onChange={onPhoto} className="hidden" /></label>
+        </Card>
+
+        <button onClick={toggleOnline} className={cn('flex w-full items-center justify-center gap-2 rounded-ds-xl py-4 text-base font-bold shadow-ds-btn transition active:scale-[.99]', online ? 'bg-ink/80 text-white' : 'bg-grad-leaf text-white')}>
+          <Power size={20} /> {online ? t('Go offline', 'Maliza (Offline)') : t('Go online — receive jobs', 'Anza kupokea kazi (Online)')}
         </button>
 
         <div className="grid grid-cols-3 gap-2.5">
@@ -85,43 +100,57 @@ export function RiderHome({ user }: { user: JikoUser }) {
           <Stat label={t('Rating', 'Nyota')} value={<span className="inline-flex items-center gap-1"><Star size={16} className="fill-ember text-ember" />{earn.rating ? earn.rating.toFixed(1) : '—'}</span>} />
         </div>
 
+        {/* ACTIVE JOB */}
         {o ? (
           <Card className="border-flame/30">
             <div className="mb-3 flex items-center justify-between">
               <span className="inline-flex items-center gap-1.5 font-bold text-flame"><Bike size={18} /> {t('Active job', 'Kazi inayoendelea')}</span>
               <span className="text-sm font-semibold">{o.orderNo}</span>
             </div>
-            <div className="space-y-2 text-sm">
-              <div className="flex items-start gap-2"><span className="mt-0.5 grid h-6 w-6 flex-shrink-0 place-items-center rounded-full bg-flame/15 text-flame"><Package size={13} /></span><div><div className="font-semibold">{t('Pick up', 'Chukua')}: {o.supplier?.businessName}</div><div className="text-xs text-ink/50">{localPhone(o.supplier?.phone)}</div></div></div>
-              <div className="flex items-start gap-2"><span className="mt-0.5 grid h-6 w-6 flex-shrink-0 place-items-center rounded-full bg-leaf/15 text-leaf"><MapPin size={13} /></span><div><div className="font-semibold">{t('Deliver to', 'Peleka')}: {o.address?.label}</div><div className="text-xs text-ink/50">{o.household?.name} · {localPhone(o.household?.phone)}</div></div></div>
-            </div>
-            <div className="mt-3 flex items-center justify-between border-t border-black/5 pt-3">
-              <span className="text-xs text-ink/50">{t('Your pay', 'Malipo yako')}</span><Money value={o.deliveryFee} className="text-leaf-dark" />
-            </div>
-            <div className="mt-4">
-              {active.status === 'CLAIMED' && <Button variant="primary" loading={busy} onClick={pick} className="w-full">{t('Picked up the gas ✓', 'Nimechukua gesi ✓')}</Button>}
-              {active.status === 'PICKED' && (
-                <div className="space-y-2">
-                  <input value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))} inputMode="numeric" maxLength={4} placeholder={t('Confirmation code (OTP)', 'Namba ya uthibitisho (OTP)')} className="w-full min-h-touch rounded-2xl border border-black/15 bg-white px-4 text-center text-lg tracking-[.4em] text-ink outline-none focus:border-flame" />
-                  <Button variant="leaf" loading={busy} onClick={deliver} className="w-full"><CheckCircle2 size={18} /> {t('Confirm delivered', 'Thibitisha umefikisha')}</Button>
+
+            {status === 'RIDER_ACCEPTED' ? (
+              <div className="rounded-xl bg-warning/10 p-3 text-sm text-warning flex items-center gap-2"><Clock size={16} /> {t('Waiting for the household to confirm your fee', 'Inasubiri kaya kuthibitisha ada yako')} (<Money value={o.deliveryFee} className="text-xs" />).</div>
+            ) : (
+              <>
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-start gap-2"><span className="mt-0.5 grid h-6 w-6 flex-shrink-0 place-items-center rounded-full bg-flame/15 text-flame"><Package size={13} /></span><div><div className="font-semibold">{t('Pick up', 'Chukua')}: {o.supplier?.businessName}</div><div className="text-xs text-ink/50">{localPhone(o.supplier?.phone)}</div></div></div>
+                  <div className="flex items-start gap-2"><span className="mt-0.5 grid h-6 w-6 flex-shrink-0 place-items-center rounded-full bg-leaf/15 text-leaf"><MapPin size={13} /></span><div><div className="font-semibold">{t('Deliver to', 'Peleka')}: {o.address?.label}{o.address?.ward ? ` · ${o.address.ward}` : ''}</div><div className="text-xs text-ink/50">{o.household?.name}</div></div></div>
                 </div>
-              )}
-            </div>
+                {destMarkers.length > 0 && <div className="mt-3"><Map markers={destMarkers} height={160} /></div>}
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <a href={`tel:${o.household?.phone}`} className="flex items-center justify-center gap-1.5 rounded-2xl bg-black/5 py-3 text-sm font-semibold"><Phone size={15} /> {t('Call household', 'Piga kaya')}</a>
+                  <a href={destUrl} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-1.5 rounded-2xl bg-leaf/15 py-3 text-sm font-semibold text-leaf-dark"><Navigation size={15} /> {t('Navigate', 'Ramani')}</a>
+                </div>
+                <div className="mt-2 flex items-center justify-between border-t border-black/5 pt-2 text-sm"><span className="text-ink/50">{t('Your fee', 'Ada yako')}</span><Money value={o.deliveryFee} className="text-leaf-dark" /></div>
+                <div className="mt-3">
+                  {status === 'FEE_CONFIRMED' && <Button variant="primary" loading={busy} onClick={pick} className="w-full">{t('Picked up the gas ✓', 'Nimechukua gesi ✓')}</Button>}
+                  {status === 'PICKED' && (
+                    <div className="space-y-2">
+                      <input value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))} inputMode="numeric" maxLength={4} placeholder={t('Confirmation code from household', 'Namba kutoka kwa kaya')} className="w-full min-h-touch rounded-2xl border border-black/15 bg-white px-4 text-center text-lg tracking-[.4em] text-ink outline-none focus:border-flame" />
+                      <Button variant="leaf" loading={busy} onClick={deliver} className="w-full"><CheckCircle2 size={18} /> {t('Confirm delivered', 'Thibitisha umefikisha')}</Button>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </Card>
         ) : !online ? (
-          <EmptyState icon={<Power size={36} />} title={t("You're offline", 'Uko offline')} sub={t('Tap the button above to start receiving delivery jobs.', 'Bonyeza kitufe hapo juu uanze kupokea kazi.')} />
+          <EmptyState icon={<Power size={36} />} title={t("You're offline", 'Uko offline')} sub={t('Go online so suppliers can send you delivery jobs.', 'Kuwa online ili wauzaji wakutume kazi.')} />
         ) : (
           <div>
-            <h2 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-ink/70"><Navigation size={15} /> {t('Available jobs', 'Kazi zinazopatikana')}</h2>
-            {feed.length === 0 ? <EmptyState icon={<Bike size={36} />} title={t('No jobs right now', 'Hakuna kazi kwa sasa')} sub={t('Wait — new orders appear here live.', 'Subiri — oda mpya zitaonekana hapa moja kwa moja.')} /> :
+            <h2 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-ink/70"><Bike size={15} /> {t('Pickup offers', 'Ofa za kazi')}</h2>
+            {offers.length === 0 ? <EmptyState icon={<Clock size={34} />} title={t('No offers yet', 'Hakuna ofa bado')} sub={t('A supplier will send you a job. It appears here live.', 'Muuzaji atakutumia kazi. Itaonekana hapa.')} /> :
               <div className="space-y-2.5">
-                {feed.map((j) => (
+                {offers.map((j) => (
                   <Card key={j.orderId}>
                     <div className="flex items-center justify-between">
-                      <div><div className="font-bold">{j.vendor}</div><div className="text-xs text-ink/50">{j.tripKm ? `${j.tripKm} km · ~${j.tripEtaMin} ${t('min', 'dak')}` : ''}</div></div>
-                      <Money value={j.payout} className="text-leaf-dark" />
+                      <div><div className="font-bold">{j.vendor}</div><div className="text-xs text-ink/50">→ {j.drop?.label}{j.tripKm ? ` · ${j.tripKm} km · ~${j.tripEtaMin} ${t('min', 'dak')}` : ''}</div></div>
+                      <Money value={j.fee} className="text-leaf-dark" />
                     </div>
-                    <Button variant="primary" loading={busy} onClick={() => claim(j.orderId)} className="mt-3 w-full">{t('Take job', 'Chukua kazi')}</Button>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <Button variant="ghost" loading={busy} onClick={() => decline(j.orderId)}>{t('Decline', 'Kataa')}</Button>
+                      <Button variant="primary" loading={busy} onClick={() => accept(j.orderId)}>{t('Accept', 'Kubali')}</Button>
+                    </div>
                   </Card>
                 ))}
               </div>

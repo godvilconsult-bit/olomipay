@@ -35,14 +35,17 @@ enum ProductType {
 }
 
 enum OrderStatus {
-  PLACED      // household submitted
-  ALERTED     // supplier notified
-  ACCEPTED    // supplier accepted
-  BROADCAST   // open to nearby riders
-  CLAIMED     // a rider took the job
-  PICKED      // rider collected from vendor
-  DELIVERED   // dropped at household (awaiting confirm/rating)
-  COMPLETED   // settled
+  PLACED         // household submitted
+  ALERTED        // supplier notified
+  ACCEPTED       // supplier confirmed stock + payment
+  BROADCAST      // (legacy) open to nearby riders
+  CLAIMED        // (legacy) a rider took the job
+  RIDER_OFFERED  // supplier assigned a specific rider, awaiting accept
+  RIDER_ACCEPTED // rider accepted → fee proposed to household
+  FEE_CONFIRMED  // household confirmed the rider fee → live tracking
+  PICKED         // rider collected from vendor
+  DELIVERED      // dropped at household (awaiting confirm/rating)
+  COMPLETED      // settled
   CANCELLED
 }
 
@@ -199,6 +202,8 @@ model SupplierProfile {
   lng           Float?
   isOpen        Boolean      @default(true)
   isVerified    Boolean      @default(false)
+  acceptsCash   Boolean      @default(true)
+  acceptsMobile Boolean      @default(true)
   tier          SupplierTier @default(FREE)
   featured      Boolean      @default(false)
   rating        Float        @default(0)

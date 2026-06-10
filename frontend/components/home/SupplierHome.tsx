@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { Store, Bell, AlertTriangle, Check, X, MapPin } from 'lucide-react';
+import { Store, Bell, AlertTriangle, Check, X, MapPin, Bike, Smartphone, Banknote, Clock } from 'lucide-react';
 import { suppliers, getAccessToken, JikoUser } from '../../lib/api';
 import { useSocket } from '../../lib/useSocket';
 import { useT } from '../../lib/i18n';
@@ -11,12 +12,12 @@ import { AppHeader } from '../AppHeader';
 import { RoleNav } from '../RoleNav';
 import { Card, Button, Spinner, EmptyState, Money, Stat, Badge, cn } from '../ui';
 
-const ACTIVE = ['ALERTED', 'PLACED', 'ACCEPTED', 'BROADCAST', 'CLAIMED', 'PICKED'];
+const ACTIVE = ['ALERTED', 'PLACED', 'ACCEPTED', 'RIDER_OFFERED', 'RIDER_ACCEPTED', 'FEE_CONFIRMED', 'PICKED'];
 
 export function SupplierHome({ user }: { user: JikoUser }) {
   const { t } = useT();
-  const token = getAccessToken();
-  const { on } = useSocket(token);
+  const router = useRouter();
+  const { on } = useSocket(getAccessToken());
   const [me, setMe]   = useState<any>(null);
   const [list, setList] = useState<any[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
@@ -28,19 +29,19 @@ export function SupplierHome({ user }: { user: JikoUser }) {
   useEffect(() => { refresh(); }, [refresh]);
 
   useEffect(() => {
-    const offNew     = on('order:new', (order: any) => { setList((l) => l.find((x) => x.id === order.id) ? l : [order, ...l]); toast(`🔔 ${t('New order', 'Oda mpya')} — ${order.orderNo}`, { icon: '🔥' }); });
-    const offClaimed = on('order:claimed', ({ orderId }: any) => setList((l) => l.map((x) => x.id === orderId ? { ...x, status: 'CLAIMED' } : x)));
-    return () => { offNew?.(); offClaimed?.(); };
-  }, [on, t]);
+    const evs = ['order:new', 'order:rider-accepted', 'rider:declined', 'order:tracking', 'order:picked', 'order:delivered', 'payment:paid'];
+    const offs = evs.map((e) => on(e, (d: any) => { if (e === 'order:new') toast(`🔔 ${t('New order', 'Oda mpya')} ${d?.orderNo ?? ''}`, { icon: '🔥' }); refresh(); }));
+    return () => offs.forEach((o) => o?.());
+  }, [on, refresh, t]);
 
   async function toggleOpen() {
     const next = !me.profile.isOpen;
     setMe((m: any) => ({ ...m, profile: { ...m.profile, isOpen: next } }));
     try { await suppliers.update({ isOpen: next }); } catch { refresh(); }
   }
-  async function accept(id: string) {
+  async function confirm(id: string) {
     setBusy(id);
-    try { const r = await suppliers.accept(id); toast.success(`${t('Accepted. OTP', 'Imekubaliwa. OTP')}: ${r.otp}`); await refresh(); }
+    try { await suppliers.accept(id); toast.success(t('Order confirmed', 'Oda imethibitishwa')); await refresh(); }
     catch (e: any) { toast.error(e?.message ?? t('Failed', 'Imeshindikana')); } finally { setBusy(null); }
   }
   async function reject(id: string) {
@@ -53,10 +54,16 @@ export function SupplierHome({ user }: { user: JikoUser }) {
   const p = me.profile;
   const queue = list.filter((o) => ACTIVE.includes(o.status));
 
+  function payInfo(o: any) {
+    if (o.payment?.status === 'PAID') return { ok: true, label: `${t('Paid', 'Imelipwa')} ✓`, icon: Smartphone };
+    if (o.payment?.provider === 'CASH') return { ok: true, label: t('Cash on delivery', 'Cash ukipokea'), icon: Banknote };
+    return { ok: false, label: t('Awaiting payment', 'Inasubiri malipo'), icon: Clock };
+  }
+
   return (
     <div className="min-h-screen pb-24">
       <AppHeader title={p.businessName} subtitle={t('Supplier dashboard', 'Dashibodi ya muuzaji')}
-        right={<button onClick={toggleOpen} className={cn('rounded-full px-3 py-1.5 text-xs font-bold', p.isOpen ? 'bg-leaf/15 text-leaf-dark' : 'bg-black/10 text-ink/50')}>{p.isOpen ? t('OPEN', 'IMEFUNGULIWA') : t('CLOSED', 'IMEFUNGWA')}</button>} />
+        right={<button onClick={toggleOpen} className={cn('rounded-full px-3 py-1.5 text-xs font-bold', p.isOpen ? 'bg-leaf/15 text-leaf-dark' : 'bg-black/10 text-ink/50')}>{p.isOpen ? t('OPEN', 'WAZI') : t('CLOSED', 'IMEFUNGWA')}</button>} />
 
       <div className="mx-auto max-w-md space-y-4 px-5 pt-4">
         <div className="grid grid-cols-3 gap-2.5">
@@ -68,42 +75,55 @@ export function SupplierHome({ user }: { user: JikoUser }) {
         {me.stats.lowStock > 0 && (
           <Card className="flex items-center gap-3 border-warning/30 !bg-warning/5">
             <AlertTriangle className="text-warning flex-shrink-0" size={20} />
-            <div className="flex-1 text-sm"><span className="font-semibold">{me.stats.lowStock} {t('items', 'bidhaa')}</span> {t('are low on stock. Request a restock.', 'zina stock ndogo. Omba kujaza upya.')}</div>
+            <div className="flex-1 text-sm"><span className="font-semibold">{me.stats.lowStock} {t('items', 'bidhaa')}</span> {t('low on stock.', 'zina stock ndogo.')}</div>
           </Card>
         )}
 
         <div>
           <h2 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-ink/70"><Bell size={15} /> {t('Orders needing action', 'Oda zinazohitaji hatua')}</h2>
-          {queue.length === 0 ? <EmptyState icon={<Store size={36} />} title={t('No orders right now', 'Hakuna oda kwa sasa')} sub={t('New orders appear here the instant they come in.', 'Oda mpya zitaonekana hapa papo hapo.')} /> :
+          {queue.length === 0 ? <EmptyState icon={<Store size={36} />} title={t('No orders right now', 'Hakuna oda kwa sasa')} sub={t('New orders appear here the instant they arrive.', 'Oda mpya zitaonekana papo hapo.')} /> :
             <div className="space-y-3">
-              {queue.map((o) => (
-                <Card key={o.id} className={cn(['ALERTED', 'PLACED'].includes(o.status) && 'border-flame/40')}>
-                  <div className="flex items-start justify-between">
-                    <div className="min-w-0">
-                      <div className="font-bold">{o.orderNo}</div>
-                      <div className="truncate text-xs text-ink/50">{o.household?.name} · {localPhone(o.household?.phone)}</div>
+              {queue.map((o) => {
+                const pay = payInfo(o);
+                const PayIcon = pay.icon;
+                return (
+                  <Card key={o.id} className={cn(['ALERTED', 'PLACED'].includes(o.status) && 'border-flame/40')}>
+                    <div className="flex items-start justify-between">
+                      <div className="min-w-0"><div className="font-bold">{o.orderNo}</div><div className="truncate text-xs text-ink/50">{o.household?.name} · {localPhone(o.household?.phone)}</div></div>
+                      <Badge status={o.status} />
                     </div>
-                    <Badge status={o.status} />
-                  </div>
-                  <div className="mt-2 space-y-1 text-sm">
-                    {o.items?.map((it: any) => (
-                      <div key={it.id} className="flex justify-between gap-2"><span className="min-w-0 truncate text-ink/70">{it.qty}× {it.brand} {it.productName}</span><Money value={it.lineTotal} className="flex-shrink-0 text-xs" /></div>
-                    ))}
-                  </div>
-                  <div className="mt-2 flex items-center gap-1 text-xs text-ink/50"><MapPin size={12} className="flex-shrink-0" /> {o.address?.label}{o.address?.ward ? ` · ${o.address.ward}` : ''}</div>
-                  <div className="mt-3 flex items-center justify-between border-t border-black/5 pt-3">
-                    <div className="text-xs text-ink/50">{t('Total', 'Jumla')} <Money value={o.total} className="ml-1 text-ink" /></div>
-                    {['ALERTED', 'PLACED'].includes(o.status) ? (
-                      <div className="flex gap-2">
-                        <Button variant="ghost" onClick={() => reject(o.id)} loading={busy === o.id} className="!px-3"><X size={16} /></Button>
-                        <Button variant="primary" onClick={() => accept(o.id)} loading={busy === o.id}><Check size={16} /> {t('Accept', 'Kubali')}</Button>
-                      </div>
-                    ) : (
-                      <span className="text-xs font-medium text-ink/50">{o.status === 'CLAIMED' ? t('Rider found', 'Dereva amepatikana') : o.status === 'PICKED' ? t('On the way', 'Njiani') : t('Waiting for rider', 'Inasubiri dereva')}</span>
-                    )}
-                  </div>
-                </Card>
-              ))}
+                    <div className="mt-2 space-y-1 text-sm">
+                      {o.items?.map((it: any) => <div key={it.id} className="flex justify-between gap-2"><span className="min-w-0 truncate text-ink/70">{it.qty}× {it.brand} {it.productName}</span><Money value={it.lineTotal} className="flex-shrink-0 text-xs" /></div>)}
+                    </div>
+                    <div className="mt-2 flex items-center gap-1 text-xs text-ink/50"><MapPin size={12} className="flex-shrink-0" /> {o.address?.label}{o.address?.ward ? ` · ${o.address.ward}` : ''}</div>
+                    <div className={cn('mt-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold', pay.ok ? 'bg-leaf/15 text-leaf-dark' : 'bg-warning/15 text-warning')}><PayIcon size={13} /> {pay.label}</div>
+
+                    {/* state-aware action */}
+                    <div className="mt-3 border-t border-black/5 pt-3">
+                      {['ALERTED', 'PLACED'].includes(o.status) ? (
+                        <div className="flex items-center justify-between">
+                          <div className="text-xs text-ink/50">{t('Total', 'Jumla')} <Money value={o.total} className="ml-1 text-ink" /></div>
+                          <div className="flex gap-2">
+                            <Button variant="ghost" onClick={() => reject(o.id)} loading={busy === o.id} className="!px-3"><X size={16} /></Button>
+                            <Button variant="primary" onClick={() => confirm(o.id)} loading={busy === o.id} disabled={!pay.ok}><Check size={16} /> {t('Confirm', 'Thibitisha')}</Button>
+                          </div>
+                        </div>
+                      ) : o.status === 'ACCEPTED' ? (
+                        <Button variant="primary" className="w-full" onClick={() => router.push(`/supplier/dispatch/${o.id}`)}><Bike size={16} /> {t('Find a rider', 'Tafuta dereva')}</Button>
+                      ) : o.status === 'RIDER_OFFERED' ? (
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-medium text-ink/60">{t('Offered to', 'Imetolewa kwa')} {o.delivery?.rider?.name ?? t('rider', 'dereva')} — {t('waiting', 'inasubiri')}…</span>
+                          <button onClick={() => router.push(`/supplier/dispatch/${o.id}`)} className="text-xs font-semibold text-flame">{t('Change', 'Badilisha')}</button>
+                        </div>
+                      ) : o.status === 'RIDER_ACCEPTED' ? (
+                        <span className="text-xs font-medium text-ink/60">{t('Rider accepted — waiting for household to confirm fee', 'Dereva amekubali — inasubiri kaya kuthibitisha ada')}</span>
+                      ) : (
+                        <Button variant="ghost" className="w-full" onClick={() => router.push(`/supplier/dispatch/${o.id}`)}><MapPin size={16} /> {o.status === 'PICKED' ? t('Track delivery', 'Fuatilia') : t('On the way — track', 'Njiani — fuatilia')}</Button>
+                      )}
+                    </div>
+                  </Card>
+                );
+              })}
             </div>
           }
         </div>
