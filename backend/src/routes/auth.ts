@@ -3,283 +3,153 @@ import rateLimit from 'express-rate-limit';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { z } from 'zod';
-import { PrismaClient } from '@prisma/client';
+import { Role } from '@prisma/client';
 import { prisma } from '../lib/prisma';
-import { deriveKeypairFromPhone, activateUserWallet, IS_TESTNET_NETWORK } from '../services/stellar';
-import { encryptSecret, hashPin, verifyPin, isEncryptedKeyValid } from '../services/crypto';
+import { hashPin, verifyPin } from '../lib/pin';
 import { requireAuth, AuthRequest } from '../middleware/auth';
-import { makeAccountNo } from '../services/accountNo';
 
-const router  = Router();
+const router = Router();
 
-// Tanzania phone number: +255 followed by 9 digits
-const phoneSchema = z
-  .string()
-  .regex(/^\+255\d{9}$/, 'Phone must be in +255XXXXXXXXX format');
+// Tanzanian MSISDN → +255XXXXXXXXX
+function normalizePhone(v: string): string {
+  const clean = v.replace(/\s+/g, '');
+  if (clean.startsWith('0'))  return '+255' + clean.slice(1);
+  if (clean.startsWith('255')) return '+' + clean;
+  if (!clean.startsWith('+')) return '+255' + clean;
+  return clean;
+}
 
-// 6-digit PIN
-const pinSchema = z
-  .string()
-  .regex(/^\d{6}$/, 'PIN must be 6 digits');
-
-// Strict rate limit on auth endpoints
 const authLimiter = rateLimit({
   windowMs: 60_000,
-  max: 10,
-  message: { error: 'Too many auth attempts, try again in 1 minute' },
+  max: 15,
+  message: { error: 'Too many attempts, try again in a minute' },
 });
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function signAccessToken(userId: string, phone: string): string {
-  return jwt.sign(
-    { userId, phone },
-    process.env.JWT_SECRET!,
-    // 7d so the PWA "just works" across sessions; refresh-token flow still rotates it.
-    { expiresIn: '7d' },
-  );
+function signAccess(userId: string, phone: string, role: Role): string {
+  return jwt.sign({ userId, phone, role }, process.env.JWT_SECRET!, { expiresIn: '7d' });
+}
+function signRefresh(userId: string): string {
+  return jwt.sign({ userId, type: 'refresh' }, process.env.JWT_REFRESH_SECRET!, { expiresIn: '180d' });
+}
+async function storeRefresh(userId: string, token: string): Promise<void> {
+  const hash = crypto.createHash('sha256').update(token).digest('hex');
+  await prisma.refreshToken.create({
+    data: { userId, tokenHash: hash, expiresAt: new Date(Date.now() + 180 * 864e5) },
+  });
 }
 
-function signRefreshToken(userId: string): string {
-  return jwt.sign(
-    { userId, type: 'refresh' },
-    process.env.JWT_REFRESH_SECRET!,
-    // Long-lived so users stay signed in until they sign out themselves; the
-    // 7d access token is rotated via this refresh token whenever it expires.
-    { expiresIn: '180d' },
-  );
-}
-
-async function storeRefreshToken(userId: string, token: string): Promise<void> {
-  const hash      = crypto.createHash('sha256').update(token).digest('hex');
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-  await prisma.refreshToken.create({ data: { userId, tokenHash: hash, expiresAt } });
-}
-
-// ── POST /api/auth/register ────────────────────────────────────────────────────
-
-router.post('/register', authLimiter, async (req, res) => {
-  console.log('[register] attempt:', req.body?.phone);
-
-  // Accept any phone format — Tanzania or international
-  const parse = z.object({
-    phone: z.string().min(7).max(20).transform(v => {
-      const clean = v.replace(/\s+/g, '');
-      if (clean.startsWith('0')) return '+255' + clean.slice(1);
-      if (!clean.startsWith('+')) return '+255' + clean;
-      return clean;
-    }),
-    pin:  z.string().regex(/^\d{6}$/, 'PIN must be 6 digits'),
-    name: z.string().min(1).max(100).optional(),
-  }).safeParse(req.body);
-
-  if (!parse.success) {
-    console.log('[register] validation failed:', parse.error.errors[0].message);
-    return res.status(400).json({ error: parse.error.errors[0].message });
-  }
-
-  const { phone, pin, name } = parse.data;
-  console.log('[register] registering:', phone, 'name:', name);
-
-  try {
-    const existing = await prisma.user.findUnique({ where: { phone } });
-    if (existing) {
-      console.log('[register] already exists:', phone);
-      return res.status(409).json({ error: 'Phone number already registered' });
-    }
-  } catch (e: any) {
-    console.error('[register] DB check failed:', e.message);
-    return res.status(500).json({ error: 'Database error. Please try again.' });
-  }
-
-  // Deterministically derive the wallet from the phone number, so the SAME wallet
-  // (same address + funds) can always be rebuilt for recovery on any device.
-  const { publicKey, secretKey } = deriveKeypairFromPhone(phone);
-  const encryptedSecret          = encryptSecret(secretKey, pin, phone);
-  const pinHash                  = hashPin(pin);
-
-  // Generate chat keypair safely
-  let chatPublicKey:    string | undefined;
-  let chatSecretKeyEnc: string | undefined;
-  try {
-    const nacl             = require('tweetnacl');
-    const { encodeBase64 } = require('tweetnacl-util');
-    const kp               = nacl.box.keyPair();
-    chatPublicKey          = encodeBase64(kp.publicKey);
-    chatSecretKeyEnc       = encryptSecret(encodeBase64(kp.secretKey), pin, phone);
-  } catch (e: any) {
-    console.warn('[register] chat keygen skipped:', e.message);
-  }
-
-  let user: any;
-  try {
-    user = await prisma.user.create({
-      data: {
-        phone,
-        pinHash,
-        stellarPubKey:    publicKey,
-        stellarSecret:    encryptedSecret,
-        kycName:          name ?? null,
-        chatPublicKey:    chatPublicKey ?? null,
-        chatSecretKeyEnc: chatSecretKeyEnc ?? null,
-      },
-    });
-    console.log('[register] user created:', user.id, phone);
-  } catch (e: any) {
-    console.error('[register] create failed:', e.message);
-    // Try minimal create without optional fields
-    try {
-      user = await prisma.$executeRawUnsafe(
-        `INSERT INTO "User" (id, phone, "pinHash", "stellarPubKey", "stellarSecret", "kycName", "kycStatus", "createdAt", "updatedAt")
-         VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, 'PENDING', NOW(), NOW()) RETURNING id, phone`,
-        phone, pinHash, publicKey, encryptedSecret, name ?? null,
-      );
-      // Re-fetch
-      user = await prisma.user.findUnique({ where: { phone } });
-      console.log('[register] fallback create succeeded:', user?.id);
-    } catch (e2: any) {
-      console.error('[register] fallback failed:', e2.message);
-      return res.status(500).json({ error: 'Registration failed. Please try again.' });
-    }
-  }
-
-  // Persist the immutable account number (OP-XXXX) for admin/audit + display.
-  try {
-    const { makeAccountNo } = await import('../services/accountNo');
-    await prisma.user.update({ where: { id: user.id }, data: { accountNo: makeAccountNo(user.id) } });
-  } catch (e: any) { console.warn('[register] accountNo set failed:', e.message); }
-
-  // Activate the wallet asynchronously (don't block registration):
-  // fund the account with min XLM + add the USDC trustline (signed with the
-  // user's key — we have the PIN here). This lets the first deposit land and
-  // gives the user a little XLM for fees from day one.
-  activateUserWallet({ publicKey, encryptedSecret, pin, phone })
-    .then(async r => {
-      console.log(`[stellar] wallet activated ${phone}: funded=${r.funded} trustline=${r.trustline}`);
-      // On testnet gas is free (Friendbot) → no activation fee owed.
-      // On mainnet the platform fronted the XLM → fee is collected from 1st deposit.
-      if (IS_TESTNET_NETWORK) {
-        await prisma.user.update({ where: { id: user.id }, data: { activationFeePaid: true } }).catch(() => {});
-      }
-    })
-    .catch(err => console.error('[stellar] activation failed:', err?.message));
-
-  const accessToken  = signAccessToken(user.id, phone);
-  const refreshToken = signRefreshToken(user.id);
-  await storeRefreshToken(user.id, refreshToken);
-
-  return res.status(201).json({
-    accessToken,
-    refreshToken,
-    user: {
-      id:           user.id,
-      phone:        user.phone,
-      stellarPubKey: user.stellarPubKey,
-      kycStatus:    user.kycStatus,
+async function publicUser(userId: string) {
+  return prisma.user.findUnique({
+    where:  { id: userId },
+    select: {
+      id: true, phone: true, role: true, name: true, region: true,
+      kycStatus: true, profilePicUrl: true, isAdmin: true, createdAt: true,
+      supplierProfile: { select: { id: true, businessName: true, isOpen: true, isVerified: true, tier: true } },
+      riderProfile:    { select: { id: true, vehicleType: true, status: true, isVerified: true, rating: true, totalDeliveries: true } },
     },
   });
+}
+
+// ── POST /api/auth/register ─────────────────────────────────────────────────────
+router.post('/register', authLimiter, async (req, res) => {
+  const parse = z.object({
+    phone:        z.string().min(7).max(20).transform(normalizePhone),
+    pin:          z.string().regex(/^\d{4,6}$/, 'PIN must be 4–6 digits'),
+    role:         z.enum(['HOUSEHOLD', 'SUPPLIER', 'RIDER']).default('HOUSEHOLD'),
+    name:         z.string().min(1).max(100).optional(),
+    region:       z.string().max(60).optional(),
+    businessName: z.string().max(120).optional(),
+    vehicleType:  z.enum(['MOTORBIKE', 'BAJAJI', 'CAR', 'TRUCK', 'BICYCLE']).optional(),
+  }).safeParse(req.body);
+
+  if (!parse.success) return res.status(400).json({ error: parse.error.errors[0].message });
+  const { phone, pin, role, name, region, businessName, vehicleType } = parse.data;
+
+  const existing = await prisma.user.findUnique({ where: { phone } });
+  if (existing) return res.status(409).json({ error: 'Phone number already registered' });
+
+  const user = await prisma.user.create({
+    data: {
+      phone,
+      pinHash: hashPin(pin),
+      role: role as Role,
+      name: name ?? null,
+      region: region ?? null,
+      // Provision the role profile up-front so suppliers/riders are usable.
+      ...(role === 'SUPPLIER' && {
+        supplierProfile: { create: { businessName: businessName ?? (name ?? 'My Gas Shop'), phone, region: region ?? 'Dar es Salaam' } },
+      }),
+      ...(role === 'RIDER' && {
+        riderProfile: { create: { region: region ?? 'Dar es Salaam', vehicleType: (vehicleType ?? 'MOTORBIKE') as any } },
+      }),
+    },
+  });
+
+  const accessToken  = signAccess(user.id, phone, user.role);
+  const refreshToken = signRefresh(user.id);
+  await storeRefresh(user.id, refreshToken);
+
+  return res.status(201).json({ accessToken, refreshToken, user: await publicUser(user.id) });
 });
 
-// ── POST /api/auth/login ──────────────────────────────────────────────────────
-
+// ── POST /api/auth/login ────────────────────────────────────────────────────────
 router.post('/login', authLimiter, async (req, res) => {
-  const parse = z.object({ phone: phoneSchema, pin: pinSchema }).safeParse(req.body);
-  if (!parse.success) {
-    return res.status(400).json({ error: parse.error.errors[0].message });
-  }
+  const parse = z.object({
+    phone: z.string().min(7).max(20).transform(normalizePhone),
+    pin:   z.string().regex(/^\d{4,6}$/, 'PIN must be 4–6 digits'),
+  }).safeParse(req.body);
+  if (!parse.success) return res.status(400).json({ error: parse.error.errors[0].message });
 
   const { phone, pin } = parse.data;
-
-  const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0] ?? req.ip ?? null;
-  const logSec = (type: string, detail?: string) =>
-    prisma.$executeRawUnsafe(
-      `INSERT INTO "SecurityEvent" ("type","phone","detail","ip") VALUES ($1,$2,$3,$4)`,
-      type, phone, detail ?? null, ip,
-    ).catch(() => {});
-
   const user = await prisma.user.findUnique({ where: { phone } });
   if (!user) {
-    // Timing-safe: still run bcrypt even on miss
-    await verifyPin('000000', '$2b$12$invalidhashpadding000000000000000000000000000000000000');
-    logSec('failed_login', 'unknown phone');
+    await verifyPin('0000', '$2b$12$invalidhashpadding000000000000000000000000000000000000');
     return res.status(401).json({ error: 'Invalid phone or PIN' });
   }
 
-  // ── Account lockout: blocked while locked, locks after 5 failed attempts ──────
-  const LOCK_MINUTES = 30;
-  const MAX_ATTEMPTS = 5;
-  const lock = await prisma.$queryRawUnsafe<any[]>(
-    `SELECT "failedLoginCount","lockedUntil" FROM "User" WHERE "id" = $1`, user.id,
-  ).catch(() => []);
-  const now = Date.now();
-  const lockedUntilMs = lock[0]?.lockedUntil ? new Date(lock[0].lockedUntil).getTime() : 0;
-  if (lockedUntilMs > now) {
-    const mins = Math.ceil((lockedUntilMs - now) / 60_000);
-    return res.status(423).json({ error: `Account locked due to too many failed attempts. Try again in ${mins} minute(s).`, locked: true, minutes: mins });
+  const MAX_ATTEMPTS = 5, LOCK_MIN = 30;
+  if (user.lockedUntil && user.lockedUntil.getTime() > Date.now()) {
+    const mins = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60_000);
+    return res.status(423).json({ error: `Account locked. Try again in ${mins} minute(s).`, locked: true });
   }
 
-  const valid = await verifyPin(pin, user.pinHash);
-  if (!valid) {
-    const count = (lock[0]?.failedLoginCount ?? 0) + 1;
+  if (!(await verifyPin(pin, user.pinHash))) {
+    const count = user.failedLoginCount + 1;
     if (count >= MAX_ATTEMPTS) {
-      const until = new Date(now + LOCK_MINUTES * 60_000);
-      await prisma.$executeRawUnsafe(`UPDATE "User" SET "failedLoginCount" = 0, "lockedUntil" = $1 WHERE "id" = $2`, until, user.id);
-      logSec('account_locked', `locked for ${LOCK_MINUTES}m after ${MAX_ATTEMPTS} failed attempts`);
-      return res.status(423).json({ error: `Too many failed attempts. Your account is locked for ${LOCK_MINUTES} minutes.`, locked: true, minutes: LOCK_MINUTES });
+      await prisma.user.update({ where: { id: user.id }, data: { failedLoginCount: 0, lockedUntil: new Date(Date.now() + LOCK_MIN * 60_000) } });
+      return res.status(423).json({ error: `Too many attempts. Locked for ${LOCK_MIN} minutes.`, locked: true });
     }
-    await prisma.$executeRawUnsafe(`UPDATE "User" SET "failedLoginCount" = $1 WHERE "id" = $2`, count, user.id);
-    logSec('failed_login', `attempt ${count}/${MAX_ATTEMPTS}`);
-    const left = MAX_ATTEMPTS - count;
-    return res.status(401).json({ error: `Invalid phone or PIN. ${left} attempt(s) left before your account is locked for ${LOCK_MINUTES} minutes.` });
+    await prisma.user.update({ where: { id: user.id }, data: { failedLoginCount: count } });
+    return res.status(401).json({ error: `Invalid phone or PIN. ${MAX_ATTEMPTS - count} attempt(s) left.` });
   }
 
-  // Success — clear any failed-attempt state
-  await prisma.$executeRawUnsafe(`UPDATE "User" SET "failedLoginCount" = 0, "lockedUntil" = NULL WHERE "id" = $1`, user.id).catch(() => {});
+  await prisma.user.update({ where: { id: user.id }, data: { failedLoginCount: 0, lockedUntil: null } });
+  const accessToken  = signAccess(user.id, phone, user.role);
+  const refreshToken = signRefresh(user.id);
+  await storeRefresh(user.id, refreshToken);
 
-  const accessToken  = signAccessToken(user.id, phone);
-  const refreshToken = signRefreshToken(user.id);
-  await storeRefreshToken(user.id, refreshToken);
-
-  return res.json({
-    accessToken,
-    refreshToken,
-    user: {
-      id:           user.id,
-      phone:        user.phone,
-      stellarPubKey: user.stellarPubKey,
-      kycStatus:    user.kycStatus,
-    },
-  });
+  return res.json({ accessToken, refreshToken, user: await publicUser(user.id) });
 });
 
-// ── POST /api/auth/refresh ────────────────────────────────────────────────────
-
+// ── POST /api/auth/refresh ──────────────────────────────────────────────────────
 router.post('/refresh', authLimiter, async (req, res) => {
   const { refreshToken } = req.body;
   if (!refreshToken) return res.status(400).json({ error: 'refreshToken required' });
-
   try {
-    const payload = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET!) as {
-      userId: string;
-      type: string;
-    };
-    if (payload.type !== 'refresh') throw new Error('wrong token type');
+    const payload = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET!) as { userId: string; type: string };
+    if (payload.type !== 'refresh') throw new Error('bad type');
 
     const hash   = crypto.createHash('sha256').update(refreshToken).digest('hex');
     const stored = await prisma.refreshToken.findUnique({ where: { tokenHash: hash } });
-    if (!stored || stored.expiresAt < new Date()) {
-      return res.status(401).json({ error: 'Refresh token expired or revoked' });
-    }
+    if (!stored || stored.expiresAt < new Date()) return res.status(401).json({ error: 'Refresh token expired' });
 
     const user = await prisma.user.findUnique({ where: { id: payload.userId } });
     if (!user) return res.status(401).json({ error: 'User not found' });
 
-    const newAccess  = signAccessToken(user.id, user.phone);
-    const newRefresh = signRefreshToken(user.id);
-
-    // Rotate refresh token
+    const newAccess  = signAccess(user.id, user.phone, user.role);
+    const newRefresh = signRefresh(user.id);
     await prisma.refreshToken.delete({ where: { tokenHash: hash } });
-    await storeRefreshToken(user.id, newRefresh);
+    await storeRefresh(user.id, newRefresh);
 
     return res.json({ accessToken: newAccess, refreshToken: newRefresh });
   } catch {
@@ -287,29 +157,14 @@ router.post('/refresh', authLimiter, async (req, res) => {
   }
 });
 
-// ── GET /api/auth/me ──────────────────────────────────────────────────────────
-
+// ── GET /api/auth/me ────────────────────────────────────────────────────────────
 router.get('/me', requireAuth, async (req: AuthRequest, res) => {
-  const user = await prisma.user.findUnique({
-    where:  { id: req.userId },
-    select: {
-      id: true, phone: true, stellarPubKey: true, stellarSecret: true,
-      accountNo: true, kycStatus: true, kycName: true, profilePicUrl: true,
-      isAdmin: true, isFeeCollector: true, createdAt: true,
-    },
-  });
+  const user = await publicUser(req.userId!);
   if (!user) return res.status(404).json({ error: 'User not found' });
-
-  // Proactive health flag — does the stored key have the current iv:tag:data shape?
-  const walletKeyValid = isEncryptedKeyValid(user.stellarSecret);
-  const { stellarSecret, ...safe } = user; // never return the secret
-  const userTag = user.accountNo ?? makeAccountNo(user.id);
-
-  return res.json({ user: { ...safe, userTag, accountNo: userTag, walletKeyValid } });
+  return res.json({ user });
 });
 
-// ── POST /api/auth/logout ─────────────────────────────────────────────────────
-
+// ── POST /api/auth/logout ───────────────────────────────────────────────────────
 router.post('/logout', requireAuth, async (req: AuthRequest, res) => {
   const { refreshToken } = req.body;
   if (refreshToken) {

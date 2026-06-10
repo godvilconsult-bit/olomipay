@@ -1,47 +1,20 @@
 import type { Metadata, Viewport } from 'next';
 import { Toaster } from 'react-hot-toast';
-import Sidebar from '../components/Sidebar';
-import AppShell from '../components/AppShell';
-import PushRegistrar from '../components/PushRegistrar';
-import NativePush from '../components/NativePush';
-import SentryInit from '../components/SentryInit';
-import ChunkGuard from '../components/ChunkGuard';
-import ChatNotifier from '../components/ChatNotifier';
-import KeyboardAware from '../components/KeyboardAware';
 import { themeInitScript } from '../lib/theme';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title:       'OlomiPay — Building Trust Through Blockchain',
-  description: 'OlomiPay — Send money instantly via Mobile Money, chat with friends, earn interest. Building Trust Through Blockchain.',
+  title:       'JIKO CONNECT — Gesi yako, popote ulipo',
+  description: 'JIKO CONNECT — order LPG cooking gas from nearby vendors, delivered by riders across Tanzania. Tafuta, agiza, pokea.',
   manifest:    '/manifest.json',
-  appleWebApp: {
-    capable:           true,
-    statusBarStyle:    'default',
-    title:             'OlomiPay',
-  },
-  icons: {
-    icon:  '/icon-192.svg',
-    apple: '/icon-192.svg',
-  },
-  openGraph: {
-    type:        'website',
-    title:       'OlomiPay',
-    description: 'Send money, chat, and earn — instantly. Built for Africa.',
-    siteName:    'OlomiPay',
-  },
+  appleWebApp: { capable: true, statusBarStyle: 'default', title: 'JIKO CONNECT' },
+  icons:       { icon: '/icon-192.svg', apple: '/icon-192.svg' },
+  openGraph:   { type: 'website', title: 'JIKO CONNECT', description: 'LPG gas delivery for Tanzania — households, suppliers, riders.', siteName: 'JIKO CONNECT' },
 };
 
 export const viewport: Viewport = {
-  width:              'device-width',
-  initialScale:       1,
-  maximumScale:       5,        // allow pinch-zoom for accessibility
-  userScalable:       true,
-  viewportFit:        'cover',  // extend under notches; safe-area insets handle padding
-  // Keyboard resizes the layout instead of floating over it — so the chat composer
-  // and PIN inputs stay visible and the screen stays steady while typing.
-  interactiveWidget:  'resizes-content',
-  themeColor:         '#1a56db',
+  width: 'device-width', initialScale: 1, maximumScale: 5, userScalable: true,
+  viewportFit: 'cover', interactiveWidget: 'resizes-content', themeColor: '#F15A24',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -51,32 +24,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
-          rel="stylesheet"
-        />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossOrigin="" />
       </head>
-      <body className="font-sans bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-50 antialiased">
-        <SentryInit />
-        <ChunkGuard />
-        <PushRegistrar />
-        <NativePush />
-        <ChatNotifier />
-        <KeyboardAware />
-        <Sidebar />
-        <AppShell>{children}</AppShell>
+      <body className="font-sans bg-sand dark:bg-background-dark text-ink dark:text-sand antialiased">
+        {children}
         <Toaster
           position="top-center"
-          toastOptions={{
-            duration: 4000,
-            style: {
-              background: '#1e293b',
-              color:      '#f1f5f9',
-              fontSize:   '14px',
-              borderRadius: '12px',
-              padding:    '12px 16px',
-            },
-          }}
+          toastOptions={{ duration: 4000, style: { background: '#1A130E', color: '#FBF7F2', fontSize: '14px', borderRadius: '12px', padding: '12px 16px' } }}
         />
       </body>
     </html>

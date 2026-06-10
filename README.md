@@ -1,58 +1,128 @@
-# OlomiPay — App UI Kit
+# 🔥 JIKO CONNECT
 
-A high-fidelity, interactive recreation of the **OlomiPay** PWA. Open `index.html` to use it as a clickable prototype inside a phone frame.
+**LPG cooking-gas logistics marketplace for Tanzania.** A logistics-first, three-sided
+network that connects **households** (who search for nearby gas vendors with stock),
+**suppliers/vendors** (who receive instant order alerts and fulfil from inventory), and
+**riders** (the delivery engine — *jiko* = stove in Swahili).
 
-> Recreated from the codebase (`github.com/godvilconsult-bit/olomipay`, `frontend/`) — **not** from screenshots. Components are cosmetic recreations of the real ones; networking, encryption and Stellar/M-Pesa calls are faked.
+> No blockchain, no crypto. Plain mobile-money fintech (M-Pesa / Tigo Pesa / Airtel Money
+> / HaloPesa) + real-time logistics.
 
-## The flow
+---
 
-`index.html` boots on the **dark marketing landing** and walks the full happy path:
+## The supply-chain loop
 
-1. **Landing** → tap *Create free account* / *Sign in*
-2. **Login** (dark glass form, phone + 6-digit PIN keypad) → *Sign in*
-3. **Dashboard** — Olomi Wallet balance card, quick actions, recent transactions, KYC banner; the bell opens **Notifications**
-4. **Chat list** → open a conversation
-5. **Chat thread** — type a message, then tap the **$** button: a money panel lets you pick a quick amount **or type a custom amount** to send inside the chat (the signature money-card bubble + an on-chain "settled in 0.8s" toast; balance updates live). The panel is a full-width bar on phones and a compact bottom-left popover on tablet/desktop.
-6. Every other surface is a real, faithful screen — reached from the quick actions, the bottom nav, or the **More** sheet.
+```
+Household searches  →  sees nearby vendors with LIVE stock + price + ETA
+       │
+       ▼
+Places order  →  Supplier gets an instant ALERT (Socket.io)  →  accepts
+       │
+       ▼
+Order BROADCAST to nearby riders  →  first rider claims it
+       │
+       ▼
+Rider picks up from vendor  →  delivers  →  OTP + photo proof
+       │
+       ▼
+Mobile-money payment auto-splits:  platform commission · supplier payout · rider fee
+```
 
-## Screens included
+**Middle-mile extension:** vendors get low-stock alerts and fire one-tap **restock requests**
+to their distributor/depot — giving the platform visibility one link up the chain.
 
-All recreated from the codebase, with multi-step flows and PIN confirmation where the real app has them:
+## Monetization (built-in hooks)
 
-| Group | Screens |
+Delivery fee · per-order commission · surge/express · supplier SaaS tier · featured listings ·
+middle-mile restock fee · rider tiers · demand-data insights. *(MVP implements delivery fee +
+commission; the rest are modelled and stubbed.)*
+
+---
+
+## Tech stack
+
+| Layer | Tech |
 |---|---|
-| **Core** | Landing · Login · Dashboard · Chat list · Chat thread (with in-chat pay) · Send |
-| **Money** | Deposit (Receive QR / Mobile Money / Bank) · Withdraw / Cash Out · Swap · Pay Bills |
-| **Grow** | Savings (4.5% vault) · Staking (locked pools) · Bonds & Investment · Rewards (tiers + referral) |
-| **Account** | Transaction History · Profile · Notifications · Virtual Card · Credit Score · Merchant QR · Chama groups · Payroll · Chama |
+| **Backend** | Node + Express + TypeScript, Prisma (PostgreSQL), Socket.io, JWT + bcrypt auth |
+| **Frontend** | Next.js 14 (App Router) + Tailwind, PWA, socket.io-client |
+| **Payments** | Tanzanian mobile money via one aggregator (AzamPay / Selcom / ClickPesa); `mock` provider for local dev |
+| **Realtime** | Socket.io — order alerts, rider job broadcast, live location |
 
-The four **More**-sheet finance flows (Deposit, Withdraw, Swap, Bills) hide the bottom nav while active, matching the focused-task pattern in the source app.
+### Monorepo layout
+```
+backend/    Express API — routes, services, prisma schema, seed
+frontend/   Next.js PWA — households + riders + suppliers + admin
+admin-panel/  (legacy — repurpose for ops console)
+mobile/       (legacy shell — repurpose for native rider app)
+```
 
-## Files
+---
 
-| File | What's in it |
+## Local setup
+
+### 1. Backend
+```bash
+cd backend
+npm install
+# set DATABASE_URL, JWT_SECRET, JWT_REFRESH_SECRET in .env
+npx prisma db push          # create the schema
+npm run seed                # demo catalog + price caps + one of each role
+npm run dev                 # http://localhost:3001
+```
+
+### 2. Frontend
+```bash
+cd frontend
+npm install
+# set NEXT_PUBLIC_API_URL=http://localhost:3001 in .env.local
+npm run dev                 # http://localhost:3000
+```
+
+### Demo logins (PIN `1234`)
+| Role | Phone |
 |---|---|
-| `index.html` | Phone frame, animation CSS, app router + state (balance, unread, toasts, More-sheet). Loads everything below. |
-| `icons.jsx` | `<Icon name size stroke />` — the Lucide glyphs used across the app, inline. |
-| `components.jsx` | `Logo, Button, Card, StatusBadge, Avatar, BalanceCard, QuickActions, TransactionItem, BottomNav`. Mirrors `frontend/components/*`. |
-| `screen-kit.jsx` | Shared screen primitives: `ScreenHeader, Pill, Panel, SuccessState, Segmented, Chips, Field, PinEntry, ConfirmCard`. |
-| `marketing.jsx` | `Landing`, `Login`, `Aurora` — the dark "2030" skin. |
-| `app-screens.jsx` | `Dashboard, ChatList, ChatThread, SendScreen` — the light "airy" core. |
-| `screens-money.jsx` | `DepositScreen, WithdrawScreen, SwapScreen, BillsScreen`. |
-| `screens-grow.jsx` | `SavingsScreen, StakeScreen, InvestScreen, RewardsScreen`. |
-| `screens-account.jsx` | `HistoryScreen, ProfileScreen, NotificationsScreen, CardScreen, CreditScreen, MerchantScreen, ChamaScreen, PayrollScreen`. |
+| Admin | `+255700000000` |
+| Supplier | `+255711111111` |
+| Rider | `+255722222222` |
+| Household | `+255733333333` |
 
-## How it mirrors the source
+Open the household login, search for gas, order; the supplier sees the alert; the rider
+claims and delivers — all live. In `mock` payment mode the M-Pesa charge settles automatically.
 
-- **Tokens & skins** follow `frontend/app/globals.css` + `tailwind.config.ts`: primary `#1a56db`, the blue→emerald money gradient, glass cards (`rgba(255,255,255,.72)` + blur), the gradient wallet card (`#1a3a6b → #1a56db`), 24px card radius, 48px touch targets, the floating glass bottom-nav with a gradient active pill.
-- **Components** are simplified ports of the real ones — `BalanceCard` (hide/refresh, watermark, USD-led + TZS), `TransactionItem` (confirmed/pending/failed, line-through on failed), `QuickActions`, `BottomNav` (active = bold-stroke icon on gradient), `StatusBadge`, `Avatar` (deterministic color + presence dot).
-- **Icons** are Lucide, the production set.
+---
 
-## Reuse
+## Environment
 
-Each component exports to `window`, so you can lift them into a new OlomiPay design. Keep the load order in `index.html` (React → Babel → `icons` → `components` → `marketing`/`app-screens`). Give any new global style object a unique name (e.g. `myThingStyles`) — never a bare `styles`.
+**Backend** (`backend/.env`)
+```
+DATABASE_URL=postgresql://...
+JWT_SECRET=...
+JWT_REFRESH_SECRET=...
+JIKO_COMMISSION_PCT=0.07          # platform commission
+JIKO_DELIVERY_BASE=2000           # TZS flag-fall
+JIKO_DELIVERY_PER_KM=500          # TZS / km
+JIKO_PAYMENTS_PROVIDER=mock       # mock | azampay
 
-## Known gaps
+# AzamPay (only when JIKO_PAYMENTS_PROVIDER=azampay)
+AZAMPAY_ENV=sandbox               # sandbox | production
+AZAMPAY_APP_NAME=...
+AZAMPAY_CLIENT_ID=...
+AZAMPAY_CLIENT_SECRET=...
+AZAMPAY_API_KEY=...
+```
 
-- All primary flows are built out and faithful to the source. A few deeper sub-flows are represented at one level of depth (e.g. KYC and Support open from Profile but aren't full screens; Deposit's bank tab is intentionally "coming soon" as in the real app).
-- No real auth/encryption/blockchain — all data is mocked in-file.
+**Frontend** (`frontend/.env.local`)
+```
+NEXT_PUBLIC_API_URL=http://localhost:3001
+```
+
+## Going live with payments
+AzamPay is wired in [`backend/src/services/azampay.ts`](backend/src/services/azampay.ts).
+Set `JIKO_PAYMENTS_PROVIDER=azampay` + the `AZAMPAY_*` creds, and register your webhook URL
+(`POST /api/payments/callback`) in the AzamPay dashboard. The charge then stays `PENDING` until
+AzamPay confirms; everything downstream — order lifecycle, payout split, notifications — runs on
+the confirmed-payment event. Leave it as `mock` for local dev and it auto-settles.
+
+## Compliance
+Tanzania-first: currency **TZS**, Swahili-first copy, EWURA LPG **price caps** enforced per
+region (admin-configurable).

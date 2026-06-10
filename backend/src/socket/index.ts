@@ -1,163 +1,115 @@
 /**
- * Socket.io server for Tuma chat.
- * Redis adapter for horizontal scaling.
- * JWT auth middleware on every connection.
+ * Socket.io — the real-time spine of JIKO CONNECT.
+ *
+ *   • Suppliers get instant `order:new` alerts when a household orders.
+ *   • Riders in a region get `job:new` broadcasts and `job:taken` when claimed.
+ *   • Households watch their rider move via `delivery:location`.
+ *
+ * REST routes drive most emits through the helpers below; the socket connection
+ * itself carries rider location pings and online/offline status.
  */
-
 import { Server as HttpServer } from 'http';
 import { Server } from 'socket.io';
-import { PrismaClient } from '@prisma/client';
-import { prisma } from '../lib/prisma';
 import jwt from 'jsonwebtoken';
-import { handleSendMessage }     from './handlers/message';
-import { handleSendPayment, handlePaymentRequest, handlePayRequest, handleRejectRequest } from './handlers/payment';
-import { handleMarkRead, handleDeleteMessage } from './handlers/room';
+import { prisma } from '../lib/prisma';
 
-
-// ── Global io — lets REST routes emit real-time events
 let _io: Server | null = null;
+
 export function getIo(): Server | null { return _io; }
+
+/** Push an event to a single user's personal room. */
 export function emitToUser(userId: string, event: string, data: any): void {
   _io?.to(`user:${userId}`).emit(event, data);
 }
 
-// Rate limiting per socket
-const messageRates  = new Map<string, { count: number; resetAt: number }>();
-const paymentRates  = new Map<string, { count: number; resetAt: number }>();
+/** Broadcast to every rider currently subscribed to a region. */
+export function emitToRiders(region: string, event: string, data: any): void {
+  _io?.to(`riders:${region}`).emit(event, data);
+}
 
-function rateCheck(map: Map<string, any>, userId: string, max: number, windowMs: number): boolean {
-  const now = Date.now();
-  const entry = map.get(userId);
-  if (!entry || now > entry.resetAt) {
-    map.set(userId, { count: 1, resetAt: now + windowMs });
-    return true;
-  }
-  if (entry.count >= max) return false;
-  entry.count++;
-  return true;
+function regionRoom(region?: string | null): string {
+  return `riders:${(region ?? 'ALL').trim()}`;
 }
 
 export function initSocket(httpServer: HttpServer): Server {
   const io = new Server(httpServer, {
     cors: {
-      origin: [
-        process.env.CORS_ORIGIN ?? 'http://localhost:3000',
-        'https://olomipay.vercel.app',
-      ],
+      origin: (origin, cb) => cb(null, true),
       credentials: true,
     },
-    transports:    ['websocket', 'polling'],
-    pingTimeout:   60_000,
-    pingInterval:  25_000,
+    transports:   ['websocket', 'polling'],
+    pingTimeout:  60_000,
+    pingInterval: 25_000,
   });
+  _io = io;
 
-  _io = io; // expose globally so REST routes can emit to users
-
-  // Optional Redis adapter (gracefully skip if no REDIS_URL)
-  if (process.env.REDIS_URL) {
-    Promise.all([
-      import('ioredis').then(m => new m.default(process.env.REDIS_URL!)),
-    ]).then(([pubClient]) => {
-      const subClient = pubClient.duplicate();
-      import('@socket.io/redis-adapter').then(({ createAdapter }) => {
-        io.adapter(createAdapter(pubClient, subClient));
-        console.log('[socket] Redis adapter connected');
-      });
-    }).catch(e => console.warn('[socket] Redis unavailable, using in-memory adapter:', e.message));
-  }
-
-  // ── JWT Auth Middleware ─────────────────────────────────────────────────────
+  // ── Auth on connect ──────────────────────────────────────────────────────────
   io.use(async (socket, next) => {
     try {
       const token = socket.handshake.auth?.token as string;
       if (!token) return next(new Error('No token'));
-      const payload = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string };
+      const payload = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string; role: string };
       const user = await prisma.user.findUnique({
         where:  { id: payload.userId },
-        select: { id: true, phone: true, kycName: true, chatPublicKey: true, isOnline: true },
+        select: { id: true, role: true, region: true, riderProfile: { select: { region: true } } },
       });
       if (!user) return next(new Error('User not found'));
       socket.data.userId = user.id;
-      socket.data.user   = user;
+      socket.data.role   = user.role;
+      socket.data.region = user.riderProfile?.region ?? user.region ?? 'ALL';
       next();
     } catch {
       next(new Error('Invalid token'));
     }
   });
 
-  // ── Connection handler ───────────────────────────────────────────────────────
   io.on('connection', async (socket) => {
     const userId = socket.data.userId as string;
-    console.log(`[socket] ${userId} connected`);
+    const role   = socket.data.role   as string;
+    const region = socket.data.region as string;
 
-    // Mark online
+    socket.join(`user:${userId}`);
+    if (role === 'RIDER') socket.join(regionRoom(region));
+
     await prisma.user.update({
       where: { id: userId },
       data:  { isOnline: true, lastSeenAt: new Date() },
     }).catch(() => {});
 
-    // Join personal room (for direct notifications from REST routes)
-    socket.join(`user:${userId}`);
+    // ── Rider goes online / offline ──────────────────────────────────────────────
+    socket.on('rider:status', async ({ status }: { status: 'ONLINE' | 'OFFLINE' | 'ON_JOB' }) => {
+      if (role !== 'RIDER') return;
+      await prisma.riderProfile.update({
+        where: { userId },
+        data:  { status: status as any },
+      }).catch(() => {});
+      if (status === 'OFFLINE') socket.leave(regionRoom(region));
+      else socket.join(regionRoom(region));
+    });
 
-    // Join all conversation rooms
-    try {
-      const memberships = await prisma.conversationMember.findMany({
-        where:  { userId },
-        select: { conversationId: true },
-      });
-      memberships.forEach(m => socket.join(m.conversationId));
-    } catch {}
+    // ── Rider location ping (every few seconds while moving) ──────────────────────
+    socket.on('rider:location', async ({ lat, lng, deliveryId }: { lat: number; lng: number; deliveryId?: string }) => {
+      if (role !== 'RIDER' || typeof lat !== 'number' || typeof lng !== 'number') return;
+      await prisma.riderProfile.update({
+        where: { userId },
+        data:  { currentLat: lat, currentLng: lng },
+      }).catch(() => {});
 
-    socket.broadcast.emit('user_online', { userId });
-
-    // ── Message events ────────────────────────────────────────────────────────
-    socket.on('send_message', async (data) => {
-      if (!rateCheck(messageRates, userId, 10, 1_000)) {
-        socket.emit('error', { message: 'Polepole! Unajaribu kutuma ujumbe haraka sana.' });
-        return;
+      if (deliveryId) {
+        const d = await prisma.delivery.update({
+          where: { id: deliveryId },
+          data:  { riderLat: lat, riderLng: lng, lastLocationAt: new Date() },
+          select: { order: { select: { householdId: true } } },
+        }).catch(() => null);
+        if (d?.order) emitToUser(d.order.householdId, 'delivery:location', { deliveryId, lat, lng });
       }
-      await handleSendMessage(io, socket, data);
     });
 
-    socket.on('send_payment', async (data) => {
-      if (!rateCheck(paymentRates, userId, 5, 60_000)) {
-        socket.emit('error', { message: 'Too many requests. Please wait a minute.' });
-        return;
-      }
-      await handleSendPayment(io, socket, data);
-    });
-
-    socket.on('payment_request',  (data) => handlePaymentRequest(io, socket, data));
-    socket.on('pay_request',      (data) => handlePayRequest(io, socket, data));
-    socket.on('reject_request',   (data) => handleRejectRequest(io, socket, data));
-    socket.on('mark_read',        (data) => handleMarkRead(io, socket, data));
-    socket.on('delete_message',   (data) => handleDeleteMessage(io, socket, data));
-
-    // ── Typing indicators ──────────────────────────────────────────────────────
-    socket.on('typing_start', ({ conversationId }: { conversationId: string }) => {
-      socket.to(conversationId).emit('typing', { userId, conversationId });
-    });
-
-    socket.on('typing_stop', ({ conversationId }: { conversationId: string }) => {
-      socket.to(conversationId).emit('stopped_typing', { userId, conversationId });
-    });
-
-    // ── Join a specific conversation ───────────────────────────────────────────
-    socket.on('join_conversation', async ({ conversationId }: { conversationId: string }) => {
-      const member = await prisma.conversationMember.findUnique({
-        where: { conversationId_userId: { conversationId, userId } },
-      }).catch(() => null);
-      if (member) socket.join(conversationId);
-    });
-
-    // ── Disconnect ─────────────────────────────────────────────────────────────
     socket.on('disconnect', async () => {
-      console.log(`[socket] ${userId} disconnected`);
       await prisma.user.update({
         where: { id: userId },
         data:  { isOnline: false, lastSeenAt: new Date() },
       }).catch(() => {});
-      io.emit('user_offline', { userId, lastSeen: new Date() });
     });
   });
 

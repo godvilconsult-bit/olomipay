@@ -1,181 +1,70 @@
 'use client';
 
-/* ════════════════════════════════════════════════════════════════════════════
-   OlomiPay — Landing (dark "2030" skin)
-   Ported faithfully from the UI kit (ui_kits/app/marketing.jsx → Landing).
-   Single immersive hero: aurora orbs + drifting world-currency activity stream
-   + "Send money like you chat." Nothing from the old marketing page is reused.
-   ════════════════════════════════════════════════════════════════════════════ */
-
-import { useState, useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowRight } from 'lucide-react';
-import AlreadyAuthed from '../components/AlreadyAuthed';
+import { useRouter } from 'next/navigation';
+import { ArrowRight, Flame, MapPin, Bike, Store } from 'lucide-react';
+import { getAccessToken } from '../lib/api';
 
-// ── Live "moving today" counter — ticks up continuously in 1,237,824 format ──
-function MovingToday() {
-  const [value, setValue] = useState(1_237_824);
-  const ref = useRef(1_237_824);
+export default function Landing() {
+  const router = useRouter();
+
+  // Already signed in? Go straight to the app.
   useEffect(() => {
-    const id = setInterval(() => {
-      // add a small random increment so it never looks constant
-      ref.current += Math.floor(Math.random() * 400) + 80;
-      setValue(ref.current);
-    }, 1200);
-    return () => clearInterval(id);
-  }, []);
+    if (getAccessToken()) router.replace('/dashboard');
+  }, [router]);
+
   return (
-    <b style={{ color: '#fff', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
-      ${value.toLocaleString('en-US')}
-    </b>
-  );
-}
+    <main className="relative min-h-screen overflow-hidden text-white bg-grad-hero">
+      {/* warm flame glow */}
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -top-32 -left-24 h-[60vmax] w-[60vmax] rounded-full" style={{ background: 'radial-gradient(circle, rgba(241,90,36,.45), transparent 60%)', filter: 'blur(90px)' }} />
+        <div className="absolute -bottom-40 -right-24 h-[55vmax] w-[55vmax] rounded-full" style={{ background: 'radial-gradient(circle, rgba(255,177,0,.30), transparent 60%)', filter: 'blur(90px)' }} />
+      </div>
 
-// ── Ambient feed — world flags + currencies drifting behind the hero ──────────
-const FEED_A = [
-  { kind: 'currency', flag: '🇹🇿', country: 'Tanzania',     code: 'TZS', rate: '2,600', accent: '#1a56db' },
-  { kind: 'transfer', f1: '🇰🇪', f2: '🇺🇸', amt: '$24.00', label: 'Kenya → USA' },
-  { kind: 'currency', flag: '🇳🇬', country: 'Nigeria',      code: 'NGN', rate: '1,580', accent: '#16a34a' },
-  { kind: 'currency', flag: '🇯🇵', country: 'Japan',        code: 'JPY', rate: '157',   accent: '#dc2626' },
-  { kind: 'transfer', f1: '🇬🇭', f2: '🇬🇧', amt: '$50.00', label: 'Ghana → UK' },
-  { kind: 'currency', flag: '🇿🇦', country: 'South Africa', code: 'ZAR', rate: '18.4',  accent: '#d97706' },
-  { kind: 'currency', flag: '🇮🇳', country: 'India',        code: 'INR', rate: '83.5',  accent: '#a855f7' },
-  { kind: 'transfer', f1: '🇺🇬', f2: '🇸🇦', amt: '$35.00', label: 'Uganda → Saudi' },
-] as const;
-const FEED_B = [
-  { kind: 'currency', flag: '🇬🇧', country: 'United Kingdom', code: 'GBP', rate: '0.79', accent: '#2563eb' },
-  { kind: 'currency', flag: '🇩🇪', country: 'Germany',        code: 'EUR', rate: '0.93', accent: '#1e40af' },
-  { kind: 'transfer', f1: '🇷🇼', f2: '🇦🇪', amt: '$30.00',   label: 'Rwanda → UAE' },
-  { kind: 'currency', flag: '🇨🇳', country: 'China',          code: 'CNY', rate: '7.24', accent: '#dc2626' },
-  { kind: 'currency', flag: '🇧🇷', country: 'Brazil',         code: 'BRL', rate: '4.97', accent: '#16a34a' },
-  { kind: 'transfer', f1: '🇿🇲', f2: '🇨🇦', amt: '$60.00',   label: 'Zambia → Canada' },
-  { kind: 'currency', flag: '🇦🇺', country: 'Australia',      code: 'AUD', rate: '1.53', accent: '#0891b2' },
-  { kind: 'currency', flag: '🇦🇪', country: 'UAE',            code: 'AED', rate: '3.67', accent: '#f59e0b' },
-] as const;
-
-function ActCard(c: any, key: number) {
-  const base: React.CSSProperties = {
-    marginBottom: 12, borderRadius: 16, padding: '10px 13px',
-    background: 'rgba(255,255,255,.07)', border: '1px solid rgba(255,255,255,.11)',
-    backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
-    display: 'flex', alignItems: 'center', gap: 10,
-    boxShadow: '0 8px 24px -14px rgba(0,0,0,.8)',
-  };
-  if (c.kind === 'currency') {
-    return (
-      <div key={key} style={{ ...base, borderLeft: `3px solid ${c.accent}` }}>
-        <span style={{ fontSize: 26, lineHeight: 1, flexShrink: 0 }}>{c.flag}</span>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 700, color: '#f1f5f9', lineHeight: 1.2 }}>{c.country}</div>
-          <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
-            <span style={{ fontWeight: 600, color: c.accent }}>{c.code}</span>
-            <span style={{ color: '#475569' }}> · 1 USD = {c.rate}</span>
+      <div className="relative z-10 mx-auto flex min-h-screen max-w-md flex-col px-6 pb-10 pt-5">
+        {/* top bar */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="grid h-9 w-9 place-items-center rounded-xl bg-grad-brand shadow-ds-btn"><Flame size={20} /></span>
+            <span className="text-lg font-extrabold tracking-tight">JIKO CONNECT</span>
           </div>
-        </div>
-      </div>
-    );
-  }
-  return (
-    <div key={key} style={base}>
-      <span style={{ fontSize: 20, flexShrink: 0 }}>{c.f1}</span>
-      <div style={{ width: 18, height: 1.5, background: 'rgba(52,211,153,.6)', borderRadius: 999, flexShrink: 0 }} />
-      <span style={{ fontSize: 20, flexShrink: 0 }}>{c.f2}</span>
-      <div style={{ flex: 1, minWidth: 0, marginLeft: 2 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{c.amt}</div>
-        <div style={{ fontSize: 10.5, color: '#94a3b8' }}>{c.label} · ✓ settled</div>
-      </div>
-    </div>
-  );
-}
-
-function ActivityStream() {
-  const col = (items: readonly any[], dur: string, side: 'left' | 'right', offset: number) => (
-    <div style={{ position: 'absolute', top: 0, [side]: -6, width: 192, height: '100%', overflow: 'hidden' } as React.CSSProperties}>
-      <div className="olo-rise" style={{ position: 'absolute', top: offset, left: 0, right: 0, animationDuration: dur }}>
-        {[...items, ...items].map((c, i) => ActCard(c, i))}
-      </div>
-    </div>
-  );
-  return (
-    <div style={{ position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none', opacity: 0.88 }}>
-      {col(FEED_A, '40s', 'left', 0)}
-      {col(FEED_B, '54s', 'right', -100)}
-    </div>
-  );
-}
-
-function Aurora() {
-  return (
-    <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 0 }}>
-      <div className="olo-aurora" style={{ position: 'absolute', top: '-22%', left: '-22%', width: '62vmax', height: '62vmax', borderRadius: '50%', background: 'rgba(37,99,235,.45)', filter: 'blur(110px)' }} />
-      <div className="olo-aurora" style={{ position: 'absolute', bottom: '-25%', right: '-20%', width: '58vmax', height: '58vmax', borderRadius: '50%', background: 'rgba(16,185,129,.40)', filter: 'blur(110px)', animationDelay: '-7s' }} />
-      <div className="olo-aurora" style={{ position: 'absolute', top: '28%', right: '-18%', width: '46vmax', height: '46vmax', borderRadius: '50%', background: 'rgba(34,211,238,.34)', filter: 'blur(110px)', animationDelay: '-13s' }} />
-      <div className="olo-aurora" style={{ position: 'absolute', bottom: '8%', left: '-18%', width: '44vmax', height: '44vmax', borderRadius: '50%', background: 'rgba(99,102,241,.30)', filter: 'blur(110px)', animationDelay: '-18s' }} />
-    </div>
-  );
-}
-
-export default function LandingPage() {
-  return (
-    <main
-      style={{
-        position: 'relative', minHeight: '100vh', overflow: 'hidden', color: '#fff',
-        background: 'radial-gradient(125% 95% at 50% 0%, #0b1c44 0%, #060f29 55%, #04081a 100%)',
-      }}
-    >
-      {/* Landing animations (olo-*) live in globals.css so server and client
-          markup match exactly — an inline <style> here caused a hydration
-          mismatch (and occasional blank-flash on slow devices). */}
-
-      {/* Redirect already-logged-in users straight to the dashboard */}
-      <AlreadyAuthed />
-
-      <Aurora />
-      <ActivityStream />
-
-      {/* Readability scrim: dark center + anchored bottom */}
-      <div style={{
-        position: 'absolute', inset: 0, zIndex: 1, pointerEvents: 'none',
-        background: 'radial-gradient(74% 52% at 50% 44%, rgba(4,8,26,.96) 30%, rgba(4,8,26,.7) 55%, transparent 84%), linear-gradient(to top, #04081a 5%, transparent 30%)',
-      }} />
-
-      {/* Content column — mobile-first, centered on larger screens */}
-      <div style={{
-        position: 'relative', zIndex: 2, minHeight: '100vh',
-        maxWidth: 440, margin: '0 auto',
-        display: 'flex', flexDirection: 'column', padding: '18px 22px 34px',
-      }}>
-        {/* Top bar */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-            <img src="/logo.svg" alt="OlomiPay" width={30} height={30} className="olo-float" />
-            <span style={{ fontSize: 16, fontWeight: 700 }}>OlomiPay</span>
-          </div>
-          <Link href="/auth/login" style={{ fontSize: 13, fontWeight: 500, color: '#e2e8f0', background: 'rgba(255,255,255,.07)', border: '1px solid rgba(255,255,255,.14)', padding: '8px 16px', borderRadius: 999, textDecoration: 'none' }}>
-            Sign in
-          </Link>
+          <Link href="/auth/login" className="rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium">Ingia</Link>
         </div>
 
-        {/* Hero */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 9, borderRadius: 999, border: '1px solid rgba(255,255,255,.14)', background: 'rgba(255,255,255,.07)', padding: '7px 15px', fontSize: 12.5, color: '#e2e8f0' }}>
-            <span className="olo-pulse-dot" style={{ width: 7, height: 7, borderRadius: 999, background: '#34d399', flexShrink: 0 }} />
-            <span><MovingToday /> moving today</span>
-          </div>
-          <h1 style={{ fontSize: 47, fontWeight: 800, lineHeight: 1.02, letterSpacing: '-0.035em', margin: '20px 0 0' }}>
-            Send money<br />like you <span className="olo-gradient-text">chat</span>.
+        {/* hero */}
+        <div className="flex flex-1 flex-col items-center justify-center text-center">
+          <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-xs text-white/80">
+            <span className="h-2 w-2 rounded-full bg-leaf-light" /> Tanzania · LPG delivery network
+          </span>
+          <h1 className="mt-5 text-[44px] font-extrabold leading-[1.03] tracking-tight">
+            Gesi yako,<br />ikiletwa <span className="bg-grad-brand bg-clip-text text-transparent">mlangoni</span>.
           </h1>
-          <p style={{ fontSize: 15.5, color: 'rgba(203,213,225,.85)', maxWidth: 290, margin: '16px 0 0', lineHeight: 1.5 }}>
-            Deposit, send and cash out in seconds — right inside the conversation.
+          <p className="mt-4 max-w-xs text-[15px] leading-relaxed text-white/70">
+            Tafuta muuzaji wa gesi aliye karibu mwenye stock, agiza, na upate dereva akukuletee — ndani ya dakika.
           </p>
+
+          {/* three sides */}
+          <div className="mt-7 grid w-full grid-cols-3 gap-2.5 text-center">
+            {[
+              { icon: <MapPin size={18} />, label: 'Kaya' },
+              { icon: <Store size={18} />,  label: 'Wauzaji' },
+              { icon: <Bike size={18} />,   label: 'Madereva' },
+            ].map((x) => (
+              <div key={x.label} className="rounded-2xl border border-white/10 bg-white/5 py-3">
+                <div className="mx-auto mb-1 grid h-9 w-9 place-items-center rounded-xl bg-white/10 text-flame-light">{x.icon}</div>
+                <div className="text-xs text-white/75">{x.label}</div>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* CTA */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
-          <Link href="/auth/register" className="olo-glow" style={{ width: '100%', maxWidth: 340, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 999, border: 0, background: 'linear-gradient(to right,#3b82f6,#22c55e)', color: '#fff', fontSize: 16, fontWeight: 700, padding: '17px 30px', textDecoration: 'none' }}>
-            Get started — it&apos;s free <ArrowRight size={18} strokeWidth={2.4} />
+        <div className="flex flex-col items-center gap-3">
+          <Link href="/auth/register" className="flex w-full max-w-sm items-center justify-center gap-2 rounded-full bg-grad-brand px-7 py-4 text-base font-bold text-white shadow-ds-btn">
+            Anza sasa — ni bure <ArrowRight size={18} strokeWidth={2.4} />
           </Link>
-          <p style={{ fontSize: 12, color: 'rgba(148,163,184,.9)', margin: 0 }}>1% flat · settles in seconds · end-to-end encrypted</p>
+          <p className="text-xs text-white/50">Lipa kwa M-Pesa, Tigo Pesa, Airtel Money · Bei za EWURA</p>
         </div>
       </div>
     </main>

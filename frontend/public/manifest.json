@@ -1,13 +1,13 @@
 {
-  "name": "OlomiPay — Building Trust Through Blockchain",
-  "short_name": "OlomiPay",
-  "description": "Send money instantly, chat with friends, earn interest. Building Trust Through Blockchain.",
+  "name": "JIKO CONNECT — Gas delivery for Tanzania",
+  "short_name": "JIKO CONNECT",
+  "description": "Order LPG cooking gas from nearby vendors, delivered by riders across Tanzania. Tafuta, agiza, pokea.",
   "start_url": "/dashboard",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0f172a",
-  "theme_color": "#1a56db",
-  "categories": ["finance", "utilities"],
+  "background_color": "#160F0A",
+  "theme_color": "#F15A24",
+  "categories": ["shopping", "utilities", "food"],
   "icons": [
     {
       "src": "/icon-192.svg",
@@ -24,16 +24,16 @@
   ],
   "shortcuts": [
     {
-      "name": "Send Money",
-      "short_name": "Send",
-      "url": "/send",
-      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+      "name": "Order gas",
+      "short_name": "Order",
+      "url": "/dashboard",
+      "icons": [{ "src": "/icon-192.svg", "sizes": "192x192" }]
     },
     {
-      "name": "Deposit",
-      "short_name": "Deposit",
-      "url": "/deposit",
-      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+      "name": "My orders",
+      "short_name": "Orders",
+      "url": "/orders",
+      "icons": [{ "src": "/icon-192.svg", "sizes": "192x192" }]
     }
   ],
   "screenshots": [],

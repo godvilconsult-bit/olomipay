@@ -1,3 +1,8 @@
+// JIKO CONNECT — LPG cooking-gas logistics marketplace (Tanzania)
+// Three-sided network: households (demand), suppliers/vendors (stock),
+// riders (last-mile + middle-mile logistics — the core engine).
+// No blockchain, no crypto. Mobile-money fintech + logistics only.
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,6 +14,13 @@ datasource db {
 
 // ── Enums ──────────────────────────────────────────────────────────────────────
 
+enum Role {
+  HOUSEHOLD
+  SUPPLIER
+  RIDER
+  ADMIN
+}
+
 enum KycStatus {
   PENDING
   SUBMITTED
@@ -16,191 +28,131 @@ enum KycStatus {
   REJECTED
 }
 
-enum TxType {
-  DEPOSIT
-  WITHDRAWAL
-  SEND
-  RECEIVE
-  FEE
-  SAVINGS_DEPOSIT
-  SAVINGS_WITHDRAW
-  BILL_PAYMENT
-  BANK_WITHDRAWAL
-  REMITTANCE
+enum ProductType {
+  REFILL     // gas refill (exchange empty for full)
+  CYLINDER   // brand-new full cylinder
+  ACCESSORY  // regulator, burner, pipe, grill, hotplate
 }
 
-enum TxStatus {
-  PENDING
-  CONFIRMED
-  FAILED
-  EXPIRED
+enum OrderStatus {
+  PLACED      // household submitted
+  ALERTED     // supplier notified
+  ACCEPTED    // supplier accepted
+  BROADCAST   // open to nearby riders
+  CLAIMED     // a rider took the job
+  PICKED      // rider collected from vendor
+  DELIVERED   // dropped at household (awaiting confirm/rating)
+  COMPLETED   // settled
+  CANCELLED
 }
 
-enum Frequency {
-  DAILY
-  WEEKLY
-  BIWEEKLY
-  MONTHLY
-}
-
-enum ClaimStatus {
+enum DeliveryStatus {
   PENDING
   CLAIMED
-  EXPIRED
-  RETURNED
-}
-
-enum StakeStatus {
-  ACTIVE
-  UNLOCKED
-  WITHDRAWN
-}
-
-enum ConvType {
-  DIRECT
-  GROUP
-}
-
-enum MessageType {
-  TEXT
-  PAYMENT
-  PAYMENT_REQUEST
-  IMAGE
-  SYSTEM
+  PICKED
+  DELIVERED
+  FAILED
 }
 
 enum PaymentStatus {
   PENDING
-  CONFIRMED
+  PAID
   FAILED
-  EXPIRED
+  REFUNDED
 }
 
-enum ChamaStatus {
-  FORMING
-  ACTIVE
-  COMPLETED
-  PAUSED
+enum PaymentProvider {
+  MPESA        // Vodacom M-Pesa TZ
+  TIGOPESA     // Mixx by Yas
+  AIRTELMONEY
+  HALOPESA
+  CARD
+  CASH
 }
 
-enum LoanStatus {
-  OPEN
-  FUNDED
-  REPAID
-  DEFAULTED
+enum PayoutStatus {
+  PENDING
+  PAID
+  FAILED
 }
 
-enum RewardTier {
-  BRONZE
-  SILVER
-  GOLD
-  PLATINUM
+enum RestockStatus {
+  REQUESTED
+  ACCEPTED
+  IN_TRANSIT
+  FULFILLED
+  CANCELLED
 }
 
-enum BusinessPlan {
-  STARTER
-  PROFESSIONAL
-  ENTERPRISE
+enum CylinderStatus {
+  WITH_SUPPLIER
+  WITH_HOUSEHOLD
+  IN_TRANSIT
+  RETURNED
+  RETIRED
 }
 
-enum BondStatus {
-  OPEN
-  CLOSED
-  MATURED
-  REDEEMED
+enum RiderStatus {
+  OFFLINE
+  ONLINE
+  ON_JOB
 }
 
-enum Country {
-  TZ
-  KE
-  UG
-  RW
-  ZM
+enum VehicleType {
+  MOTORBIKE   // boda-boda / pikipiki
+  BAJAJI      // three-wheeler
+  CAR
+  TRUCK
+  BICYCLE
 }
 
-// ── Core models ───────────────────────────────────────────────────────────────
+enum SupplierTier {
+  FREE
+  STANDARD
+  PREMIUM
+}
+
+// ── Core ────────────────────────────────────────────────────────────────────────
 
 model User {
   id              String    @id @default(cuid())
   phone           String    @unique
   pinHash         String
-  stellarPubKey   String    @unique
-  stellarSecret   String
-  // Immutable public account number (OP-XXXX) — admin/audit source of truth + user-facing ID
-  accountNo       String?   @unique
+  role            Role      @default(HOUSEHOLD)
+  name            String?
+  email           String?
+  profilePicUrl   String?
+
+  region          String?   // Dar es Salaam, Mwanza, Arusha, Dodoma, Mbeya, Zanzibar...
   kycStatus       KycStatus @default(PENDING)
-  kycLevel        Int       @default(0)
   kycName         String?
   kycIdType       String?
   kycIdNumber     String?
-  dailyVolumeTzs  Float     @default(0)
-  dailyVolumeDate DateTime?
+
+  isActive        Boolean   @default(true)
+  isFrozen        Boolean   @default(false)
+  isAdmin         Boolean   @default(false)
+
+  // Login lockout
+  failedLoginCount Int      @default(0)
+  lockedUntil      DateTime?
+
+  isOnline        Boolean   @default(false)
+  lastSeenAt      DateTime?
+
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  transactions       Transaction[]
-  refreshTokens      RefreshToken[]
-  bankAccounts       BankAccount[]
-  savingsPosition    SavingsPosition?
-  billPayments       BillPayment[]
-  scheduledPayments  ScheduledPayment[]
-  pushSubscriptions  PushSubscription[]
-  notifications      Notification[]
-  stakePosition      StakePosition?
-  chamasAdmin        Chama[]
-  chamaMembers       ChamaMember[]
-  loansGiven         LoanListing[]     @relation("LenderLoans")
-  loansTaken         LoanListing[]     @relation("BorrowerLoans")
-  creditScore        CreditScore?
-  rewardPoints       RewardPoints?
-  virtualCard        VirtualCard?
-  merchant           Merchant?
-  bondHoldings       BondHolding[]
-  devApiKeys         DevApiKey[]
-  country            Country           @default(TZ)
-  chatPublicKey      String?
-  profilePicUrl      String?
-  isAdmin            Boolean   @default(false)
-  isFeeCollector     Boolean   @default(false)
-  activationFeePaid  Boolean   @default(false)
-  // ── Admin RBAC + 2FA (columns already exist in DB via dbSetup;
-  //    declared here so Prisma is type-aware and code drops the `as any` casts).
-  //    adminRole values in use: FINANCE | COMPLIANCE | SUPER_ADMIN (null = not staff)
-  adminRole          String?
-  isFrozen           Boolean   @default(false)
-  adminTotpSecret    String?
-  adminTotpEnabled   Boolean   @default(false)
-  chatSecretKeyEnc   String?
-  isOnline           Boolean           @default(false)
-  lastSeenAt         DateTime?
-  chatMembers        ConversationMember[]
-  sentMessages       Message[]
-  messageReceipts    MessageReceipt[]
-  blockedUsers       BlockedUser[]     @relation("Blocker")
-  blockedBy          BlockedUser[]     @relation("Blocked")
-}
-
-model Transaction {
-  id          String   @id @default(cuid())
-  userId      String
-  type        TxType
-  status      TxStatus @default(PENDING)
-  amountTzs   Float?
-  amountUsdc  Float?
-  amountXlm   Float?
-  stellarTxId String?
-  mpesaTxId   String?
-  toAddress   String?
-  memo        String?
-  metadata    String?
-  errorMsg    String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  user        User     @relation(fields: [userId], references: [id])
-
-  @@index([userId, createdAt])
-  @@index([mpesaTxId])
-  @@index([stellarTxId])
+  refreshTokens     RefreshToken[]
+  notifications     Notification[]
+  pushSubscriptions PushSubscription[]
+  addresses         Address[]
+  supplierProfile   SupplierProfile?
+  riderProfile      RiderProfile?
+  orders            Order[]            @relation("HouseholdOrders")
+  deliveries        Delivery[]         @relation("RiderDeliveries")
+  payouts           Payout[]
+  reviews           Review[]           @relation("ReviewAuthor")
 }
 
 model RefreshToken {
@@ -214,179 +166,293 @@ model RefreshToken {
   @@index([userId])
 }
 
-model ExchangeRateCache {
-  id        String   @id @default("singleton")
-  usdToTzs  Float
-  updatedAt DateTime @updatedAt
-}
-
-// ── Feature 1: Bank Withdrawal ────────────────────────────────────────────────
-
-model BankAccount {
-  id            String   @id @default(cuid())
-  userId        String
-  bankName      String
-  accountNumber String
-  swiftCode     String
-  accountName   String
-  isVerified    Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  user          User     @relation(fields: [userId], references: [id])
-
-  @@index([userId])
-}
-
-// ── Feature 2: Savings ────────────────────────────────────────────────────────
-
-model SavingsPosition {
-  id           String    @id @default(cuid())
-  userId       String    @unique
-  principal    Float     @default(0)
-  yieldEarned  Float     @default(0)
-  depositedAt  DateTime?
-  lastYieldAt  DateTime?
-  user         User      @relation(fields: [userId], references: [id])
-}
-
-model KycDocument {
-  id         String   @id @default(cuid())
-  userId     String
-  kind       String   // ID_FRONT | ID_BACK | SELFIE
-  storageKey String?  // private R2 object key
-  dataUrl    String?  @db.Text // base64 fallback when object storage isn't configured
-  mimeType   String   @default("image/jpeg")
-  uploadedAt DateTime @default(now())
-
-  @@index([userId])
-}
-
-model SavingsGoal {
-  id             String    @id @default(cuid())
-  userId         String
-  name           String
-  emoji          String    @default("🎯")
-  targetAmount   Float
-  savedAmount    Float     @default(0)
-  targetDate     DateTime?
-  autoSaveAmount Float     @default(0)
-  autoSaveFreq   String    @default("none") // none | weekly | monthly
-  nextAutoSaveAt DateTime?
-  status         String    @default("active") // active | completed | archived
-  createdAt      DateTime  @default(now())
-
-  @@index([userId])
-}
-
-model Agent {
-  id              String   @id @default(cuid())
-  userId          String   @unique
-  code            String   @unique
-  businessName    String
-  city            String
-  country         String   @default("TZ")
-  phone           String
-  commissionPct   Float    @default(0.5)
-  commissionEarned Float   @default(0)
-  perTxLimitUsdc  Float    @default(500)
-  dailyLimitUsdc  Float    @default(2000)
-  status          String   @default("pending") // pending | active | suspended
-  createdAt       DateTime @default(now())
-
-  @@index([country, status])
-}
-
-model AgentTransaction {
-  id            String   @id @default(cuid())
-  agentId       String
-  userId        String   // the customer
-  type          String   // CASH_IN | CASH_OUT
-  amountUsdc    Float
-  localAmount   Float    @default(0)
-  currency      String   @default("TZS")
-  code          String?  // 6-digit confirmation code for cash-out
-  status        String   @default("PENDING") // PENDING | COMPLETED | CANCELLED | EXPIRED
-  stellarTxId   String?
-  commissionUsdc Float   @default(0)
-  expiresAt     DateTime?
-  createdAt     DateTime @default(now())
-
-  @@index([agentId])
-  @@index([userId])
-}
-
-// ── Feature 3: Bill Payments ──────────────────────────────────────────────────
-
-model BillPayment {
-  id            String   @id @default(cuid())
-  userId        String
-  billerName    String
-  billerCode    String
-  accountNumber String
-  amountTzs     Float
-  amountUsdc    Float
-  reference     String?
-  token         String?  // LUKU electricity token
-  status        TxStatus @default(PENDING)
-  createdAt     DateTime @default(now())
-  user          User     @relation(fields: [userId], references: [id])
-
-  @@index([userId])
-}
-
-// ── Feature 4: Contacts / Pending Claims ─────────────────────────────────────
-
-model PendingClaim {
-  id         String      @id @default(cuid())
-  senderId   String
-  toPhone    String
-  claimToken String      @unique
-  amountUsdc Float
-  expiresAt  DateTime
-  claimedAt  DateTime?
-  status     ClaimStatus @default(PENDING)
-  createdAt  DateTime    @default(now())
-
-  @@index([claimToken])
-  @@index([toPhone])
-}
-
-// ── Feature 5: Scheduled Payments ────────────────────────────────────────────
-
-model ScheduledPayment {
-  id             String    @id @default(cuid())
-  userId         String
-  toAddress      String
-  toPhone        String?
-  toName         String?
-  amount         Float
-  asset          String    @default("USDC")
-  frequency      Frequency
-  nextRunAt      DateTime
-  endDate        DateTime?
-  memo           String?
-  isActive       Boolean   @default(true)
-  executionCount Int       @default(0)
-  lastRunAt      DateTime?
-  createdAt      DateTime  @default(now())
-  user           User      @relation(fields: [userId], references: [id])
-
-  @@index([userId])
-  @@index([nextRunAt, isActive])
-}
-
-// ── Feature 6: Push Notifications ────────────────────────────────────────────
-
-model PushSubscription {
+model Address {
   id        String   @id @default(cuid())
   userId    String
-  endpoint  String   @unique
-  p256dhKey String
-  authKey   String
+  label     String   @default("Home")
+  lat       Float
+  lng       Float
+  street    String?
+  ward      String?
+  district  String?
+  region    String?
+  isDefault Boolean  @default(false)
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders    Order[]
 
   @@index([userId])
 }
+
+// ── Supplier / Vendor ────────────────────────────────────────────────────────────
+
+model SupplierProfile {
+  id            String       @id @default(cuid())
+  userId        String       @unique
+  businessName  String
+  phone         String
+  logoUrl       String?
+  region        String
+  district      String?
+  ward          String?
+  lat           Float?
+  lng           Float?
+  isOpen        Boolean      @default(true)
+  isVerified    Boolean      @default(false)
+  tier          SupplierTier @default(FREE)
+  featured      Boolean      @default(false)
+  rating        Float        @default(0)
+  ratingCount   Int          @default(0)
+  distributor   String?      // upstream depot/distributor name (middle-mile)
+  createdAt     DateTime     @default(now())
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  inventory       Inventory[]
+  orders          Order[]
+  restockRequests RestockRequest[]
+
+  @@index([region, isOpen])
+}
+
+// ── Rider / Logistics ────────────────────────────────────────────────────────────
+
+model RiderProfile {
+  id              String      @id @default(cuid())
+  userId          String      @unique
+  vehicleType     VehicleType @default(MOTORBIKE)
+  plateNo         String?
+  region          String
+  status          RiderStatus @default(OFFLINE)
+  currentLat      Float?
+  currentLng      Float?
+  isVerified      Boolean     @default(false)
+  rating          Float       @default(0)
+  ratingCount     Int         @default(0)
+  totalDeliveries Int         @default(0)
+  totalEarnings   Float       @default(0)
+  createdAt       DateTime    @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([region, status])
+}
+
+// ── Catalog ──────────────────────────────────────────────────────────────────────
+
+model Product {
+  id        String      @id @default(cuid())
+  brand     String      // Taifa Gas, Oryx, Lake Gas, O-Gas, Manjis, Camel Gas
+  name      String
+  type      ProductType @default(REFILL)
+  sizeKg    Float?      // 6, 15, 38, 45  (null for accessory)
+  imageUrl  String?
+  createdAt DateTime    @default(now())
+
+  inventory  Inventory[]
+  orderItems OrderItem[]
+
+  @@index([brand, type])
+}
+
+model Inventory {
+  id          String  @id @default(cuid())
+  supplierId  String
+  productId   String
+  price       Float   // TZS
+  stock       Int     @default(0)
+  isAvailable Boolean @default(true)
+
+  supplier SupplierProfile @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  product  Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([supplierId, productId])
+  @@index([productId])
+}
+
+// ── Orders ───────────────────────────────────────────────────────────────────────
+
+model Order {
+  id               String      @id @default(cuid())
+  orderNo          String      @unique
+  householdId      String
+  supplierId       String
+  addressId        String
+  status           OrderStatus @default(PLACED)
+
+  itemsTotal       Float       @default(0)
+  deliveryFee      Float       @default(0)
+  surgeMultiplier  Float       @default(1)
+  total            Float       @default(0)
+  commissionPct    Float       @default(0)
+  commissionAmount Float       @default(0)
+
+  note             String?
+  placedAt         DateTime    @default(now())
+  acceptedAt       DateTime?
+  deliveredAt      DateTime?
+  completedAt      DateTime?
+  cancelledAt      DateTime?
+  cancelReason     String?
+
+  household User            @relation("HouseholdOrders", fields: [householdId], references: [id])
+  supplier  SupplierProfile @relation(fields: [supplierId], references: [id])
+  address   Address         @relation(fields: [addressId], references: [id])
+  items     OrderItem[]
+  delivery  Delivery?
+  payment   Payment?
+  review    Review?
+
+  @@index([householdId, status])
+  @@index([supplierId, status])
+  @@index([status, placedAt])
+}
+
+model OrderItem {
+  id          String  @id @default(cuid())
+  orderId     String
+  productId   String
+  productName String  // snapshot
+  brand       String
+  sizeKg      Float?
+  qty         Int     @default(1)
+  unitPrice   Float
+  lineTotal   Float
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+}
+
+model Delivery {
+  id             String         @id @default(cuid())
+  orderId        String         @unique
+  riderId        String?
+  status         DeliveryStatus @default(PENDING)
+  riderFee       Float          @default(0)
+
+  pickupLat      Float?
+  pickupLng      Float?
+  dropLat        Float?
+  dropLng        Float?
+  riderLat       Float?
+  riderLng       Float?
+  lastLocationAt DateTime?
+
+  otp            String?
+  proofPhotoUrl  String?
+  claimedAt      DateTime?
+  pickedAt       DateTime?
+  deliveredAt    DateTime?
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  rider User? @relation("RiderDeliveries", fields: [riderId], references: [id])
+
+  @@index([riderId, status])
+  @@index([status])
+}
+
+// ── Payments / Payouts ───────────────────────────────────────────────────────────
+
+model Payment {
+  id          String          @id @default(cuid())
+  orderId     String          @unique
+  provider    PaymentProvider @default(MPESA)
+  amount      Float
+  currency    String          @default("TZS")
+  status      PaymentStatus   @default(PENDING)
+  providerRef String?
+  phone       String?
+  createdAt   DateTime        @default(now())
+  paidAt      DateTime?
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([providerRef])
+}
+
+model Payout {
+  id          String       @id @default(cuid())
+  userId      String
+  orderId     String?
+  role        String       // SUPPLIER | RIDER | PLATFORM
+  amount      Float
+  status      PayoutStatus @default(PENDING)
+  provider    String?
+  providerRef String?
+  createdAt   DateTime     @default(now())
+  paidAt      DateTime?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, status])
+}
+
+// ── Supply-chain (middle-mile restock) ──────────────────────────────────────────
+
+model RestockRequest {
+  id           String        @id @default(cuid())
+  supplierId   String
+  productId    String?
+  distributor  String?
+  qty          Int
+  status       RestockStatus @default(REQUESTED)
+  note         String?
+  riderId      String?
+  fee          Float?
+  createdAt    DateTime      @default(now())
+  fulfilledAt  DateTime?
+
+  supplier SupplierProfile @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@index([supplierId, status])
+}
+
+// ── Reviews ──────────────────────────────────────────────────────────────────────
+
+model Review {
+  id             String   @id @default(cuid())
+  orderId        String   @unique
+  authorId       String
+  supplierId     String?
+  riderId        String?
+  supplierRating Int?     // 1..5
+  riderRating    Int?     // 1..5
+  comment        String?
+  createdAt      DateTime @default(now())
+
+  order  Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  author User  @relation("ReviewAuthor", fields: [authorId], references: [id])
+}
+
+// ── Cylinder registry (plain DB, no chain) ──────────────────────────────────────
+
+model Cylinder {
+  id        String         @id @default(cuid())
+  serial    String         @unique
+  brand     String
+  sizeKg    Float
+  ownerId   String?        // current holder (household / supplier user id)
+  status    CylinderStatus @default(WITH_SUPPLIER)
+  createdAt DateTime       @default(now())
+
+  @@index([ownerId])
+}
+
+// ── EWURA price regulation ───────────────────────────────────────────────────────
+
+model PriceCap {
+  id        String   @id @default(cuid())
+  region    String
+  productId String?
+  maxPrice  Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([region, productId])
+}
+
+// ── Notifications ────────────────────────────────────────────────────────────────
 
 model Notification {
   id        String   @id @default(cuid())
@@ -403,362 +469,14 @@ model Notification {
   @@index([userId, createdAt])
 }
 
-// ── Phase 3 Models ────────────────────────────────────────────────────────────
-
-model StakePosition {
-  id           String      @id @default(cuid())
-  userId       String      @unique
-  amountUsdc   Float
-  lockDays     Int
-  apyBps       Int
-  stakedAt     DateTime
-  unlockAt     DateTime
-  yieldClaimed Float       @default(0)
-  contractKey  String?
-  status       StakeStatus @default(ACTIVE)
-  user         User        @relation(fields: [userId], references: [id])
-}
-
-model Chama {
-  id               String      @id @default(cuid())
-  name             String
-  contractId       String?
-  adminId          String
-  contributionUsdc Float
-  frequencyDays    Int
-  currentRound     Int         @default(0)
-  status           ChamaStatus @default(FORMING)
-  nextDueAt        DateTime?
-  createdAt        DateTime    @default(now())
-  members          ChamaMember[]
-  admin            User        @relation(fields: [adminId], references: [id])
-}
-
-model ChamaMember {
-  id          String  @id @default(cuid())
-  chamaId     String
-  userId      String
-  position    Int
-  hasReceived Boolean @default(false)
-  chama       Chama   @relation(fields: [chamaId], references: [id])
-  user        User    @relation(fields: [userId], references: [id])
-
-  @@unique([chamaId, userId])
-  @@index([chamaId])
-}
-
-model LoanListing {
-  id           String     @id @default(cuid())
-  lenderId     String
-  amountUsdc   Float
-  interestBps  Int
-  durationDays Int
-  status       LoanStatus @default(OPEN)
-  borrowerId   String?
-  contractLoanId Int?
-  createdAt    DateTime   @default(now())
-  dueAt        DateTime?
-  lender       User       @relation("LenderLoans",   fields: [lenderId],   references: [id])
-  borrower     User?      @relation("BorrowerLoans", fields: [borrowerId], references: [id])
-
-  @@index([status])
-  @@index([lenderId])
-}
-
-model CreditScore {
-  id           String   @id @default(cuid())
-  userId       String   @unique
-  score        Int      @default(40)
-  loansRepaid  Int      @default(0)
-  defaults     Int      @default(0)
-  monthsActive Int      @default(0)
-  updatedAt    DateTime @default(now())
-  user         User     @relation(fields: [userId], references: [id])
-}
-
-model RewardPoints {
-  id           String     @id @default(cuid())
-  userId       String     @unique
-  balance      Int        @default(0)
-  totalEarned  Int        @default(0)
-  tier         RewardTier @default(BRONZE)
-  streak       Int        @default(0)
-  lastActivity DateTime?
-  user         User       @relation(fields: [userId], references: [id])
-}
-
-model VirtualCard {
-  id           String   @id @default(cuid())
-  userId       String   @unique
-  cardRef      String   @unique
-  maskedNumber String
-  expiryMonth  Int
-  expiryYear   Int
-  status       String   @default("active")
-  dailyLimit   Float    @default(500)
-  createdAt    DateTime @default(now())
-  user         User     @relation(fields: [userId], references: [id])
-}
-
-model RateHistory {
+model PushSubscription {
   id        String   @id @default(cuid())
-  usdToTzs  Float
-  date      DateTime @unique
-  createdAt DateTime @default(now())
-}
-
-// ── Phase 4 Models ────────────────────────────────────────────────────────────
-
-model Business {
-  id          String       @id @default(cuid())
-  name        String
-  tin         String       @unique
-  contactName String
-  email       String       @unique
-  phone       String
-  passwordHash String
-  apiKey      String       @unique @default(cuid())
-  plan        BusinessPlan @default(STARTER)
-  country     Country      @default(TZ)
-  createdAt   DateTime     @default(now())
-  payrollRuns PayrollRun[]
-  govPrograms GovProgram[]
-  webhooks    Webhook[]
-}
-
-model PayrollRun {
-  id             String    @id @default(cuid())
-  businessId     String
-  totalAmount    Float
-  recipientCount Int
-  stellarTxId    String?
-  status         TxStatus  @default(PENDING)
-  csvUrl         String?
-  executedAt     DateTime?
-  createdAt      DateTime  @default(now())
-  business       Business  @relation(fields: [businessId], references: [id])
-  recipients     PayrollRecipient[]
-}
-
-model PayrollRecipient {
-  id           String     @id @default(cuid())
-  payrollRunId String
-  name         String
-  phone        String?
-  address      String?
-  amountUsdc   Float
-  department   String?
-  reference    String?
-  status       TxStatus   @default(PENDING)
-  stellarTxId  String?
-  payrollRun   PayrollRun @relation(fields: [payrollRunId], references: [id])
-}
-
-model Merchant {
-  id         String   @id @default(cuid())
-  userId     String   @unique
-  shopName   String
-  category   String
-  qrPayload  String
-  totalSales Float    @default(0)
-  createdAt  DateTime @default(now())
-  user       User     @relation(fields: [userId], references: [id])
-}
-
-model GovProgram {
-  id           String        @id @default(cuid())
-  businessId   String
-  name         String
-  description  String?
-  budgetUsdc   Float
-  disbursed    Float         @default(0)
-  startDate    DateTime
-  status       String        @default("active")
-  createdAt    DateTime      @default(now())
-  business     Business      @relation(fields: [businessId], references: [id])
-  beneficiaries GovBeneficiary[]
-}
-
-model GovBeneficiary {
-  id           String     @id @default(cuid())
-  programId    String
-  nationalId   String
-  fullName     String
-  phone        String
-  amountUsdc   Float
-  ward         String?
-  district     String?
-  status       TxStatus   @default(PENDING)
-  reference    String     @unique @default(cuid())
-  stellarTxId  String?
-  disbursedAt  DateTime?
-  program      GovProgram @relation(fields: [programId], references: [id])
-
-  @@index([programId])
-  @@index([nationalId])
-}
-
-model Bond {
-  id             String     @id @default(cuid())
-  contractBondId Int?
-  name           String
-  faceValueUsdc  Float
-  couponRateBps  Int
-  maturityDate   DateTime
-  totalSupply    Float
-  invested       Float      @default(0)
-  minInvestment  Float
-  status         BondStatus @default(OPEN)
-  description    String?
-  createdAt      DateTime   @default(now())
-  holdings       BondHolding[]
-}
-
-model BondHolding {
-  id             String   @id @default(cuid())
-  bondId         String
-  userId         String
-  amountInvested Float
-  couponClaimed  Float    @default(0)
-  investedAt     DateTime @default(now())
-  bond           Bond     @relation(fields: [bondId], references: [id])
-  user           User     @relation(fields: [userId], references: [id])
-
-  @@unique([bondId, userId])
-}
-
-model Webhook {
-  id         String   @id @default(cuid())
-  businessId String
-  url        String
-  events     String[]
-  secret     String
-  isActive   Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  business   Business @relation(fields: [businessId], references: [id])
-}
-
-model AuditLog {
-  id         String   @id @default(cuid())
-  adminId    String
-  action     String
-  resource   String
-  resourceId String?
-  metadata   Json?
-  ipAddress  String
-  createdAt  DateTime @default(now())
-
-  @@index([adminId])
-  @@index([createdAt])
-}
-
-model DevApiKey {
-  id          String   @id @default(cuid())
-  userId      String
-  name        String
-  keyHash     String   @unique
-  lastUsedAt  DateTime?
-  requestCount Int     @default(0)
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  user        User     @relation(fields: [userId], references: [id])
-}
-
-// ── Chat Models ───────────────────────────────────────────────────────────────
-
-model Conversation {
-  id                 String    @id @default(cuid())
-  type               ConvType  @default(DIRECT)
-  groupName          String?
-  groupAvatar        String?
-  groupAdminId       String?
-  lastMessageAt      DateTime?
-  lastMessagePreview String?
-  createdAt          DateTime  @default(now())
-  participants       ConversationMember[]
-  messages           Message[]
-  groupKeys          GroupKey[]
-
-  @@index([lastMessageAt])
-}
-
-model ConversationMember {
-  id             String       @id @default(cuid())
-  conversationId String
-  userId         String
-  joinedAt       DateTime     @default(now())
-  lastReadAt     DateTime?
-  isMuted        Boolean      @default(false)
-  isArchived     Boolean      @default(false)
-  conversation   Conversation @relation(fields: [conversationId], references: [id])
-  user           User         @relation(fields: [userId], references: [id])
-
-  @@unique([conversationId, userId])
-  @@index([userId])
-}
-
-model Message {
-  id               String        @id @default(cuid())
-  conversationId   String
-  senderId         String
-  type             MessageType   @default(TEXT)
-  encryptedContent String?
-  plainContent     String?
-  amountUsdc       Float?
-  amountTzs        Float?
-  paymentAsset     String?       @default("USDC")
-  stellarTxId      String?
-  paymentStatus    PaymentStatus?
-  // Idempotency: client-supplied UUID per payment attempt; a retry with the
-  // same ref returns the original result instead of sending a second payment.
-  clientRef        String?       @unique
-  paymentNote      String?
-  mediaUrl         String?
-  mediaThumbUrl    String?
-  mediaMimeType    String?
-  replyToId        String?
-  isDeleted        Boolean       @default(false)
-  deletedAt        DateTime?
-  deliveredAt      DateTime?
-  createdAt        DateTime      @default(now())
-  replyTo          Message?      @relation("Replies", fields: [replyToId], references: [id])
-  replies          Message[]     @relation("Replies")
-  conversation     Conversation  @relation(fields: [conversationId], references: [id])
-  sender           User          @relation(fields: [senderId], references: [id])
-  receipts         MessageReceipt[]
-
-  @@index([conversationId, createdAt])
-  @@index([senderId])
-}
-
-model MessageReceipt {
-  id        String   @id @default(cuid())
-  messageId String
   userId    String
-  readAt    DateTime @default(now())
-  message   Message  @relation(fields: [messageId], references: [id])
-  user      User     @relation(fields: [userId], references: [id])
-
-  @@unique([messageId, userId])
-}
-
-model GroupKey {
-  id             String       @id @default(cuid())
-  conversationId String
-  userId         String
-  encryptedKey   String
-  conversation   Conversation @relation(fields: [conversationId], references: [id])
-
-  @@unique([conversationId, userId])
-}
-
-model BlockedUser {
-  id        String   @id @default(cuid())
-  blockerId String
-  blockedId String
+  endpoint  String   @unique
+  p256dhKey String
+  authKey   String
   createdAt DateTime @default(now())
-  blocker   User     @relation("Blocker",  fields: [blockerId], references: [id])
-  blocked   User     @relation("Blocked",  fields: [blockedId],  references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([blockerId, blockedId])
+  @@index([userId])
 }

@@ -5,12 +5,10 @@ const PUBLIC_PATHS = [
   '/',
   '/auth/login',
   '/auth/register',
-  '/join',
-  '/scan',          // QR scanner — allow unauthenticated scanning
 ];
 
-// Prefixes that are always public (e.g. /claim/abc123, /join/xyz)
-const PUBLIC_PREFIXES = ['/claim/', '/join/', '/auth/', '/_next/', '/api/', '/icon', '/logo', '/manifest', '/sw.js'];
+// Prefixes that are always public
+const PUBLIC_PREFIXES = ['/auth/', '/_next/', '/api/', '/icon', '/logo', '/manifest', '/sw.js'];
 
 function isPublic(pathname: string): boolean {
   if (PUBLIC_PATHS.includes(pathname)) return true;
@@ -24,7 +22,7 @@ export function middleware(req: NextRequest) {
   if (isPublic(pathname)) return NextResponse.next();
 
   // Check for the session cookie set by setTokens() in api.ts
-  const hasSession = req.cookies.has('olomipay_session');
+  const hasSession = req.cookies.has('jiko_session');
 
   if (!hasSession) {
     // Redirect unauthenticated users to the LOGIN page — never to '/'.
