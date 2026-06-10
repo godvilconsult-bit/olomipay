@@ -6,9 +6,14 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "android:add": "cap add android",
+    "android:sync": "cap sync android",
+    "android:apk": "cd android && ./gradlew assembleDebug"
   },
   "dependencies": {
+    "@capacitor/android": "^6.2.1",
+    "@capacitor/core": "^6.2.1",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.395.0",
     "next": "14.2.4",
@@ -18,6 +23,7 @@
     "socket.io-client": "^4.7.5"
   },
   "devDependencies": {
+    "@capacitor/cli": "^6.2.1",
     "@types/leaflet": "^1.9.12",
     "@types/node": "^20.14.2",
     "@types/react": "^18.3.3",

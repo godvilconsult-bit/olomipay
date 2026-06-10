@@ -1,1 +1,12 @@
+node_modules/
+.next/
+out/
 .vercel
+*.log
+
+# env
+.env*.local
+
+# Capacitor — the native project is generated in CI (cap add android)
+/android/
+/ios/
