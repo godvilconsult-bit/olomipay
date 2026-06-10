@@ -72,8 +72,11 @@ httpServer.listen(PORT, async () => {
   if (process.env.DATABASE_URL) {
     try {
       const { execSync } = await import('child_process');
-      console.log('[schema] prisma db push…');
-      execSync('npx prisma db push --accept-data-loss --skip-generate', { stdio: 'inherit', timeout: 120_000 });
+      // JIKO_DB_RESET=1 forces a full reset — used ONCE to drop a previous
+      // project's schema. Leave it unset afterwards so deploys never wipe data.
+      const reset = process.env.JIKO_DB_RESET === '1' ? ' --force-reset' : '';
+      console.log(`[schema] prisma db push${reset}…`);
+      execSync(`npx prisma db push --accept-data-loss --skip-generate${reset}`, { stdio: 'inherit', timeout: 120_000 });
       console.log('[schema] in sync');
     } catch (e: any) { console.error('[schema] db push failed:', e?.message); }
   }
