@@ -3,6 +3,7 @@ builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "node dist/index.js"
+# Runs `prisma db push` to create/replace the schema, then starts the API.
+startCommand = "sh start.sh"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
