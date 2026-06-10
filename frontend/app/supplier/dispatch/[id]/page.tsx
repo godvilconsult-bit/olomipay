@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Star, Phone, Bike, MapPin, Check } from 'lucide-react';
+import { ArrowLeft, Star, Phone, Bike, MapPin, Check, BadgeCheck } from 'lucide-react';
 import { suppliers, getAccessToken } from '../../../../lib/api';
 import { useSocket } from '../../../../lib/useSocket';
 import { useT } from '../../../../lib/i18n';
@@ -89,7 +89,7 @@ export default function DispatchPage() {
                   <Card key={r.riderId} className="flex items-center gap-3 !p-3">
                     <Avatar name={r.name} url={r.photoUrl} />
                     <div className="min-w-0 flex-1">
-                      <div className="font-semibold">{r.name ?? localPhone(r.phone)}</div>
+                      <div className="flex items-center gap-1 font-semibold">{r.name ?? localPhone(r.phone)}{r.isVerified && <BadgeCheck size={14} className="text-leaf" />}</div>
                       <div className="flex flex-wrap items-center gap-x-2 text-xs text-ink/50">
                         <span className="inline-flex items-center gap-0.5"><Star size={11} className="fill-ember text-ember" />{r.rating ? r.rating.toFixed(1) : t('New', 'Mpya')}</span>
                         <span>· {r.plateNo ?? r.vehicleType}</span>

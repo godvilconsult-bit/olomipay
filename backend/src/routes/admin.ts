@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { requireAdmin, AuthRequest } from '../middleware/auth';
 import { notify } from '../services/notify';
+import { hashPin } from '../lib/pin';
 
 const router = Router();
 
@@ -51,6 +52,16 @@ router.get('/orders', requireAdmin, async (req: AuthRequest, res) => {
     take:    200,
   });
   res.json({ orders });
+});
+
+// ── GET /api/admin/kyc ─ pending KYC submissions with selfie + ID images ──────────
+router.get('/kyc', requireAdmin, async (_req: AuthRequest, res) => {
+  const pending = await prisma.user.findMany({
+    where:   { kycStatus: 'SUBMITTED' },
+    select:  { id: true, name: true, phone: true, role: true, region: true, kycName: true, kycIdType: true, kycIdNumber: true, kycSelfieUrl: true, kycIdUrl: true, createdAt: true },
+    orderBy: { createdAt: 'desc' },
+  });
+  res.json({ pending });
 });
 
 // ── POST /api/admin/kyc/:userId ─ approve / reject KYC + verify role profile ──────
@@ -113,6 +124,50 @@ router.post('/price-caps', requireAdmin, async (req: AuthRequest, res) => {
     create: { region, productId: productId ?? null, maxPrice },
   });
   res.json({ cap });
+});
+
+// ── POST /api/admin/seed-demo ─ KYC-approved demo supplier + rider + household ────
+router.post('/seed-demo', requireAdmin, async (_req: AuthRequest, res) => {
+  const pin = hashPin('1234');
+
+  // Supplier (verified, open, located)
+  const sup = await prisma.user.upsert({
+    where:  { phone: '+255788000001' },
+    update: {},
+    create: { phone: '+255788000001', pinHash: pin, role: 'SUPPLIER', name: 'Demo Gas Centre', region: 'Dar es Salaam', kycStatus: 'APPROVED',
+      supplierProfile: { create: { businessName: 'Demo Gas Centre', phone: '+255788000001', region: 'Dar es Salaam', district: 'Kinondoni', lat: -6.7725, lng: 39.2400, isOpen: true, isVerified: true } } },
+  });
+  await prisma.supplierProfile.updateMany({ where: { userId: sup.id }, data: { isVerified: true, isOpen: true, lat: -6.7725, lng: 39.2400, region: 'Dar es Salaam' } });
+  const sp = await prisma.supplierProfile.findUnique({ where: { userId: sup.id } });
+  if (sp) {
+    const prods = await prisma.product.findMany({ where: { type: 'REFILL', sizeKg: { in: [6, 15] } }, take: 4 });
+    for (const p of prods) {
+      await prisma.inventory.upsert({
+        where:  { supplierId_productId: { supplierId: sp.id, productId: p.id } },
+        update: { stock: 15, isAvailable: true },
+        create: { supplierId: sp.id, productId: p.id, price: p.sizeKg === 6 ? 22000 : 48000, stock: 15, isAvailable: true },
+      });
+    }
+  }
+
+  // Rider (verified, online, near the shop)
+  const rid = await prisma.user.upsert({
+    where:  { phone: '+255788000002' },
+    update: {},
+    create: { phone: '+255788000002', pinHash: pin, role: 'RIDER', name: 'Demo Rider', region: 'Dar es Salaam', kycStatus: 'APPROVED',
+      riderProfile: { create: { region: 'Dar es Salaam', vehicleType: 'MOTORBIKE', plateNo: 'MC 555 DEMO', isVerified: true, status: 'ONLINE', currentLat: -6.7740, currentLng: 39.2410 } } },
+  });
+  await prisma.riderProfile.updateMany({ where: { userId: rid.id }, data: { isVerified: true, status: 'ONLINE', currentLat: -6.7740, currentLng: 39.2410, region: 'Dar es Salaam' } });
+
+  // Household (with default address)
+  await prisma.user.upsert({
+    where:  { phone: '+255788000003' },
+    update: {},
+    create: { phone: '+255788000003', pinHash: pin, role: 'HOUSEHOLD', name: 'Demo Household', region: 'Dar es Salaam', kycStatus: 'APPROVED',
+      addresses: { create: { label: 'Home', lat: -6.7900, lng: 39.2280, ward: 'Mikocheni', district: 'Kinondoni', region: 'Dar es Salaam', isDefault: true } } },
+  });
+
+  res.json({ ok: true, logins: { supplier: '0788000001', rider: '0788000002', household: '0788000003', pin: '1234' } });
 });
 
 export { router as adminRouter };

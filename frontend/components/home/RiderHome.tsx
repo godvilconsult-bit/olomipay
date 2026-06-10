@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import toast from 'react-hot-toast';
-import { Power, Bike, MapPin, Package, Star, CheckCircle2, Navigation, Phone, Camera, Clock } from 'lucide-react';
+import { Power, Bike, MapPin, Package, Star, CheckCircle2, Navigation, Phone, Camera, Clock, ShieldAlert, BadgeCheck } from 'lucide-react';
 import { jobs, getAccessToken, JikoUser } from '../../lib/api';
 import { useSocket } from '../../lib/useSocket';
 import { useT } from '../../lib/i18n';
@@ -17,6 +19,8 @@ const Map = dynamic(() => import('../Map'), { ssr: false });
 
 export function RiderHome({ user }: { user: JikoUser }) {
   const { t } = useT();
+  const router = useRouter();
+  const verified = !!user.riderProfile?.isVerified;
   const token = getAccessToken();
   const { emit, on } = useSocket(token);
   const [online, setOnline] = useState(user.riderProfile?.status === 'ONLINE' || user.riderProfile?.status === 'ON_JOB');
@@ -50,10 +54,11 @@ export function RiderHome({ user }: { user: JikoUser }) {
   }, [on, refresh, t]);
 
   async function toggleOnline() {
+    if (!online && !verified) { router.push('/kyc'); return; }
     try {
       if (online) { await jobs.offline(); emit('rider:status', { status: 'OFFLINE' }); setOnline(false); }
       else { const c = coordsRef.current; await jobs.online(c?.lat, c?.lng); emit('rider:status', { status: 'ONLINE' }); setOnline(true); await refresh(); }
-    } catch { toast.error(t('Failed', 'Imeshindikana')); }
+    } catch (e: any) { if (e?.message?.includes('KYC')) router.push('/kyc'); else toast.error(t('Failed', 'Imeshindikana')); }
   }
   async function accept(orderId: string) { setBusy(true); try { await jobs.acceptOffer(orderId); toast.success(t('Accepted — fee sent to household', 'Umekubali — ada imetumwa kwa kaya')); await refresh(); } catch (e: any) { toast.error(e?.message ?? t('Failed', 'Imeshindikana')); } finally { setBusy(false); } }
   async function decline(orderId: string) { setBusy(true); try { await jobs.declineOffer(orderId); await refresh(); } finally { setBusy(false); } }
@@ -86,11 +91,19 @@ export function RiderHome({ user }: { user: JikoUser }) {
         {/* profile / photo */}
         <Card className="flex items-center gap-3 !p-3">
           {photo ? <img src={photo} alt="" className="h-12 w-12 rounded-full object-cover" /> : <span className="grid h-12 w-12 place-items-center rounded-full bg-flame/15 font-bold text-flame">{(user.name ?? '?').slice(0, 2).toUpperCase()}</span>}
-          <div className="flex-1 min-w-0"><div className="font-semibold">{user.name}</div><div className="text-xs text-ink/50">{user.riderProfile?.plateNo ?? user.riderProfile?.vehicleType} · {localPhone(user.phone)}</div></div>
+          <div className="flex-1 min-w-0"><div className="flex items-center gap-1 font-semibold">{user.name}{verified && <BadgeCheck size={15} className="text-leaf" />}</div><div className="text-xs text-ink/50">{user.riderProfile?.plateNo ?? user.riderProfile?.vehicleType} · {localPhone(user.phone)}</div></div>
           <label className="flex cursor-pointer items-center gap-1 rounded-xl bg-black/5 px-3 py-2 text-xs font-semibold"><Camera size={14} /> {photo ? t('Update', 'Badili') : t('Add photo', 'Weka picha')}<input type="file" accept="image/*" capture="user" onChange={onPhoto} className="hidden" /></label>
         </Card>
 
-        <button onClick={toggleOnline} className={cn('flex w-full items-center justify-center gap-2 rounded-ds-xl py-4 text-base font-bold shadow-ds-btn transition active:scale-[.99]', online ? 'bg-ink/80 text-white' : 'bg-grad-leaf text-white')}>
+        {!verified && (
+          <Link href="/kyc"><Card className="flex items-center gap-3 border-warning/40 !bg-warning/5">
+            <ShieldAlert className="text-warning flex-shrink-0" size={22} />
+            <div className="flex-1 text-sm"><span className="font-semibold">{t('Verify your identity (KYC)', 'Thibitisha utambulisho (KYC)')}</span> — {t('required before you can go online.', 'lazima kabla ya kuanza kazi.')}</div>
+            <span className="flex-shrink-0 rounded-full bg-warning px-3 py-1 text-xs font-bold text-white">{t('Verify', 'Thibitisha')}</span>
+          </Card></Link>
+        )}
+
+        <button onClick={toggleOnline} disabled={!verified && !online} className={cn('flex w-full items-center justify-center gap-2 rounded-ds-xl py-4 text-base font-bold shadow-ds-btn transition active:scale-[.99] disabled:opacity-50', online ? 'bg-ink/80 text-white' : 'bg-grad-leaf text-white')}>
           <Power size={20} /> {online ? t('Go offline', 'Maliza (Offline)') : t('Go online — receive jobs', 'Anza kupokea kazi (Online)')}
         </button>
 

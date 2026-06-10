@@ -93,14 +93,14 @@ router.get('/riders/nearby', requireRole('SUPPLIER'), async (req: AuthRequest, r
   const profile = await myProfile(req.userId!);
   if (!profile) return res.status(404).json({ error: 'No supplier profile' });
   const riders = await prisma.riderProfile.findMany({
-    where:   { status: 'ONLINE', region: profile.region },
+    where:   { status: 'ONLINE', isVerified: true, region: profile.region },
     include: { user: { select: { id: true, name: true, phone: true, profilePicUrl: true } } },
   });
   const list = riders.map(r => {
     const km = profile.lat != null && profile.lng != null && r.currentLat != null && r.currentLng != null
       ? haversineKm(profile.lat, profile.lng, r.currentLat, r.currentLng) : null;
     return {
-      riderId: r.userId, name: r.user.name, phone: r.user.phone, photoUrl: r.user.profilePicUrl,
+      riderId: r.userId, name: r.user.name, phone: r.user.phone, photoUrl: r.user.profilePicUrl, isVerified: r.isVerified,
       plateNo: r.plateNo, vehicleType: r.vehicleType, rating: r.rating, totalDeliveries: r.totalDeliveries,
       lat: r.currentLat, lng: r.currentLng, distanceKm: km != null ? Math.round(km * 10) / 10 : null,
     };

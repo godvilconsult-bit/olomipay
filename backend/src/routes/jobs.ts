@@ -11,6 +11,8 @@ const router = Router();
 
 // ── POST /api/jobs/online | /offline (+ optional photo/plate via profile) ─────────
 router.post('/online', requireRole('RIDER'), async (req: AuthRequest, res) => {
+  const rp = await prisma.riderProfile.findUnique({ where: { userId: req.userId }, select: { isVerified: true } });
+  if (!rp?.isVerified) return res.status(403).json({ error: 'Complete KYC verification before going online', kyc: true });
   const { lat, lng } = req.body ?? {};
   await prisma.riderProfile.update({
     where: { userId: req.userId },

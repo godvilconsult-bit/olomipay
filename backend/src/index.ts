@@ -46,6 +46,7 @@ async function loadRoutes() {
     ['/api/payments',  () => import('./routes/payments'),  'paymentsRouter'],
     ['/api/addresses', () => import('./routes/addresses'), 'addressesRouter'],
     ['/api/notifications', () => import('./routes/notifications'), 'notificationsRouter'],
+    ['/api/kyc',       () => import('./routes/kyc'),       'kycRouter'],
     ['/api/admin',     () => import('./routes/admin'),     'adminRouter'],
   ];
   for (const [path, load, name] of mounts) {

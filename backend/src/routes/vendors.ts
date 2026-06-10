@@ -36,6 +36,7 @@ router.get('/search', requireAuth, async (req, res) => {
   const suppliers = await prisma.supplierProfile.findMany({
     where: {
       isOpen: true,
+      isVerified: true, // KYC-approved vendors only
       lat: { not: null },
       lng: { not: null },
       inventory: { some: { isAvailable: true, stock: { gt: 0 }, ...(Object.keys(productWhere).length ? { product: productWhere } : {}) } },

@@ -17,10 +17,12 @@ export function AdminHome({ user }: { user: JikoUser }) {
   const [stats, setStats] = useState<any>(null);
   const [users, setUsers] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
+  const [kycList, setKyc] = useState<any[]>([]);
+  const [zoom, setZoom]   = useState<string | null>(null);
 
   async function load() {
-    const [s, u, o] = await Promise.all([adminApi.stats().catch(() => null), adminApi.users().catch(() => ({ users: [] })), adminApi.orders().catch(() => ({ orders: [] }))]);
-    setStats(s); setUsers(u.users ?? []); setOrders(o.orders ?? []);
+    const [s, u, o, k] = await Promise.all([adminApi.stats().catch(() => null), adminApi.users().catch(() => ({ users: [] })), adminApi.orders().catch(() => ({ orders: [] })), adminApi.kycPending().catch(() => ({ pending: [] }))]);
+    setStats(s); setUsers(u.users ?? []); setOrders(o.orders ?? []); setKyc(k.pending ?? []);
   }
   useEffect(() => { load(); }, []);
 
@@ -30,7 +32,6 @@ export function AdminHome({ user }: { user: JikoUser }) {
   }
 
   if (!stats) return <Spinner />;
-  const pending = users.filter((u) => u.kycStatus !== 'APPROVED' && u.role !== 'ADMIN');
 
   const TabBtn = ({ id, label }: { id: typeof tab; label: string }) => (
     <button onClick={() => setTab(id)} className={cn('flex-1 rounded-xl py-2 text-sm font-semibold transition', tab === id ? 'bg-grad-brand text-white' : 'bg-black/5 text-ink/60')}>{label}</button>
@@ -39,6 +40,7 @@ export function AdminHome({ user }: { user: JikoUser }) {
   return (
     <div className="min-h-screen pb-10">
       <AppHeader title={t('JIKO Admin', 'JIKO Admin')} subtitle={t('Network control', 'Usimamizi wa mtandao')} />
+      {zoom && <div onClick={() => setZoom(null)} className="fixed inset-0 z-50 grid place-items-center bg-black/80 p-6"><img src={zoom} alt="" className="max-h-full max-w-full rounded-xl" /></div>}
 
       <div className="mx-auto max-w-md space-y-4 px-5 pt-4">
         <div className="flex gap-2">
@@ -63,22 +65,29 @@ export function AdminHome({ user }: { user: JikoUser }) {
                 <div><div className="text-xl font-extrabold">{stats.users.riders}</div><div className="text-xs text-ink/50">{t('Riders', 'Madereva')}</div></div>
               </div>
             </Card>
-            {pending.length > 0 && (
-              <div>
-                <h2 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-ink/70"><ShieldCheck size={15} /> {t('Pending verification (KYC)', 'Uthibitisho unaosubiri')}</h2>
-                <div className="space-y-2">
-                  {pending.map((u) => (
-                    <Card key={u.id} className="flex items-center justify-between !p-3">
-                      <div><div className="font-semibold">{u.name ?? localPhone(u.phone)}</div><div className="text-xs text-ink/50">{u.role} · {localPhone(u.phone)}</div></div>
-                      <div className="flex gap-2">
-                        <Button variant="ghost" className="!px-3 !text-xs" onClick={() => decide(u.id, 'REJECTED')}>{t('Reject', 'Kataa')}</Button>
-                        <Button variant="leaf" className="!px-3 !text-xs" onClick={() => decide(u.id, 'APPROVED')}>{t('Verify', 'Thibitisha')}</Button>
+            <div>
+              <h2 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-ink/70"><ShieldCheck size={15} /> {t('KYC submissions to review', 'Uthibitisho wa kukagua')} ({kycList.length})</h2>
+              {kycList.length === 0 ? <p className="py-4 text-center text-sm text-ink/50">{t('No KYC pending.', 'Hakuna KYC inayosubiri.')}</p> :
+                <div className="space-y-3">
+                  {kycList.map((u) => (
+                    <Card key={u.id}>
+                      <div className="flex items-center justify-between">
+                        <div><div className="font-semibold">{u.kycName ?? u.name}</div><div className="text-xs text-ink/50">{u.role} · {localPhone(u.phone)} · {u.region ?? '—'}</div></div>
+                        <span className="rounded-full bg-black/5 px-2 py-0.5 text-[10px] font-bold text-ink/60">{u.kycIdType} {u.kycIdNumber}</span>
+                      </div>
+                      <div className="mt-2 grid grid-cols-2 gap-2">
+                        {u.kycSelfieUrl && <button onClick={() => setZoom(u.kycSelfieUrl)}><img src={u.kycSelfieUrl} alt="selfie" className="h-28 w-full rounded-xl object-cover" /><span className="text-[10px] text-ink/50">{t('Selfie', 'Picha ya uso')}</span></button>}
+                        {u.kycIdUrl && <button onClick={() => setZoom(u.kycIdUrl)}><img src={u.kycIdUrl} alt="id" className="h-28 w-full rounded-xl object-cover" /><span className="text-[10px] text-ink/50">{t('ID', 'Kitambulisho')}</span></button>}
+                      </div>
+                      <div className="mt-3 flex gap-2">
+                        <Button variant="ghost" className="flex-1 !text-sm" onClick={() => decide(u.id, 'REJECTED')}>{t('Reject', 'Kataa')}</Button>
+                        <Button variant="leaf" className="flex-1 !text-sm" onClick={() => decide(u.id, 'APPROVED')}>{t('Approve & verify', 'Kubali & thibitisha')}</Button>
                       </div>
                     </Card>
                   ))}
                 </div>
-              </div>
-            )}
+              }
+            </div>
           </>
         )}
 

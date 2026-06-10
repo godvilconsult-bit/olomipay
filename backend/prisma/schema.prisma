@@ -131,6 +131,8 @@ model User {
   kycName         String?
   kycIdType       String?
   kycIdNumber     String?
+  kycSelfieUrl    String?   @db.Text   // KYC selfie (data URL / hosted)
+  kycIdUrl        String?   @db.Text   // KYC ID document image
 
   isActive        Boolean   @default(true)
   isFrozen        Boolean   @default(false)

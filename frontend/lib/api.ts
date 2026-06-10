@@ -178,14 +178,21 @@ export const suppliers = {
 };
 
 export const adminApi = {
-  stats:  () => apiFetch('/api/admin/stats'),
-  users:  (role?: string) => apiFetch(`/api/admin/users${role ? `?role=${role}` : ''}`),
-  orders: () => apiFetch('/api/admin/orders'),
-  kyc:    (userId: string, status: 'APPROVED' | 'REJECTED') => apiFetch(`/api/admin/kyc/${userId}`, { method: 'POST', body: JSON.stringify({ status }) }),
+  stats:      () => apiFetch('/api/admin/stats'),
+  users:      (role?: string) => apiFetch(`/api/admin/users${role ? `?role=${role}` : ''}`),
+  orders:     () => apiFetch('/api/admin/orders'),
+  kycPending: () => apiFetch('/api/admin/kyc'),
+  kyc:        (userId: string, status: 'APPROVED' | 'REJECTED') => apiFetch(`/api/admin/kyc/${userId}`, { method: 'POST', body: JSON.stringify({ status }) }),
 };
 
 export const notifications = {
   list:    () => apiFetch<{ notifications: any[]; unread: number }>('/api/notifications'),
   readAll: () => apiFetch('/api/notifications/read-all', { method: 'POST' }),
   read:    (id: string) => apiFetch(`/api/notifications/${id}/read`, { method: 'POST' }),
+};
+
+export const kyc = {
+  status: () => apiFetch<{ kycStatus: string; submitted: boolean; kycName?: string }>('/api/kyc/status'),
+  submit: (body: { name: string; idType: string; idNumber: string; selfieUrl: string; idUrl: string }) =>
+    apiFetch('/api/kyc/submit', { method: 'POST', body: JSON.stringify(body) }),
 };
