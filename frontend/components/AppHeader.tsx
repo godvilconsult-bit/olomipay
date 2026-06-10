@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Flame, LogOut, Bell } from 'lucide-react';
 import { auth, notifications } from '../lib/api';
+import { LangToggle } from '../lib/i18n';
 
 function NotificationBell() {
   const [unread, setUnread] = useState(0);
@@ -41,8 +42,9 @@ export function AppHeader({ title, subtitle, right }: { title: string; subtitle?
         </div>
         <div className="flex items-center gap-2">
           {right}
+          <LangToggle />
           <NotificationBell />
-          <button onClick={logout} className="grid h-9 w-9 place-items-center rounded-xl bg-black/5 dark:bg-white/10 text-ink/60" aria-label="Toka"><LogOut size={17} /></button>
+          <button onClick={logout} className="grid h-9 w-9 place-items-center rounded-xl bg-black/5 text-ink/60" aria-label="Logout"><LogOut size={17} /></button>
         </div>
       </div>
     </header>

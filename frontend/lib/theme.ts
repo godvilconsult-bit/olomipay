@@ -1,29 +1,18 @@
 'use client';
 
-export type ThemeMode = 'light' | 'dark' | 'system';
+// JIKO CONNECT uses a single warm light theme (sand + flame). We intentionally
+// do NOT follow the system dark mode — the design is light-only, so we always
+// keep <html> out of `.dark` to avoid dark-on-dark contrast problems.
 
-const KEY = 'olomipay_theme';
+export type ThemeMode = 'light';
 
-export function getStoredTheme(): ThemeMode {
-  if (typeof window === 'undefined') return 'system';
-  const v = localStorage.getItem(KEY) as ThemeMode | null;
-  return v === 'light' || v === 'dark' || v === 'system' ? v : 'system';
-}
-
-/** Apply a theme mode to <html> and persist it. */
-export function applyTheme(mode: ThemeMode) {
+export function getStoredTheme(): ThemeMode { return 'light'; }
+export function applyTheme(_mode?: ThemeMode) {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(KEY, mode);
-  const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const dark = mode === 'dark' || (mode === 'system' && systemDark);
-  document.documentElement.classList.toggle('dark', dark);
+  document.documentElement.classList.remove('dark');
 }
 
-/** Inline script (runs before paint) to avoid a light/dark flash on load. */
+/** Inline script (runs before paint): force light, never follow system dark. */
 export const themeInitScript = `
-(function(){try{
-  var m=localStorage.getItem('${KEY}')||'system';
-  var d=m==='dark'||(m==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);
-  document.documentElement.classList.toggle('dark',d);
-}catch(e){}})();
+(function(){try{document.documentElement.classList.remove('dark');document.documentElement.style.colorScheme='light';}catch(e){}})();
 `;

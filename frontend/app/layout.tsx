@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Toaster } from 'react-hot-toast';
 import { themeInitScript } from '../lib/theme';
+import { LanguageProvider } from '../lib/i18n';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -27,8 +28,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossOrigin="" />
       </head>
-      <body className="font-sans bg-sand dark:bg-background-dark text-ink dark:text-sand antialiased">
-        {children}
+      <body className="font-sans bg-sand text-ink antialiased">
+        <LanguageProvider>{children}</LanguageProvider>
         <Toaster
           position="top-center"
           toastOptions={{ duration: 4000, style: { background: '#1A130E', color: '#FBF7F2', fontSize: '14px', borderRadius: '12px', padding: '12px 16px' } }}

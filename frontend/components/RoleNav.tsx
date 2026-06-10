@@ -4,47 +4,48 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Home, Package, MapPin, Bell, Store, Boxes, Bike, Wallet, ShieldCheck } from 'lucide-react';
 import { Role } from '../lib/api';
+import { useT } from '../lib/i18n';
 import { cn } from './ui';
-
-type Tab = { href: string; label: string; icon: any };
-
-const TABS: Record<Role, Tab[]> = {
-  HOUSEHOLD: [
-    { href: '/dashboard',     label: 'Nyumbani', icon: Home },
-    { href: '/orders',        label: 'Oda',      icon: Package },
-    { href: '/addresses',     label: 'Anwani',   icon: MapPin },
-    { href: '/notifications', label: 'Arifa',    icon: Bell },
-  ],
-  SUPPLIER: [
-    { href: '/dashboard',         label: 'Oda',     icon: Store },
-    { href: '/supplier/inventory',label: 'Bidhaa',  icon: Boxes },
-    { href: '/supplier/setup',    label: 'Duka',    icon: MapPin },
-    { href: '/notifications',     label: 'Arifa',   icon: Bell },
-  ],
-  RIDER: [
-    { href: '/dashboard',     label: 'Kazi',   icon: Bike },
-    { href: '/rider/earnings',label: 'Mapato', icon: Wallet },
-    { href: '/notifications', label: 'Arifa',  icon: Bell },
-  ],
-  ADMIN: [
-    { href: '/dashboard', label: 'Dashibodi', icon: ShieldCheck },
-  ],
-};
 
 export function RoleNav({ role }: { role: Role }) {
   const pathname = usePathname();
+  const { t } = useT();
+
+  const TABS: Record<Role, { href: string; label: string; icon: any }[]> = {
+    HOUSEHOLD: [
+      { href: '/dashboard',     label: t('Home', 'Nyumbani'),    icon: Home },
+      { href: '/orders',        label: t('Orders', 'Oda'),       icon: Package },
+      { href: '/addresses',     label: t('Addresses', 'Anwani'), icon: MapPin },
+      { href: '/notifications', label: t('Alerts', 'Arifa'),     icon: Bell },
+    ],
+    SUPPLIER: [
+      { href: '/dashboard',          label: t('Orders', 'Oda'),    icon: Store },
+      { href: '/supplier/inventory', label: t('Stock', 'Bidhaa'),  icon: Boxes },
+      { href: '/supplier/setup',     label: t('Shop', 'Duka'),     icon: MapPin },
+      { href: '/notifications',      label: t('Alerts', 'Arifa'),  icon: Bell },
+    ],
+    RIDER: [
+      { href: '/dashboard',      label: t('Jobs', 'Kazi'),        icon: Bike },
+      { href: '/rider/earnings', label: t('Earnings', 'Mapato'),  icon: Wallet },
+      { href: '/notifications',  label: t('Alerts', 'Arifa'),     icon: Bell },
+    ],
+    ADMIN: [
+      { href: '/dashboard', label: t('Dashboard', 'Dashibodi'), icon: ShieldCheck },
+    ],
+  };
+
   const tabs = TABS[role] ?? TABS.HOUSEHOLD;
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-black/5 bg-white/95 backdrop-blur dark:border-white/5 dark:bg-ink-2/95" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-black/5 bg-white/95 backdrop-blur" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
       <div className="mx-auto flex max-w-md items-stretch justify-around px-2 py-1.5">
-        {tabs.map((t) => {
-          const active = pathname === t.href || (t.href !== '/dashboard' && pathname.startsWith(t.href));
-          const Icon = t.icon;
+        {tabs.map((tab) => {
+          const active = pathname === tab.href || (tab.href !== '/dashboard' && pathname.startsWith(tab.href));
+          const Icon = tab.icon;
           return (
-            <Link key={t.href} href={t.href} className={cn('flex flex-1 flex-col items-center gap-0.5 rounded-xl py-1.5 transition', active ? 'text-flame' : 'text-ink/45 dark:text-sand/45')}>
+            <Link key={tab.href} href={tab.href} className={cn('flex flex-1 flex-col items-center gap-0.5 rounded-xl py-1.5 transition', active ? 'text-flame' : 'text-ink/45')}>
               <Icon size={21} strokeWidth={active ? 2.5 : 2} />
-              <span className="text-[10px] font-medium">{t.label}</span>
+              <span className="text-[10px] font-medium">{tab.label}</span>
             </Link>
           );
         })}

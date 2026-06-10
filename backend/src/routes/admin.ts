@@ -37,6 +37,22 @@ router.get('/users', requireAdmin, async (req: AuthRequest, res) => {
   res.json({ users });
 });
 
+// ── GET /api/admin/orders ─ full service-flow record across all users ────────────
+router.get('/orders', requireAdmin, async (req: AuthRequest, res) => {
+  const orders = await prisma.order.findMany({
+    include: {
+      items:    true,
+      payment:  { select: { status: true, provider: true } },
+      household: { select: { name: true, phone: true } },
+      supplier:  { select: { businessName: true, phone: true } },
+      delivery:  { include: { rider: { select: { name: true, phone: true } } } },
+    },
+    orderBy: { placedAt: 'desc' },
+    take:    200,
+  });
+  res.json({ orders });
+});
+
 // ── POST /api/admin/kyc/:userId ─ approve / reject KYC + verify role profile ──────
 router.post('/kyc/:userId', requireAdmin, async (req: AuthRequest, res) => {
   const parse = z.object({ status: z.enum(['APPROVED', 'REJECTED']) }).safeParse(req.body);

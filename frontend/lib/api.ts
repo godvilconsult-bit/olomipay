@@ -173,9 +173,10 @@ export const suppliers = {
 };
 
 export const adminApi = {
-  stats: () => apiFetch('/api/admin/stats'),
-  users: (role?: string) => apiFetch(`/api/admin/users${role ? `?role=${role}` : ''}`),
-  kyc:   (userId: string, status: 'APPROVED' | 'REJECTED') => apiFetch(`/api/admin/kyc/${userId}`, { method: 'POST', body: JSON.stringify({ status }) }),
+  stats:  () => apiFetch('/api/admin/stats'),
+  users:  (role?: string) => apiFetch(`/api/admin/users${role ? `?role=${role}` : ''}`),
+  orders: () => apiFetch('/api/admin/orders'),
+  kyc:    (userId: string, status: 'APPROVED' | 'REJECTED') => apiFetch(`/api/admin/kyc/${userId}`, { method: 'POST', body: JSON.stringify({ status }) }),
 };
 
 export const notifications = {

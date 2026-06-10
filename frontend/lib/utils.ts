@@ -37,6 +37,16 @@ export function formatPhone(phone: string): string {
   return phone;
 }
 
+/** Local Tanzania format for display: 0712214214 (no +255). */
+export function localPhone(phone?: string | null): string {
+  if (!phone) return '';
+  const d = phone.replace(/\D/g, '');
+  if (d.startsWith('255') && d.length === 12) return '0' + d.slice(3);
+  if (d.length === 9) return '0' + d;
+  if (d.startsWith('0')) return d;
+  return phone;
+}
+
 /** Return how long ago a date was as a human-readable string. */
 export function timeAgo(date: string | Date): string {
   const seconds = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
