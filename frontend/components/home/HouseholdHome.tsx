@@ -29,7 +29,7 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
   const [locBusy, setLocBusy]   = useState(false);
   const [brands, setBrands]     = useState<string[]>([]);
   const [sizes, setSizes]       = useState<number[]>([]);
-  const [filter, setFilter]     = useState<{ type: string; brand: string; sizeKg: string }>({ type: 'REFILL', brand: '', sizeKg: '' });
+  const [filter, setFilter]     = useState<{ type: string; brand: string; sizeKg: string }>({ type: '', brand: '', sizeKg: '' });
   const [vlist, setVlist]       = useState<any[] | null>(null);
   const [recent, setRecent]     = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
@@ -84,10 +84,13 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
   const search = useCallback(async () => {
     setSearching(true);
     try {
-      const r = await vendors.search({ lat: center.lat, lng: center.lng, type: filter.type, brand: filter.brand || undefined, sizeKg: filter.sizeKg ? Number(filter.sizeKg) : undefined, radiusKm: 25 });
+      const r = await vendors.search({ lat: center.lat, lng: center.lng, type: filter.type || undefined, brand: filter.brand || undefined, sizeKg: filter.sizeKg ? Number(filter.sizeKg) : undefined, radiusKm: 50 });
       setVlist(r.vendors ?? []);
     } catch { setVlist([]); } finally { setSearching(false); }
   }, [center.lat, center.lng, filter]);
+
+  // Show nearby available vendors automatically (and re-run when location/filters change).
+  useEffect(() => { search(); }, [search]);
 
   useEffect(() => {
     const evs = ['order:confirmed', 'order:fee', 'order:picked', 'order:delivered', 'order:rejected', 'payment:paid'];
@@ -178,7 +181,8 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
 
         {/* filters */}
         <div className="flex gap-2">
-          {TYPES.map((ty) => <Pill key={ty.v} active={filter.type === ty.v} onClick={() => setFilter((f) => ({ ...f, type: ty.v }))}>{ty.l}</Pill>)}
+          <Pill active={!filter.type} onClick={() => setFilter((f) => ({ ...f, type: '' }))}>{t('All', 'Zote')}</Pill>
+          {TYPES.map((ty) => <Pill key={ty.v} active={filter.type === ty.v} onClick={() => setFilter((f) => ({ ...f, type: f.type === ty.v ? '' : ty.v }))}>{ty.l}</Pill>)}
         </div>
         <div className={cn('grid gap-2', filter.type === 'ACCESSORY' ? 'grid-cols-1' : 'grid-cols-2')}>
           <label className="block">
