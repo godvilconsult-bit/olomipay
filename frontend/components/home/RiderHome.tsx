@@ -39,12 +39,21 @@ export function RiderHome({ user }: { user: JikoUser }) {
   }, []);
   useEffect(() => { refresh(); }, [refresh]);
 
+  // Real-time location: while online, continuously share the rider's live GPS so
+  // vendors see fresh positions and the household can track an active delivery.
+  // Nothing is "saved" — the position is transient/live.
   useEffect(() => {
     if (!navigator.geolocation) return;
     const id = navigator.geolocation.watchPosition(
-      (p) => { coordsRef.current = { lat: p.coords.latitude, lng: p.coords.longitude };
-        if (online && active && ['FEE_CONFIRMED', 'PICKED'].includes(active.order?.status)) emit('rider:location', { lat: p.coords.latitude, lng: p.coords.longitude, deliveryId: active.id }); },
-      () => {}, { enableHighAccuracy: true, maximumAge: 5000 },
+      (p) => {
+        const lat = p.coords.latitude, lng = p.coords.longitude;
+        coordsRef.current = { lat, lng };
+        if (online) {
+          const enroute = active && ['FEE_CONFIRMED', 'PICKED'].includes(active.order?.status);
+          emit('rider:location', { lat, lng, deliveryId: enroute ? active.id : undefined });
+        }
+      },
+      () => {}, { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 },
     );
     return () => navigator.geolocation.clearWatch(id);
   }, [online, active, emit]);

@@ -4,11 +4,13 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { Store, Bell, AlertTriangle, Check, X, MapPin, Bike, Smartphone, Banknote, Clock, ShieldAlert } from 'lucide-react';
+import { Store, Bell, AlertTriangle, Check, X, MapPin, Bike, Smartphone, Banknote, Clock, ShieldAlert, Navigation } from 'lucide-react';
 import { suppliers, getAccessToken, JikoUser } from '../../lib/api';
 import { useSocket } from '../../lib/useSocket';
 import { useT } from '../../lib/i18n';
 import { localPhone } from '../../lib/utils';
+import { getDeviceLocation, distanceM, prettyDistance } from '../../lib/location';
+import { reverseGeocode } from '../../lib/geocode';
 import { AppHeader } from '../AppHeader';
 import { RoleNav } from '../RoleNav';
 import { Card, Button, Spinner, EmptyState, Money, Stat, Badge, cn } from '../ui';
@@ -22,12 +24,36 @@ export function SupplierHome({ user }: { user: JikoUser }) {
   const [me, setMe]   = useState<any>(null);
   const [list, setList] = useState<any[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
+  const [mismatchM, setMismatchM] = useState<number | null>(null);
+  const [noLoc, setNoLoc] = useState(false);
+  const [locBusy, setLocBusy] = useState(false);
 
   const refresh = useCallback(async () => {
     const [m, o] = await Promise.all([suppliers.me().catch(() => null), suppliers.orders().catch(() => ({ orders: [] }))]);
     setMe(m); setList(o.orders ?? []);
   }, []);
   useEffect(() => { refresh(); }, [refresh]);
+
+  // Compare the shop's saved location to where the device is now.
+  useEffect(() => {
+    const p = me?.profile;
+    if (!p) return;
+    if (p.lat == null || p.lng == null) { setNoLoc(true); return; }
+    let alive = true;
+    getDeviceLocation().then((d) => { if (alive) { const m = distanceM(d, { lat: p.lat, lng: p.lng }); setMismatchM(m > 300 ? m : null); } }).catch(() => {});
+    return () => { alive = false; };
+  }, [me?.profile?.id]);
+
+  async function updateShopLocation() {
+    setLocBusy(true);
+    try {
+      const d = await getDeviceLocation();
+      const g = await reverseGeocode(d.lat, d.lng);
+      await suppliers.update({ lat: d.lat, lng: d.lng, ...(g?.region && { region: g.region }), ...(g?.district && { district: g.district }), ...(g?.ward && { ward: g.ward }) });
+      setMismatchM(null); setNoLoc(false); await refresh();
+      toast.success(t('Shop location updated', 'Eneo la duka limesasishwa'));
+    } catch { toast.error(t("Couldn't get your location", 'Imeshindwa kupata eneo')); } finally { setLocBusy(false); }
+  }
 
   useEffect(() => {
     const evs = ['order:new', 'order:rider-accepted', 'rider:declined', 'order:tracking', 'order:picked', 'order:delivered', 'payment:paid'];
@@ -74,6 +100,22 @@ export function SupplierHome({ user }: { user: JikoUser }) {
             <span className="flex-shrink-0 rounded-full bg-warning px-3 py-1 text-xs font-bold text-white">{t('Verify', 'Thibitisha')}</span>
           </Card></Link>
         )}
+
+        {/* shop location — set it or update when the device is elsewhere */}
+        {noLoc ? (
+          <Card className="border-flame/40 !bg-flame/5">
+            <div className="flex items-center gap-2 text-sm"><MapPin size={18} className="flex-shrink-0 text-flame" /><span className="flex-1 font-semibold">{t('Set your shop location so customers can find you.', 'Weka eneo la duka ili wateja wakuone.')}</span></div>
+            <Button variant="primary" className="mt-2 w-full" loading={locBusy} onClick={updateShopLocation}><Navigation size={15} /> {t('Set location with GPS', 'Weka eneo kwa GPS')}</Button>
+          </Card>
+        ) : mismatchM != null ? (
+          <Card className="border-flame/40 !bg-flame/5">
+            <div className="text-sm">{t('Your shop is saved about', 'Duka lako limehifadhiwa takriban')} {prettyDistance(mismatchM)} {t('from where you are now. Update it?', 'kutoka ulipo sasa. Usasishe?')}</div>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <Button variant="primary" loading={locBusy} onClick={updateShopLocation}><Navigation size={15} /> {t('Update', 'Sasisha')}</Button>
+              <Button variant="ghost" onClick={() => setMismatchM(null)}>{t('Keep saved', 'Baki na hii')}</Button>
+            </div>
+          </Card>
+        ) : null}
 
         <div className="grid grid-cols-3 gap-2.5">
           <Stat label={t('Pending', 'Zinasubiri')} value={me.stats.pending} accent />

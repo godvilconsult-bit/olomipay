@@ -120,6 +120,8 @@ export const auth = {
 export const addresses = {
   list:    () => apiFetch('/api/addresses'),
   create:  (body: any) => apiFetch('/api/addresses', { method: 'POST', body: JSON.stringify(body) }),
+  current: (body: { lat: number; lng: number; label?: string; region?: string; district?: string; ward?: string }) =>
+    apiFetch<{ address: any }>('/api/addresses/current', { method: 'POST', body: JSON.stringify(body) }),
   setDefault: (id: string) => apiFetch(`/api/addresses/${id}/default`, { method: 'POST' }),
   remove:  (id: string) => apiFetch(`/api/addresses/${id}`, { method: 'DELETE' }),
 };
