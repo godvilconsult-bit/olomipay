@@ -35,6 +35,14 @@ jobs:
       - name: Add Android platform
         run: npx cap add android || npx cap sync android
 
+      - name: Add location permissions to manifest
+        run: |
+          MANIFEST=android/app/src/main/AndroidManifest.xml
+          if ! grep -q ACCESS_FINE_LOCATION "$MANIFEST"; then
+            perl -0pi -e 's/(<application)/<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"\/>\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"\/>\n    $1/' "$MANIFEST"
+          fi
+          cat "$MANIFEST"
+
       - name: Build debug APK
         run: |
           cd android

@@ -12,8 +12,13 @@ import { Server as HttpServer } from 'http';
 import { Server } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma';
+import { haversineKm } from '../lib/geo';
+import { notify } from '../services/notify';
 
 let _io: Server | null = null;
+
+// Deliveries we've already sent an "arrived" alert for (reset on restart).
+const arrivedNotified = new Set<string>();
 
 export function getIo(): Server | null { return _io; }
 
@@ -99,12 +104,22 @@ export function initSocket(httpServer: HttpServer): Server {
         const d = await prisma.delivery.update({
           where: { id: deliveryId },
           data:  { riderLat: lat, riderLng: lng, lastLocationAt: new Date() },
-          select: { order: { select: { householdId: true, supplier: { select: { userId: true } } } } },
+          select: { dropLat: true, dropLng: true, order: { select: { id: true, orderNo: true, status: true, householdId: true, supplier: { select: { userId: true } } } } },
         }).catch(() => null);
         if (d?.order) {
           // Both the household AND the supplier watch the rider live.
           emitToUser(d.order.householdId, 'delivery:location', { deliveryId, lat, lng });
           if (d.order.supplier?.userId) emitToUser(d.order.supplier.userId, 'delivery:location', { deliveryId, lat, lng });
+
+          // Geofence: rider within ~150 m of the destination while carrying the gas → "arrived".
+          if (d.order.status === 'PICKED' && d.dropLat != null && d.dropLng != null && !arrivedNotified.has(deliveryId)) {
+            const km = haversineKm(lat, lng, d.dropLat, d.dropLng);
+            if (km <= 0.15) {
+              arrivedNotified.add(deliveryId);
+              emitToUser(d.order.householdId, 'order:arriving', { orderId: d.order.id });
+              await notify(d.order.householdId, { title: 'Your rider has arrived 🏍️', body: `${d.order.orderNo}: the rider is at your location. Have your code ready.`, type: 'order', data: { orderId: d.order.id } });
+            }
+          }
         }
       }
     });

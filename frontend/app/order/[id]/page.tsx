@@ -66,10 +66,10 @@ export default function OrderPage() {
   async function review(n: number) { setStars(n); try { await orders.review(id, { supplierRating: n, riderRating: n }); toast.success(t('Thanks for the rating!', 'Asante!')); } catch {} }
 
   const markers: MapMarker[] = [];
-  if (order.address) markers.push({ lat: order.address.lat, lng: order.address.lng, kind: 'dest', label: t('You', 'Wewe') });
-  if (order.supplier?.lat != null) markers.push({ lat: order.supplier.lat, lng: order.supplier.lng, kind: 'vendor', label: order.supplier.businessName });
+  if (order.address) markers.push({ lat: order.address.lat, lng: order.address.lng, kind: 'dest', label: t('Your location', 'Eneo lako'), name: t('Your location', 'Eneo lako') });
+  if (order.supplier?.lat != null) markers.push({ lat: order.supplier.lat, lng: order.supplier.lng, kind: 'vendor', label: order.supplier.businessName, name: order.supplier.businessName, shop: order.supplier.businessName, phone: order.supplier.phone });
   const rp = riderPos ?? (order.delivery?.riderLat != null ? { lat: order.delivery.riderLat, lng: order.delivery.riderLng } : null);
-  if (rp) markers.push({ lat: rp.lat, lng: rp.lng, kind: 'rider', label: rd?.name });
+  if (rp) markers.push({ lat: rp.lat, lng: rp.lng, kind: 'rider', label: rd?.name, name: rd?.name, phone: rd?.phone, photo: rd?.profilePicUrl, plate: rd?.riderProfile?.plateNo });
 
   return (
     <div className="min-h-screen bg-sand pb-10">

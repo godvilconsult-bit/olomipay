@@ -10,6 +10,7 @@ import { jobs, getAccessToken, JikoUser } from '../../lib/api';
 import { useSocket } from '../../lib/useSocket';
 import { useT } from '../../lib/i18n';
 import { localPhone } from '../../lib/utils';
+import { playAlert, primeAudio } from '../../lib/sound';
 import { AppHeader } from '../AppHeader';
 import { RoleNav } from '../RoleNav';
 import { Card, Button, Spinner, EmptyState, Money, Stat, cn } from '../ui';
@@ -49,12 +50,16 @@ export function RiderHome({ user }: { user: JikoUser }) {
   }, [online, active, emit]);
 
   useEffect(() => {
-    const offs = ['job:offered', 'fee:confirmed', 'order:cancelled'].map((e) => on(e, (d: any) => { if (e === 'job:offered') toast(`🏍️ ${t('New pickup offer', 'Ofa mpya ya kazi')}`, { icon: '🔥' }); refresh(); }));
+    const offs = ['job:offered', 'fee:confirmed', 'order:cancelled'].map((e) => on(e, (d: any) => {
+      if (e === 'job:offered') { playAlert(); toast(`🏍️ ${t('New pickup offer', 'Ofa mpya ya kazi')}`, { icon: '🔥', duration: 6000 }); }
+      refresh();
+    }));
     return () => offs.forEach((o) => o?.());
   }, [on, refresh, t]);
 
   async function toggleOnline() {
     if (!online && !verified) { router.push('/kyc'); return; }
+    primeAudio(); // unlock the alert sound from this user gesture
     try {
       if (online) { await jobs.offline(); emit('rider:status', { status: 'OFFLINE' }); setOnline(false); }
       else { const c = coordsRef.current; await jobs.online(c?.lat, c?.lng); emit('rider:status', { status: 'ONLINE' }); setOnline(true); await refresh(); }

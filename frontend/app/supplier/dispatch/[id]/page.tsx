@@ -61,14 +61,14 @@ export default function DispatchPage() {
   const rd = order.delivery?.rider;
 
   const trackMarkers: MapMarker[] = [];
-  if (order.address) trackMarkers.push({ lat: order.address.lat, lng: order.address.lng, kind: 'dest', label: t('Household', 'Kaya') });
-  if (shop?.lat != null) trackMarkers.push({ lat: shop.lat, lng: shop.lng, kind: 'vendor', label: t('Your shop', 'Duka lako') });
+  if (order.address) trackMarkers.push({ lat: order.address.lat, lng: order.address.lng, kind: 'dest', label: t('Household', 'Kaya'), name: order.household?.name ?? t('Household', 'Kaya'), phone: order.household?.phone });
+  if (shop?.lat != null) trackMarkers.push({ lat: shop.lat, lng: shop.lng, kind: 'vendor', label: t('Your shop', 'Duka lako'), name: t('Your shop', 'Duka lako'), shop: t('Your shop', 'Duka lako') });
   const rp = riderPos ?? (order.delivery?.riderLat != null ? { lat: order.delivery.riderLat, lng: order.delivery.riderLng } : null);
-  if (rp) trackMarkers.push({ lat: rp.lat, lng: rp.lng, kind: 'rider', label: rd?.name });
+  if (rp) trackMarkers.push({ lat: rp.lat, lng: rp.lng, kind: 'rider', label: rd?.name, name: rd?.name, phone: rd?.phone, photo: rd?.profilePicUrl, plate: rd?.riderProfile?.plateNo });
 
   const pickerMarkers: MapMarker[] = [];
-  if (shop?.lat != null) pickerMarkers.push({ lat: shop.lat, lng: shop.lng, kind: 'vendor', label: t('Your shop', 'Duka lako') });
-  riders.filter((r) => r.lat != null).forEach((r) => pickerMarkers.push({ lat: r.lat, lng: r.lng, kind: 'rider', label: r.name, id: r.riderId }));
+  if (shop?.lat != null) pickerMarkers.push({ lat: shop.lat, lng: shop.lng, kind: 'vendor', label: t('Your shop', 'Duka lako'), shop: t('Your shop', 'Duka lako') });
+  riders.filter((r) => r.lat != null).forEach((r) => pickerMarkers.push({ lat: r.lat, lng: r.lng, kind: 'rider', label: r.name, name: r.name, phone: r.phone, photo: r.photoUrl, plate: r.plateNo }));
 
   return (
     <div className="min-h-screen bg-sand pb-10">
@@ -81,7 +81,7 @@ export default function DispatchPage() {
       <div className="mx-auto max-w-md space-y-4 px-5 pt-4">
         {picking && (
           <>
-            {pickerMarkers.length > 0 && <Card className="!p-1.5"><Map markers={pickerMarkers} height={220} onMarkerClick={(rid) => rid && assign(rid)} /></Card>}
+            {pickerMarkers.length > 0 && <Card className="!p-1.5"><Map markers={pickerMarkers} height={220} /></Card>}
             <h2 className="flex items-center gap-1.5 text-sm font-bold text-ink/70"><Bike size={15} /> {t('Available riders near you', 'Madereva walio karibu')}</h2>
             {riders.length === 0 ? <EmptyState icon={<Bike size={34} />} title={t('No riders online nearby', 'Hakuna dereva online karibu')} sub={t('Wait for a rider to come online, then refresh.', 'Subiri dereva aje online.')} /> :
               <div className="space-y-2">

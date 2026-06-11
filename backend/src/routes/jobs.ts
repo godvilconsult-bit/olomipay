@@ -103,6 +103,7 @@ router.post('/:orderId/pick', requireRole('RIDER'), async (req: AuthRequest, res
   await prisma.delivery.update({ where: { id: delivery.id }, data: { status: 'PICKED', pickedAt: new Date() } });
   const order = await prisma.order.update({ where: { id: req.params.orderId }, data: { status: 'PICKED' } });
   emitToUser(order.householdId, 'order:picked', { orderId: order.id });
+  await notify(order.householdId, { title: 'Rider has your gas 🏍️', body: `${order.orderNo}: the rider picked up your order and is on the way.`, type: 'order', data: { orderId: order.id } });
   res.json({ ok: true });
 });
 

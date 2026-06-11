@@ -9,10 +9,10 @@ import { Flame, Home, Store, Bike, Navigation } from 'lucide-react';
 import { auth, setTokens, ApiError, Role } from '../../../lib/api';
 import { useT, LangToggle } from '../../../lib/i18n';
 import { Button, Field, cn } from '../../../components/ui';
+import { TZ_REGIONS } from '../../../lib/tanzania';
+import { reverseGeocode } from '../../../lib/geocode';
 
 const Map = dynamic(() => import('../../../components/Map'), { ssr: false });
-
-const REGIONS = ['Dar es Salaam', 'Mwanza', 'Arusha', 'Dodoma', 'Mbeya', 'Zanzibar'];
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -24,11 +24,21 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const set = (k: string) => (e: any) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
+  const [detected, setDetected] = useState('');
   function getLocation() {
     if (!navigator.geolocation) return toast.error(t('GPS unavailable', 'GPS haipatikani'));
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
-      (p) => { setCoords({ lat: p.coords.latitude, lng: p.coords.longitude }); setLocating(false); toast.success(t('Location captured', 'Eneo limepatikana')); },
+      async (p) => {
+        const lat = p.coords.latitude, lng = p.coords.longitude;
+        setCoords({ lat, lng }); setLocating(false); toast.success(t('Location captured', 'Eneo limepatikana'));
+        // Auto-detect region/district from the map and fill it in.
+        const g = await reverseGeocode(lat, lng);
+        if (g) {
+          if (g.region && TZ_REGIONS.includes(g.region)) setForm((f) => ({ ...f, region: g.region }));
+          setDetected([g.ward, g.district, g.region].filter(Boolean).join(', '));
+        }
+      },
       () => { setLocating(false); toast.error(t("Couldn't get location", 'Imeshindwa kupata eneo')); },
       { enableHighAccuracy: true, timeout: 10000 },
     );
@@ -97,7 +107,7 @@ export default function RegisterPage() {
           <label className="block">
             <span className="mb-1.5 block text-sm font-medium text-ink/70">{t('Region', 'Mkoa')}</span>
             <select value={form.region} onChange={set('region')} className="w-full min-h-touch rounded-2xl border border-black/10 bg-white px-4 text-ink outline-none focus:border-flame">
-              {REGIONS.map((r) => <option key={r}>{r}</option>)}
+              {TZ_REGIONS.map((r) => <option key={r}>{r}</option>)}
             </select>
           </label>
 
@@ -120,6 +130,7 @@ export default function RegisterPage() {
             <button type="button" onClick={getLocation} className={cn('flex w-full items-center justify-center gap-2 rounded-2xl py-3 text-sm font-semibold', coords ? 'bg-leaf/15 text-leaf-dark' : 'bg-flame/10 text-flame')}>
               <Navigation size={16} /> {locating ? t('Locating…', 'Inatafuta…') : coords ? `${t('Location set', 'Eneo limewekwa')} ✓` : t('Use my live location (GPS)', 'Tumia eneo langu (GPS)')}
             </button>
+            {detected && <p className="mt-1.5 text-xs text-leaf-dark">📍 {detected}</p>}
             {coords && <div className="mt-2"><Map markers={[{ lat: coords.lat, lng: coords.lng, kind: 'me', label: t('You', 'Wewe') }]} height={170} /></div>}
           </div>
 

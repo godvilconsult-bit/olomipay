@@ -2,16 +2,16 @@
 
 import { useEffect, useRef } from 'react';
 import L from 'leaflet';
+import { markerSvg, markerSize, infoHtml, hasInfo } from './mapIcons';
 import type { MapMarker } from './Map';
 
-const EMOJI: Record<MapMarker['kind'], string> = { rider: '🏍️', dest: '📍', vendor: '🏪', me: '🔵' };
-
 function icon(kind: MapMarker['kind']) {
+  const { w, h, anchorX, anchorY } = markerSize(kind);
   return L.divIcon({
     className: '',
-    html: `<div style="font-size:26px;line-height:1;filter:drop-shadow(0 2px 3px rgba(0,0,0,.45))">${EMOJI[kind]}</div>`,
-    iconSize: [26, 26],
-    iconAnchor: [13, 24],
+    html: `<div style="filter:drop-shadow(0 2px 2px rgba(0,0,0,.4))">${markerSvg(kind)}</div>`,
+    iconSize: [w, h],
+    iconAnchor: [anchorX, anchorY],
   });
 }
 
@@ -37,8 +37,9 @@ export default function LeafletMap({ markers, height = 200, onMarkerClick }: { m
     const pts: [number, number][] = [];
     for (const m of markers.filter((x) => typeof x.lat === 'number' && typeof x.lng === 'number')) {
       const mk = L.marker([m.lat, m.lng], { icon: icon(m.kind) }).addTo(layer);
-      if (m.label) mk.bindTooltip(m.label, { direction: 'top', offset: [0, -20] });
-      if (m.id && onMarkerClick) mk.on('click', () => onMarkerClick(m.id!));
+      if (onMarkerClick && m.id) mk.on('click', () => onMarkerClick(m.id!));
+      else if (hasInfo(m)) mk.bindPopup(infoHtml(m));
+      else if (m.label) mk.bindTooltip(m.label, { direction: 'top', offset: [0, -20] });
       pts.push([m.lat, m.lng]);
     }
     if (pts.length === 1) map.setView(pts[0], 15);

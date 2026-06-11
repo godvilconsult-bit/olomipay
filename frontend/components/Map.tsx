@@ -9,6 +9,12 @@ export interface MapMarker {
   kind: 'rider' | 'dest' | 'vendor' | 'me';
   label?: string;
   id?: string;
+  // Contact details shown when the marker is tapped
+  name?: string;
+  phone?: string;
+  photo?: string;
+  plate?: string;
+  shop?: string;
 }
 
 export interface MapProps {

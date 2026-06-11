@@ -9,9 +9,10 @@ import { suppliers } from '../../../lib/api';
 import { useT } from '../../../lib/i18n';
 import { Card, Button, Field, Spinner, cn } from '../../../components/ui';
 import { RoleNav } from '../../../components/RoleNav';
+import { TZ_REGIONS, TZ_DISTRICTS } from '../../../lib/tanzania';
+import { reverseGeocode } from '../../../lib/geocode';
 
 const Map = dynamic(() => import('../../../components/Map'), { ssr: false });
-const REGIONS = ['Dar es Salaam', 'Mwanza', 'Arusha', 'Dodoma', 'Mbeya', 'Zanzibar'];
 
 export default function SupplierSetup() {
   const router = useRouter();
@@ -26,10 +27,12 @@ export default function SupplierSetup() {
 
   function useLocation() {
     if (!navigator.geolocation) return toast.error(t('GPS unavailable', 'GPS haipatikani'));
-    navigator.geolocation.getCurrentPosition(
-      (p) => { setForm((f: any) => ({ ...f, lat: p.coords.latitude, lng: p.coords.longitude })); toast.success(t('Location set', 'Eneo limewekwa')); },
-      () => toast.error(t("Couldn't get location", 'Imeshindwa kupata eneo')), { enableHighAccuracy: true },
-    );
+    navigator.geolocation.getCurrentPosition(async (p) => {
+      const lat = p.coords.latitude, lng = p.coords.longitude;
+      setForm((f: any) => ({ ...f, lat, lng })); toast.success(t('Location set', 'Eneo limewekwa'));
+      const g = await reverseGeocode(lat, lng);
+      if (g) setForm((f: any) => ({ ...f, region: (g.region && TZ_REGIONS.includes(g.region)) ? g.region : f.region, district: g.district || f.district, ward: g.ward || f.ward }));
+    }, () => toast.error(t("Couldn't get location", 'Imeshindwa kupata eneo')), { enableHighAccuracy: true });
   }
   async function save() {
     setSaving(true);
@@ -54,12 +57,19 @@ export default function SupplierSetup() {
           <Field label={t('Phone', 'Simu')} value={form.phone ?? ''} onChange={set('phone')} />
           <label className="block">
             <span className="mb-1.5 block text-sm font-medium text-ink/70">{t('Region', 'Mkoa')}</span>
-            <select value={form.region ?? ''} onChange={set('region')} className="w-full min-h-touch rounded-2xl border border-black/15 bg-white px-4 text-ink outline-none focus:border-flame">
-              {REGIONS.map((r) => <option key={r}>{r}</option>)}
+            <select value={form.region ?? ''} onChange={(e) => setForm((f: any) => ({ ...f, region: e.target.value, district: '' }))} className="w-full min-h-touch rounded-2xl border border-black/15 bg-white px-4 text-ink outline-none focus:border-flame">
+              {TZ_REGIONS.map((r) => <option key={r}>{r}</option>)}
             </select>
           </label>
           <div className="grid grid-cols-2 gap-3">
-            <Field label={t('District', 'Wilaya')} value={form.district ?? ''} onChange={set('district')} />
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-medium text-ink/70">{t('District', 'Wilaya')}</span>
+              <select value={form.district ?? ''} onChange={set('district')} className="w-full min-h-touch rounded-2xl border border-black/15 bg-white px-3 text-ink outline-none focus:border-flame">
+                <option value="">{t('Select', 'Chagua')}</option>
+                {(TZ_DISTRICTS[form.region] ?? []).map((d) => <option key={d}>{d}</option>)}
+                {form.district && !(TZ_DISTRICTS[form.region] ?? []).includes(form.district) && <option>{form.district}</option>}
+              </select>
+            </label>
             <Field label={t('Ward', 'Kata')} value={form.ward ?? ''} onChange={set('ward')} />
           </div>
           <Field label={t('Distributor (for restock)', 'Distributor (kujaza stock)')} value={form.distributor ?? ''} onChange={set('distributor')} hint={t('e.g. Oryx Depot Dar', 'mfano: Oryx Depot Dar')} />

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import LeafletMap from './LeafletMap';
+import { markerSvg, markerSize, infoHtml, hasInfo } from './mapIcons';
 import type { MapMarker } from './Map';
 
 const KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
@@ -23,17 +24,19 @@ function loadGoogle(): Promise<any> {
   return loaderPromise;
 }
 
-const COLORS: Record<MapMarker['kind'], string> = { rider: '#F15A24', dest: '#1FA463', vendor: '#1A130E', me: '#2563EB' };
-const GLYPH:  Record<MapMarker['kind'], string> = { rider: '🏍️', dest: '📍', vendor: '🏪', me: '●' };
-
 function iconFor(google: any, kind: MapMarker['kind']) {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="50" viewBox="0 0 40 50"><path d="M20 0C9 0 0 9 0 20c0 13 20 30 20 30s20-17 20-30C40 9 31 0 20 0z" fill="${COLORS[kind]}"/><circle cx="20" cy="19" r="13" fill="#fff"/><text x="20" y="25" font-size="16" text-anchor="middle">${GLYPH[kind]}</text></svg>`;
-  return { url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg), scaledSize: new google.maps.Size(38, 47), anchor: new google.maps.Point(19, 47) };
+  const { w, h, anchorX, anchorY } = markerSize(kind);
+  return {
+    url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(markerSvg(kind)),
+    scaledSize: new google.maps.Size(w, h),
+    anchor: new google.maps.Point(anchorX, anchorY),
+  };
 }
 
 export default function GoogleMap({ markers, height = 200, onMarkerClick }: { markers: MapMarker[]; height?: number; onMarkerClick?: (id: string) => void }) {
   const elRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
+  const infoRef = useRef<any>(null);
   const markerRefs = useRef<Map<string, any>>(new Map());
   const prevKeys = useRef<string>('');
   const [failed, setFailed] = useState(false);
@@ -47,6 +50,7 @@ export default function GoogleMap({ markers, height = 200, onMarkerClick }: { ma
         center: { lat: -6.7924, lng: 39.2083 }, zoom: 13,
         disableDefaultUI: true, zoomControl: true, gestureHandling: 'greedy', clickableIcons: false,
       });
+      infoRef.current = new google.maps.InfoWindow();
       setReady(true);
     }).catch(() => { if (alive) setFailed(true); });
     return () => { alive = false; };
@@ -67,7 +71,10 @@ export default function GoogleMap({ markers, height = 200, onMarkerClick }: { ma
       if (mk) { mk.setPosition(pos); }
       else {
         mk = new google.maps.Marker({ position: pos, map, icon: iconFor(google, m.kind), title: m.label });
-        if (onMarkerClick && m.id) mk.addListener('click', () => onMarkerClick(m.id!));
+        mk.addListener('click', () => {
+          if (onMarkerClick && m.id) { onMarkerClick(m.id); return; }
+          if (hasInfo(m)) { infoRef.current.setContent(infoHtml(m)); infoRef.current.open({ anchor: mk, map }); }
+        });
         markerRefs.current.set(key, mk);
       }
       bounds.extend(pos);

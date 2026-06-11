@@ -8,6 +8,7 @@ import { HouseholdHome } from '../../components/home/HouseholdHome';
 import { RiderHome } from '../../components/home/RiderHome';
 import { SupplierHome } from '../../components/home/SupplierHome';
 import { AdminHome } from '../../components/home/AdminHome';
+import { LocationPrompt } from '../../components/LocationPrompt';
 
 export default function Dashboard() {
   const router = useRouter();
@@ -18,13 +19,12 @@ export default function Dashboard() {
     auth.me().then((r) => setUser(r.user)).catch(() => router.replace('/auth/login'));
   }, [router]);
 
-  if (!user) return <div className="min-h-screen bg-sand dark:bg-background-dark"><Spinner /></div>;
+  if (!user) return <div className="min-h-screen bg-sand"><Spinner /></div>;
 
-  switch (user.role) {
-    case 'HOUSEHOLD': return <HouseholdHome user={user} />;
-    case 'RIDER':     return <RiderHome user={user} />;
-    case 'SUPPLIER':  return <SupplierHome user={user} />;
-    case 'ADMIN':     return <AdminHome user={user} />;
-    default:          return <HouseholdHome user={user} />;
-  }
+  const home = user.role === 'RIDER' ? <RiderHome user={user} />
+    : user.role === 'SUPPLIER' ? <SupplierHome user={user} />
+    : user.role === 'ADMIN' ? <AdminHome user={user} />
+    : <HouseholdHome user={user} />;
+
+  return <>{home}{user.role !== 'ADMIN' && <LocationPrompt />}</>;
 }
