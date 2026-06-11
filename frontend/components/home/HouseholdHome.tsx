@@ -5,8 +5,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import toast from 'react-hot-toast';
-import { MapPin, Star, BadgeCheck, Search, Navigation, Package, List, Map as MapIcon } from 'lucide-react';
-import { vendors, orders, addresses, JikoUser } from '../../lib/api';
+import { MapPin, Star, BadgeCheck, Search, Navigation, Package, List, Map as MapIcon, HandCoins, Bike, Smartphone, Banknote } from 'lucide-react';
+import { vendors, orders, addresses, getAccessToken, JikoUser } from '../../lib/api';
+import { useSocket } from '../../lib/useSocket';
 import { useT } from '../../lib/i18n';
 import { AppHeader } from '../AppHeader';
 import { RoleNav } from '../RoleNav';
@@ -23,6 +24,7 @@ function dist(km: number, t: (e: string, s: string) => string): string {
 export function HouseholdHome({ user }: { user: JikoUser }) {
   const { t } = useT();
   const router = useRouter();
+  const { on } = useSocket(getAccessToken());
   const [coords, setCoords] = useState(DAR);
   const [brands, setBrands] = useState<string[]>([]);
   const [sizes, setSizes]   = useState<number[]>([]);
@@ -32,6 +34,29 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
   const [recent, setRecent] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
   const [view, setView]     = useState<'list' | 'map'>('list');
+  const [busy, setBusy]     = useState(false);
+
+  const loadOrders = useCallback(() => { orders.list().then((r) => setRecent(r.orders ?? [])).catch(() => {}); }, []);
+  const active = recent.find((o) => !['COMPLETED', 'CANCELLED'].includes(o.status));
+
+  useEffect(() => {
+    const evs = ['order:confirmed', 'order:fee', 'order:picked', 'order:delivered', 'order:rejected', 'payment:paid'];
+    const offs = evs.map((e) => on(e, () => loadOrders()));
+    return () => offs.forEach((o) => o?.());
+  }, [on, loadOrders]);
+
+  async function confirmFee() {
+    if (!active) return;
+    setBusy(true);
+    try { await orders.confirmFee(active.id); toast.success(t('Fee confirmed — rider is on the way', 'Ada imethibitishwa — dereva anakuja')); loadOrders(); }
+    catch (e: any) { toast.error(e?.message ?? t('Failed', 'Imeshindikana')); } finally { setBusy(false); }
+  }
+  async function payNow(provider: string) {
+    if (!active) return;
+    setBusy(true);
+    try { await orders.pay(active.id, { provider }); toast.success(provider === 'CASH' ? t("You'll pay cash", 'Utalipa cash') : t('Check your phone to pay', 'Angalia simu kulipa')); setTimeout(loadOrders, 2000); }
+    catch (e: any) { toast.error(e?.message); } finally { setBusy(false); }
+  }
 
   const TYPES = [
     { v: 'REFILL', l: t('Refill', 'Refill') },
@@ -43,7 +68,7 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
   useEffect(() => {
     vendors.products().then((r) => { setBrands(r.brands ?? []); setSizes(r.sizes ?? []); }).catch(() => {});
     addresses.list().then((r) => setAddrs(r.addresses ?? [])).catch(() => {});
-    orders.list().then((r) => setRecent((r.orders ?? []).slice(0, 3))).catch(() => {});
+    loadOrders();
     if (navigator.geolocation) navigator.geolocation.getCurrentPosition((p) => setCoords({ lat: p.coords.latitude, lng: p.coords.longitude }), () => {}, { timeout: 6000 });
   }, []);
 
@@ -84,6 +109,44 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
           <button onClick={useMyLocation} className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-xl bg-flame/10 text-flame"><Navigation size={17} /></button>
         </Card>
 
+        {/* active order — actions surfaced right here on the dashboard */}
+        {active && (
+          <Card className="border-flame/40">
+            <div className="flex items-center justify-between">
+              <div className="min-w-0"><div className="font-bold">{active.orderNo}</div><div className="truncate text-xs text-ink/50">{active.supplier?.businessName}</div></div>
+              <Badge status={active.status} />
+            </div>
+
+            {active.payment?.status !== 'PAID' && active.payment?.provider !== 'CASH' ? (
+              <div className="mt-3">
+                <div className="mb-1.5 text-xs font-medium text-ink/60">{t('Complete payment for your gas', 'Kamilisha malipo ya gesi')}</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button variant="primary" loading={busy} onClick={() => payNow('MPESA')}><Smartphone size={15} /> {t('Mobile money', 'Pesa za simu')}</Button>
+                  <Button variant="ghost" loading={busy} onClick={() => payNow('CASH')}><Banknote size={15} /> {t('Cash', 'Cash')}</Button>
+                </div>
+              </div>
+            ) : active.status === 'RIDER_ACCEPTED' ? (
+              <div className="mt-3 rounded-xl bg-flame/5 p-3">
+                <div className="flex items-center gap-2 text-sm font-bold text-flame"><HandCoins size={16} /> {t('Confirm the rider fee', 'Thibitisha ada ya dereva')}</div>
+                <div className="my-1 text-center"><Money value={active.deliveryFee} className="text-2xl" /></div>
+                <Button variant="primary" loading={busy} onClick={confirmFee} className="w-full">{t('Confirm fee & start delivery', 'Thibitisha & anza')}</Button>
+              </div>
+            ) : ['FEE_CONFIRMED', 'PICKED'].includes(active.status) ? (
+              <div className="mt-3 flex items-center justify-between">
+                <span className="inline-flex items-center gap-1.5 text-sm font-medium text-leaf-dark"><Bike size={15} /> {active.status === 'PICKED' ? t('Rider on the way', 'Dereva njiani') : t('Rider heading to pickup', 'Dereva anaenda kuchukua')}</span>
+                <Link href={`/order/${active.id}`} className="text-xs font-semibold text-flame">{t('Track live', 'Fuatilia')}</Link>
+              </div>
+            ) : active.status === 'DELIVERED' ? (
+              <Link href={`/order/${active.id}`}><Button variant="leaf" className="mt-3 w-full">{t('Confirm receipt & rate', 'Thibitisha & toa nyota')}</Button></Link>
+            ) : (
+              <div className="mt-3 flex items-center justify-between">
+                <span className="text-sm text-ink/60">{['ACCEPTED', 'RIDER_OFFERED'].includes(active.status) ? t('Finding a rider…', 'Inatafuta dereva…') : t('Waiting for vendor…', 'Inasubiri muuzaji…')}</span>
+                <Link href={`/order/${active.id}`} className="text-xs font-semibold text-flame">{t('View', 'Angalia')}</Link>
+              </div>
+            )}
+          </Card>
+        )}
+
         {/* type chips */}
         <div className="flex gap-2">
           {TYPES.map((ty) => <Pill key={ty.v} active={filter.type === ty.v} onClick={() => setFilter((f) => ({ ...f, type: ty.v }))}>{ty.l}</Pill>)}
@@ -112,14 +175,14 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
         <Button variant="primary" className="w-full" loading={searching} onClick={search}><Search size={17} /> {t('Search vendors', 'Tafuta wauzaji')}</Button>
 
         {/* recent orders (before any search) */}
-        {vlist === null && recent.length > 0 && (
+        {vlist === null && recent.filter((o) => o.id !== active?.id).length > 0 && (
           <div>
             <div className="mb-2 flex items-center justify-between">
               <h2 className="text-sm font-bold text-ink/70">{t('Your recent orders', 'Oda zako za hivi karibuni')}</h2>
               <Link href="/orders" className="text-xs font-semibold text-flame">{t('All', 'Zote')}</Link>
             </div>
             <div className="space-y-2">
-              {recent.map((o) => (
+              {recent.filter((o) => o.id !== active?.id).slice(0, 3).map((o) => (
                 <Link key={o.id} href={`/order/${o.id}`}>
                   <Card className="flex items-center justify-between !p-3">
                     <div className="min-w-0"><div className="text-sm font-semibold">{o.orderNo}</div><div className="truncate text-xs text-ink/50">{o.supplier?.businessName}</div></div>

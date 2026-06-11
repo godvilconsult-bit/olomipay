@@ -60,10 +60,13 @@ router.post('/register', authLimiter, async (req, res) => {
     region:       z.string().max(60).optional(),
     businessName: z.string().max(120).optional(),
     vehicleType:  z.enum(['MOTORBIKE', 'BAJAJI', 'CAR', 'TRUCK', 'BICYCLE']).optional(),
+    lat:          z.number().optional(),
+    lng:          z.number().optional(),
   }).safeParse(req.body);
 
   if (!parse.success) return res.status(400).json({ error: parse.error.errors[0].message });
-  const { phone, pin, role, name, region, businessName, vehicleType } = parse.data;
+  const { phone, pin, role, name, region, businessName, vehicleType, lat, lng } = parse.data;
+  const hasLoc = typeof lat === 'number' && typeof lng === 'number';
 
   const existing = await prisma.user.findUnique({ where: { phone } });
   if (existing) return res.status(409).json({ error: 'Phone number already registered' });
@@ -76,11 +79,14 @@ router.post('/register', authLimiter, async (req, res) => {
       name: name ?? null,
       region: region ?? null,
       // Provision the role profile up-front so suppliers/riders are usable.
+      ...(role === 'HOUSEHOLD' && hasLoc && {
+        addresses: { create: { label: 'Home', lat: lat!, lng: lng!, region: region ?? 'Dar es Salaam', isDefault: true } },
+      }),
       ...(role === 'SUPPLIER' && {
-        supplierProfile: { create: { businessName: businessName ?? (name ?? 'My Gas Shop'), phone, region: region ?? 'Dar es Salaam' } },
+        supplierProfile: { create: { businessName: businessName ?? (name ?? 'My Gas Shop'), phone, region: region ?? 'Dar es Salaam', ...(hasLoc && { lat: lat!, lng: lng! }) } },
       }),
       ...(role === 'RIDER' && {
-        riderProfile: { create: { region: region ?? 'Dar es Salaam', vehicleType: (vehicleType ?? 'MOTORBIKE') as any } },
+        riderProfile: { create: { region: region ?? 'Dar es Salaam', vehicleType: (vehicleType ?? 'MOTORBIKE') as any, ...(hasLoc && { currentLat: lat!, currentLng: lng! }) } },
       }),
     },
   });

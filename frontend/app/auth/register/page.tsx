@@ -3,11 +3,14 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import toast from 'react-hot-toast';
-import { Flame, Home, Store, Bike } from 'lucide-react';
+import { Flame, Home, Store, Bike, Navigation } from 'lucide-react';
 import { auth, setTokens, ApiError, Role } from '../../../lib/api';
 import { useT, LangToggle } from '../../../lib/i18n';
 import { Button, Field, cn } from '../../../components/ui';
+
+const Map = dynamic(() => import('../../../components/Map'), { ssr: false });
 
 const REGIONS = ['Dar es Salaam', 'Mwanza', 'Arusha', 'Dodoma', 'Mbeya', 'Zanzibar'];
 
@@ -16,8 +19,23 @@ export default function RegisterPage() {
   const { t } = useT();
   const [role, setRole] = useState<Role>('HOUSEHOLD');
   const [form, setForm] = useState({ name: '', phone: '', pin: '', region: 'Dar es Salaam', businessName: '', vehicleType: 'MOTORBIKE' });
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [locating, setLocating] = useState(false);
   const [loading, setLoading] = useState(false);
   const set = (k: string) => (e: any) => setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  function getLocation() {
+    if (!navigator.geolocation) return toast.error(t('GPS unavailable', 'GPS haipatikani'));
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (p) => { setCoords({ lat: p.coords.latitude, lng: p.coords.longitude }); setLocating(false); toast.success(t('Location captured', 'Eneo limepatikana')); },
+      () => { setLocating(false); toast.error(t("Couldn't get location", 'Imeshindwa kupata eneo')); },
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
+  }
+  const locLabel = role === 'SUPPLIER' ? t('Pin your shop location', 'Weka eneo la duka')
+    : role === 'RIDER' ? t('Share your current location', 'Shiriki eneo lako sasa')
+    : t('Pin your delivery location', 'Weka eneo la kupokelea');
 
   const ROLES: { value: Role; label: string; sub: string; icon: any }[] = [
     { value: 'HOUSEHOLD', label: t('Household', 'Kaya'),    sub: t('Order gas', 'Agiza gesi'),     icon: Home },
@@ -35,7 +53,8 @@ export default function RegisterPage() {
         phone: form.phone, pin: form.pin, role, name: form.name, region: form.region,
         ...(role === 'SUPPLIER' && { businessName: form.businessName || form.name }),
         ...(role === 'RIDER' && { vehicleType: form.vehicleType }),
-      });
+        ...(coords && { lat: coords.lat, lng: coords.lng }),
+      } as any);
       setTokens(res.accessToken, res.refreshToken);
       toast.success(t('Account created!', 'Akaunti imefunguliwa!'));
       router.replace('/dashboard');
@@ -95,6 +114,14 @@ export default function RegisterPage() {
               </select>
             </label>
           )}
+
+          <div>
+            <span className="mb-1.5 block text-sm font-medium text-ink/70">{locLabel}</span>
+            <button type="button" onClick={getLocation} className={cn('flex w-full items-center justify-center gap-2 rounded-2xl py-3 text-sm font-semibold', coords ? 'bg-leaf/15 text-leaf-dark' : 'bg-flame/10 text-flame')}>
+              <Navigation size={16} /> {locating ? t('Locating…', 'Inatafuta…') : coords ? `${t('Location set', 'Eneo limewekwa')} ✓` : t('Use my live location (GPS)', 'Tumia eneo langu (GPS)')}
+            </button>
+            {coords && <div className="mt-2"><Map markers={[{ lat: coords.lat, lng: coords.lng, kind: 'me', label: t('You', 'Wewe') }]} height={170} /></div>}
+          </div>
 
           <Field label={t('Create a 4-digit PIN', 'Weka PIN ya tarakimu 4')} type="password" inputMode="numeric" maxLength={4} placeholder="••••" value={form.pin} onChange={(e) => setForm((f) => ({ ...f, pin: e.target.value.replace(/\D/g, '') }))} required />
           <Button type="submit" loading={loading} className="w-full">{t('Create account', 'Fungua akaunti')}</Button>
