@@ -16,9 +16,12 @@ router.post('/submit', requireAuth, async (req: AuthRequest, res) => {
     idNumber: z.string().min(4).max(40),
     selfieUrl: IMG,
     idUrl:     IMG,
+    // Riders: vehicle details captured during KYC
+    plateNo:     z.string().max(20).optional(),
+    vehicleType: z.enum(['MOTORBIKE', 'BAJAJI', 'CAR', 'TRUCK', 'BICYCLE']).optional(),
   }).safeParse(req.body);
   if (!parse.success) return res.status(400).json({ error: parse.error.errors[0].message });
-  const { name, idType, idNumber, selfieUrl, idUrl } = parse.data;
+  const { name, idType, idNumber, selfieUrl, idUrl, plateNo, vehicleType } = parse.data;
 
   const user = await prisma.user.update({
     where: { id: req.userId },
@@ -30,6 +33,14 @@ router.post('/submit', requireAuth, async (req: AuthRequest, res) => {
       ...(name && { name }),
     },
   });
+
+  // Riders: store vehicle type + registration/plate on their profile.
+  if (user.role === 'RIDER' && (plateNo || vehicleType)) {
+    await prisma.riderProfile.updateMany({
+      where: { userId: user.id },
+      data:  { ...(plateNo && { plateNo }), ...(vehicleType && { vehicleType: vehicleType as any }) },
+    }).catch(() => {});
+  }
 
   // Tell the admins there's a new KYC to review.
   const admins = await prisma.user.findMany({ where: { role: 'ADMIN' }, select: { id: true } });

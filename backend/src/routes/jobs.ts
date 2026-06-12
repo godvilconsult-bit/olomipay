@@ -77,6 +77,7 @@ router.post('/:orderId/accept-offer', requireRole('RIDER'), async (req: AuthRequ
   emitToUser(order.householdId, 'order:fee', { orderId: order.id, fee: order.deliveryFee });
   emitToUser(order.supplier.userId, 'order:rider-accepted', { orderId: order.id });
   await notify(order.householdId, { title: 'Confirm the rider fee', body: `Rider fee is TZS ${order.deliveryFee.toLocaleString()}. Confirm to start delivery.`, type: 'order', data: { orderId: order.id } });
+  await notify(order.supplier.userId, { title: 'Rider accepted 🏍️', body: `${order.orderNo}: a rider accepted. Waiting for the household to confirm the fee.`, type: 'order', data: { orderId: order.id } });
   res.json({ ok: true, fee: order.deliveryFee });
 });
 
@@ -102,6 +103,8 @@ router.post('/:orderId/pick', requireRole('RIDER'), async (req: AuthRequest, res
   const order = await prisma.order.update({ where: { id: req.params.orderId }, data: { status: 'PICKED' } });
   emitToUser(order.householdId, 'order:picked', { orderId: order.id });
   await notify(order.householdId, { title: 'Rider has your gas 🏍️', body: `${order.orderNo}: the rider picked up your order and is on the way.`, type: 'order', data: { orderId: order.id } });
+  const sup = await prisma.supplierProfile.findUnique({ where: { id: order.supplierId }, select: { userId: true } });
+  if (sup) await notify(sup.userId, { title: 'Rider collected the order', body: `${order.orderNo}: rider picked up and is heading to the household.`, type: 'order', data: { orderId: order.id } });
   res.json({ ok: true });
 });
 
@@ -132,6 +135,8 @@ router.post('/:orderId/deliver', requireRole('RIDER'), async (req: AuthRequest, 
 
   emitToUser(order.householdId, 'order:delivered', { orderId: order.id });
   await notify(order.householdId, { title: 'Gas delivered ✅', body: `Thanks for using JIKO CONNECT. Please rate your rider.`, type: 'order', data: { orderId: order.id } });
+  await notify(order.supplier.userId, { title: 'Order delivered ✅', body: `${order.orderNo} was delivered. Your payout of TZS ${split.supplierAmount.toLocaleString()} is pending.`, type: 'payment', data: { orderId: order.id } });
+  await notify(req.userId!, { title: 'Delivery complete 🎉', body: `You earned TZS ${split.riderAmount.toLocaleString()} for ${order.orderNo}.`, type: 'payment', data: { orderId: order.id } });
   res.json({ ok: true, earned: split.riderAmount });
 });
 

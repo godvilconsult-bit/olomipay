@@ -94,11 +94,13 @@ router.post('/', requireRole('HOUSEHOLD'), async (req: AuthRequest, res) => {
   // Alert the vendor in real time.
   emitToUser(supplier.userId, 'order:new', order);
   await notify(supplier.userId, {
-    title: 'Oda mpya! 🔔',
+    title: 'New order! 🔔',
     body:  `${order.orderNo} · TZS ${money.total.toLocaleString()} · ${money.distanceKm} km`,
     type:  'order',
     data:  { orderId: order.id },
   });
+  // Confirm to the household.
+  await notify(req.userId!, { title: 'Order placed ✅', body: `${order.orderNo} sent to ${supplier.businessName}. Complete your payment.`, type: 'order', data: { orderId: order.id } });
 
   res.status(201).json({ order, money });
 });
@@ -137,6 +139,7 @@ router.post('/:id/cancel', requireRole('HOUSEHOLD'), async (req: AuthRequest, re
   });
 
   emitToUser(order.supplier.userId, 'order:cancelled', { orderId: order.id });
+  await notify(order.supplier.userId, { title: 'Order cancelled', body: `${order.orderNo} was cancelled by the household.`, type: 'order', data: { orderId: order.id } });
   res.json({ ok: true });
 });
 
@@ -152,6 +155,7 @@ router.post('/:id/confirm-fee', requireRole('HOUSEHOLD'), async (req: AuthReques
     await notify(order.delivery.riderId, { title: 'Fee confirmed — proceed 🏍️', body: `Household confirmed TZS ${order.deliveryFee.toLocaleString()}. Collect and deliver.`, type: 'order', data: { orderId: order.id } });
   }
   emitToUser(order.supplier.userId, 'order:tracking', { orderId: order.id });
+  await notify(order.supplier.userId, { title: 'Delivery starting 🏍️', body: `${order.orderNo}: household confirmed the rider fee. Rider is collecting.`, type: 'order', data: { orderId: order.id } });
   res.json({ ok: true });
 });
 

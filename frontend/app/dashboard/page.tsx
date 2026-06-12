@@ -9,6 +9,7 @@ import { RiderHome } from '../../components/home/RiderHome';
 import { SupplierHome } from '../../components/home/SupplierHome';
 import { AdminHome } from '../../components/home/AdminHome';
 import { LocationPrompt } from '../../components/LocationPrompt';
+import { NotificationListener } from '../../components/NotificationListener';
 
 export default function Dashboard() {
   const router = useRouter();
@@ -26,5 +27,5 @@ export default function Dashboard() {
     : user.role === 'ADMIN' ? <AdminHome user={user} />
     : <HouseholdHome user={user} />;
 
-  return <>{home}{user.role !== 'ADMIN' && <LocationPrompt />}</>;
+  return <>{home}<NotificationListener />{user.role !== 'ADMIN' && <LocationPrompt />}</>;
 }

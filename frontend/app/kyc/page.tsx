@@ -33,7 +33,7 @@ export default function KycPage() {
   const { t } = useT();
   const [status, setStatus] = useState<string | null>(null);
   const [role, setRole]     = useState<Role>('HOUSEHOLD');
-  const [form, setForm]     = useState({ name: '', idType: 'NIDA', idNumber: '' });
+  const [form, setForm]     = useState({ name: '', idType: 'NIDA', idNumber: '', vehicleType: 'MOTORBIKE', plateNo: '' });
   const [selfie, setSelfie] = useState<string>('');
   const [idImg, setIdImg]   = useState<string>('');
   const [busy, setBusy]     = useState(false);
@@ -55,10 +55,14 @@ export default function KycPage() {
 
   async function submit() {
     if (!form.name || !form.idNumber) return toast.error(t('Fill your name and ID number', 'Jaza jina na namba ya kitambulisho'));
+    if (role === 'RIDER' && !form.plateNo) return toast.error(t('Enter your vehicle registration number', 'Weka namba ya usajili wa chombo'));
     if (!selfie) return toast.error(t('Add a selfie photo', 'Weka picha ya uso'));
     if (!idImg) return toast.error(t('Add your ID photo', 'Weka picha ya kitambulisho'));
     setBusy(true);
-    try { await kyc.submit({ name: form.name, idType: form.idType, idNumber: form.idNumber, selfieUrl: selfie, idUrl: idImg }); toast.success(t('Submitted for review', 'Imewasilishwa kwa ukaguzi')); router.replace('/dashboard'); }
+    try {
+      await kyc.submit({ name: form.name, idType: form.idType, idNumber: form.idNumber, selfieUrl: selfie, idUrl: idImg, ...(role === 'RIDER' && { plateNo: form.plateNo, vehicleType: form.vehicleType }) });
+      toast.success(t('Submitted — KYC under review', 'Imewasilishwa — KYC inakaguliwa')); router.replace('/dashboard');
+    }
     catch (e: any) { toast.error(e?.message ?? t('Failed', 'Imeshindikana')); } finally { setBusy(false); }
   }
 
@@ -100,6 +104,17 @@ export default function KycPage() {
                 </label>
                 <Field label={t('ID number', 'Namba ya kitambulisho')} value={form.idNumber} onChange={(e) => setForm((f) => ({ ...f, idNumber: e.target.value }))} />
               </div>
+              {role === 'RIDER' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="block">
+                    <span className="mb-1.5 block text-sm font-medium text-ink/70">{t('Vehicle type', 'Aina ya chombo')}</span>
+                    <select value={form.vehicleType} onChange={(e) => setForm((f) => ({ ...f, vehicleType: e.target.value }))} className="w-full min-h-touch rounded-2xl border border-black/15 bg-white px-3 text-ink outline-none focus:border-flame">
+                      <option value="MOTORBIKE">{t('Motorbike', 'Pikipiki')}</option><option value="BAJAJI">{t('Bajaji', 'Bajaji')}</option><option value="BICYCLE">{t('Bicycle', 'Baiskeli')}</option><option value="CAR">{t('Car', 'Gari')}</option><option value="TRUCK">{t('Truck', 'Lori')}</option>
+                    </select>
+                  </label>
+                  <Field label={t('Vehicle reg. number', 'Namba ya usajili')} placeholder="MC 123 ABC" value={form.plateNo} onChange={(e) => setForm((f) => ({ ...f, plateNo: e.target.value.toUpperCase() }))} />
+                </div>
+              )}
               <Shot url={selfie} on={(e: any) => pick(e, 'selfie')} label={t('Selfie photo', 'Picha ya uso')} icon={<Camera size={28} />} capture="user" />
               <Shot url={idImg} on={(e: any) => pick(e, 'id')} label={t('ID document photo', 'Picha ya kitambulisho')} icon={<CreditCard size={28} />} capture="environment" />
               <Button variant="primary" className="w-full" loading={busy} onClick={submit}><Upload size={17} /> {t('Submit for verification', 'Wasilisha kwa uthibitisho')}</Button>

@@ -196,6 +196,6 @@ export const notifications = {
 
 export const kyc = {
   status: () => apiFetch<{ kycStatus: string; submitted: boolean; kycName?: string }>('/api/kyc/status'),
-  submit: (body: { name: string; idType: string; idNumber: string; selfieUrl: string; idUrl: string }) =>
+  submit: (body: { name: string; idType: string; idNumber: string; selfieUrl: string; idUrl: string; plateNo?: string; vehicleType?: string }) =>
     apiFetch('/api/kyc/submit', { method: 'POST', body: JSON.stringify(body) }),
 };

@@ -93,13 +93,18 @@ export function SupplierHome({ user }: { user: JikoUser }) {
         right={<button onClick={toggleOpen} className={cn('rounded-full px-3 py-1.5 text-xs font-bold', p.isOpen ? 'bg-leaf/15 text-leaf-dark' : 'bg-black/10 text-ink/50')}>{p.isOpen ? t('OPEN', 'WAZI') : t('CLOSED', 'IMEFUNGWA')}</button>} />
 
       <div className="mx-auto max-w-md space-y-4 px-5 pt-4">
-        {!user.supplierProfile?.isVerified && (
+        {!user.supplierProfile?.isVerified && (user.kycStatus === 'SUBMITTED' ? (
+          <Card className="flex items-center gap-3 border-warning/40 !bg-warning/5">
+            <Clock className="text-warning flex-shrink-0" size={22} />
+            <div className="flex-1 text-sm"><span className="font-semibold">{t('KYC under review', 'KYC inakaguliwa')}</span> — {t("we'll notify you once approved.", 'tutakuarifu ikikubaliwa.')}</div>
+          </Card>
+        ) : (
           <Link href="/kyc"><Card className="flex items-center gap-3 border-warning/40 !bg-warning/5">
             <ShieldAlert className="text-warning flex-shrink-0" size={22} />
-            <div className="flex-1 text-sm"><span className="font-semibold">{t('Verify your business (KYC)', 'Thibitisha biashara (KYC)')}</span> — {t('required to appear to customers.', 'lazima ili uonekane kwa wateja.')}</div>
+            <div className="flex-1 text-sm"><span className="font-semibold">{t('Verify your business (KYC)', 'Thibitisha biashara (KYC)')}</span> — {t('to earn your verified badge.', 'kupata beji ya uthibitisho.')}</div>
             <span className="flex-shrink-0 rounded-full bg-warning px-3 py-1 text-xs font-bold text-white">{t('Verify', 'Thibitisha')}</span>
           </Card></Link>
-        )}
+        ))}
 
         {/* shop location — set it or update when the device is elsewhere */}
         {noLoc ? (

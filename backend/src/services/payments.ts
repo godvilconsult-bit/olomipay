@@ -92,12 +92,15 @@ export async function settlePayment(ref: string, success: boolean): Promise<void
   if (success) {
     emitToUser(order.householdId, 'payment:paid', { orderId: order.id, ref });
     await notify(order.householdId, {
-      title: 'Malipo yamethibitishwa',
-      body:  `Order ${order.orderNo} imelipiwa. Tunatafuta dereva.`,
+      title: 'Payment confirmed ✅',
+      body:  `Order ${order.orderNo} is paid. The vendor will confirm shortly.`,
       type:  'payment',
       data:  { orderId: order.id },
     });
-    if (order.supplier?.userId) emitToUser(order.supplier.userId, 'payment:paid', { orderId: order.id });
+    if (order.supplier?.userId) {
+      emitToUser(order.supplier.userId, 'payment:paid', { orderId: order.id });
+      await notify(order.supplier.userId, { title: 'Payment received 💳', body: `${order.orderNo} is paid. Confirm the order to dispatch it.`, type: 'payment', data: { orderId: order.id } });
+    }
   } else {
     emitToUser(order.householdId, 'payment:failed', { orderId: order.id, ref });
   }

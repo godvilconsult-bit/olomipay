@@ -10,7 +10,7 @@ import { jobs, getAccessToken, JikoUser } from '../../lib/api';
 import { useSocket } from '../../lib/useSocket';
 import { useT } from '../../lib/i18n';
 import { localPhone } from '../../lib/utils';
-import { playAlert, primeAudio } from '../../lib/sound';
+import { primeAudio } from '../../lib/sound';
 import { getDeviceLocation } from '../../lib/location';
 import { AppHeader } from '../AppHeader';
 import { RoleNav } from '../RoleNav';
@@ -60,12 +60,10 @@ export function RiderHome({ user }: { user: JikoUser }) {
   }, [online, active, emit]);
 
   useEffect(() => {
-    const offs = ['job:offered', 'fee:confirmed', 'order:cancelled'].map((e) => on(e, (d: any) => {
-      if (e === 'job:offered') { playAlert(); toast(`🏍️ ${t('New pickup offer', 'Ofa mpya ya kazi')}`, { icon: '🔥', duration: 6000 }); }
-      refresh();
-    }));
+    // Sound + toast come from the global NotificationListener; here we just refresh the feed.
+    const offs = ['job:offered', 'fee:confirmed', 'order:cancelled'].map((e) => on(e, () => refresh()));
     return () => offs.forEach((o) => o?.());
-  }, [on, refresh, t]);
+  }, [on, refresh]);
 
   async function toggleOnline() {
     primeAudio(); // unlock the alert sound from this user gesture
@@ -115,13 +113,18 @@ export function RiderHome({ user }: { user: JikoUser }) {
           <label className="flex cursor-pointer items-center gap-1 rounded-xl bg-black/5 px-3 py-2 text-xs font-semibold"><Camera size={14} /> {photo ? t('Update', 'Badili') : t('Add photo', 'Weka picha')}<input type="file" accept="image/*" capture="user" onChange={onPhoto} className="hidden" /></label>
         </Card>
 
-        {!verified && (
+        {!verified && (user.kycStatus === 'SUBMITTED' ? (
+          <Card className="flex items-center gap-3 border-warning/40 !bg-warning/5">
+            <Clock className="text-warning flex-shrink-0" size={22} />
+            <div className="flex-1 text-sm"><span className="font-semibold">{t('KYC under review', 'KYC inakaguliwa')}</span> — {t("we'll notify you once approved.", 'tutakuarifu ikikubaliwa.')}</div>
+          </Card>
+        ) : (
           <Link href="/kyc"><Card className="flex items-center gap-3 border-warning/40 !bg-warning/5">
             <ShieldAlert className="text-warning flex-shrink-0" size={22} />
             <div className="flex-1 text-sm"><span className="font-semibold">{t('Verify your identity (KYC)', 'Thibitisha utambulisho (KYC)')}</span> — {t('to earn your verified badge.', 'kupata beji ya uthibitisho.')}</div>
             <span className="flex-shrink-0 rounded-full bg-warning px-3 py-1 text-xs font-bold text-white">{t('Verify', 'Thibitisha')}</span>
           </Card></Link>
-        )}
+        ))}
 
         <button onClick={toggleOnline} className={cn('flex w-full items-center justify-center gap-2 rounded-ds-xl py-4 text-base font-bold shadow-ds-btn transition active:scale-[.99]', online ? 'bg-ink/80 text-white' : 'bg-grad-leaf text-white')}>
           <Power size={20} /> {online ? t('Go offline', 'Maliza (Offline)') : t('Go online — receive jobs', 'Anza kupokea kazi (Online)')}
