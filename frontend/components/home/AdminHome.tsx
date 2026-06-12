@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Users, ShieldCheck, Activity, Phone, Home, Store, Bike } from 'lucide-react';
+import { Users, ShieldCheck, Activity, Phone, Home, Store, Bike, Trash2 } from 'lucide-react';
 import { adminApi, JikoUser } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 import { localPhone, timeAgo } from '../../lib/utils';
@@ -29,6 +29,11 @@ export function AdminHome({ user }: { user: JikoUser }) {
   async function decide(id: string, status: 'APPROVED' | 'REJECTED') {
     try { await adminApi.kyc(id, status); toast.success(status === 'APPROVED' ? t('Approved', 'Imethibitishwa') : t('Rejected', 'Imekataliwa')); load(); }
     catch { toast.error(t('Failed', 'Imeshindikana')); }
+  }
+  async function delUser(id: string) {
+    if (!confirm(t('Delete this user and all their data?', 'Futa mtumiaji huyu na data zote?'))) return;
+    try { await adminApi.deleteUser(id); toast.success(t('User deleted', 'Mtumiaji amefutwa')); load(); }
+    catch (e: any) { toast.error(e?.message ?? t('Failed', 'Imeshindikana')); }
   }
 
   if (!stats) return <Spinner />;
@@ -107,6 +112,7 @@ export function AdminHome({ user }: { user: JikoUser }) {
                     <span className="rounded-full bg-black/5 px-2 py-0.5 text-[10px] font-bold text-ink/60">{u.role}</span>
                     <div className="mt-1 text-[10px] text-ink/40">{timeAgo(u.createdAt)}</div>
                   </div>
+                  {u.role !== 'ADMIN' && <button onClick={() => delUser(u.id)} className="grid h-8 w-8 flex-shrink-0 place-items-center rounded-lg text-danger"><Trash2 size={15} /></button>}
                 </Card>
               );
             })}

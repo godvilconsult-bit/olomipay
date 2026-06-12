@@ -88,6 +88,27 @@ router.post('/users/:userId/freeze', requireAdmin, async (req: AuthRequest, res)
   res.json({ ok: true, frozen });
 });
 
+// ── DELETE /api/admin/users/:userId ─ remove a user + all their data ──────────────
+router.delete('/users/:userId', requireAdmin, async (req: AuthRequest, res) => {
+  const id = req.params.userId;
+  const u = await prisma.user.findUnique({ where: { id }, include: { supplierProfile: true, riderProfile: true } });
+  if (!u) return res.status(404).json({ error: 'User not found' });
+  if (u.isAdmin) return res.status(400).json({ error: 'Cannot delete an admin' });
+  const supplierId = u.supplierProfile?.id;
+
+  await prisma.$transaction(async (tx) => {
+    const orders = await tx.order.findMany({ where: { OR: [{ householdId: id }, ...(supplierId ? [{ supplierId }] : [])] }, select: { id: true } });
+    const oids = orders.map((o) => o.id);
+    // Deliveries this rider made on OTHER people's orders → just unlink the rider.
+    await tx.delivery.updateMany({ where: { riderId: id, orderId: { notIn: oids } }, data: { riderId: null } });
+    await tx.payout.deleteMany({ where: { OR: [{ userId: id }, { orderId: { in: oids } }] } });
+    await tx.review.deleteMany({ where: { authorId: id } });
+    await tx.order.deleteMany({ where: { id: { in: oids } } }); // cascades items/payment/delivery/review
+    await tx.user.delete({ where: { id } });                    // cascades addresses/notifications/push/tokens/profiles→inventory
+  });
+  res.json({ ok: true });
+});
+
 // ── Products catalog ─────────────────────────────────────────────────────────────
 router.get('/products', requireAdmin, async (_req: AuthRequest, res) => {
   const products = await prisma.product.findMany({ orderBy: [{ brand: 'asc' }, { sizeKg: 'asc' }] });

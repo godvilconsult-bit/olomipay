@@ -185,6 +185,7 @@ export const adminApi = {
   orders:     () => apiFetch('/api/admin/orders'),
   kycPending: () => apiFetch('/api/admin/kyc'),
   kyc:        (userId: string, status: 'APPROVED' | 'REJECTED') => apiFetch(`/api/admin/kyc/${userId}`, { method: 'POST', body: JSON.stringify({ status }) }),
+  deleteUser: (userId: string) => apiFetch(`/api/admin/users/${userId}`, { method: 'DELETE' }),
 };
 
 export const notifications = {
