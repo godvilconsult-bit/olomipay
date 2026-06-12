@@ -1,7 +1,7 @@
 FROM node:20-alpine
 
 # Cache bust — increment to force full rebuild
-ARG CACHE_BUST=10
+ARG CACHE_BUST=11
 
 # Install OpenSSL for Prisma
 RUN apk add --no-cache openssl openssl-dev
@@ -12,8 +12,9 @@ WORKDIR /app
 COPY package*.json ./
 COPY prisma ./prisma/
 
-# Install all deps (including dev for build)
-RUN npm install --include=dev
+# Install all deps (including dev for build). --omit=optional skips the heavy,
+# unused embedded-postgres platform binaries (local-dev only) → much faster builds.
+RUN npm install --include=dev --omit=optional
 
 # Generate Prisma client
 RUN npx prisma generate
