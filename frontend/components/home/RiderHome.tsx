@@ -11,7 +11,7 @@ import { useSocket } from '../../lib/useSocket';
 import { useT } from '../../lib/i18n';
 import { localPhone } from '../../lib/utils';
 import { primeAudio } from '../../lib/sound';
-import { getDeviceLocation } from '../../lib/location';
+import { getDeviceLocation, watchDeviceLocation } from '../../lib/location';
 import { AppHeader } from '../AppHeader';
 import { RoleNav } from '../RoleNav';
 import { Card, Button, Spinner, EmptyState, Money, Stat, cn } from '../ui';
@@ -33,6 +33,10 @@ export function RiderHome({ user }: { user: JikoUser }) {
   const [otp, setOtp]       = useState('');
   const [busy, setBusy]     = useState(false);
   const coordsRef = useRef<{ lat: number; lng: number } | null>(null);
+  const onlineRef = useRef(online);
+  const activeRef = useRef(active);
+  useEffect(() => { onlineRef.current = online; }, [online]);
+  useEffect(() => { activeRef.current = active; }, [active]);
 
   const refresh = useCallback(async () => {
     const [e, a, o] = await Promise.all([jobs.earnings().catch(() => null), jobs.active().catch(() => ({ delivery: null })), jobs.offers().catch(() => ({ offers: [] }))]);
@@ -42,22 +46,22 @@ export function RiderHome({ user }: { user: JikoUser }) {
 
   // Real-time location: while online, continuously share the rider's live GPS so
   // vendors see fresh positions and the household can track an active delivery.
-  // Nothing is "saved" — the position is transient/live.
+  // Uses the native-aware watcher (Capacitor plugin on the app, geolocation on
+  // web). Created ONCE and reads live state via refs so it never restarts the
+  // GPS when an order updates. Nothing is "saved" — the position is live.
   useEffect(() => {
-    if (!navigator.geolocation) return;
-    const id = navigator.geolocation.watchPosition(
-      (p) => {
-        const lat = p.coords.latitude, lng = p.coords.longitude;
-        coordsRef.current = { lat, lng };
-        if (online) {
-          const enroute = active && ['FEE_CONFIRMED', 'PICKED'].includes(active.order?.status);
-          emit('rider:location', { lat, lng, deliveryId: enroute ? active.id : undefined });
-        }
-      },
-      () => {}, { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 },
-    );
-    return () => navigator.geolocation.clearWatch(id);
-  }, [online, active, emit]);
+    let cleanup: (() => void) | null = null;
+    let cancelled = false;
+    watchDeviceLocation((loc) => {
+      coordsRef.current = { lat: loc.lat, lng: loc.lng };
+      if (onlineRef.current) {
+        const a = activeRef.current;
+        const enroute = a && ['FEE_CONFIRMED', 'PICKED'].includes(a.order?.status);
+        emit('rider:location', { lat: loc.lat, lng: loc.lng, deliveryId: enroute ? a.id : undefined });
+      }
+    }).then((c) => { cancelled ? c() : (cleanup = c); });
+    return () => { cancelled = true; cleanup?.(); };
+  }, [emit]);
 
   useEffect(() => {
     // Sound + toast come from the global NotificationListener; here we just refresh the feed.
@@ -127,7 +131,7 @@ export function RiderHome({ user }: { user: JikoUser }) {
         ))}
 
         <button onClick={toggleOnline} className={cn('flex w-full items-center justify-center gap-2 rounded-ds-xl py-4 text-base font-bold shadow-ds-btn transition active:scale-[.99]', online ? 'bg-ink/80 text-white' : 'bg-grad-leaf text-white')}>
-          <Power size={20} /> {online ? t('Go offline', 'Maliza (Offline)') : t('Go online — receive jobs', 'Anza kupokea kazi (Online)')}
+          <Power size={20} /> {online ? t('Go offline', 'Maliza') : t('Go online', 'Anza kazi')}
         </button>
 
         <div className="grid grid-cols-3 gap-2.5">

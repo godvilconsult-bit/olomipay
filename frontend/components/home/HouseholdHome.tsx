@@ -204,8 +204,17 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
         </div>
         <Button variant="primary" className="w-full" loading={searching} onClick={search}><Search size={17} /> {t('Search vendors', 'Tafuta wauzaji')}</Button>
 
+        {/* results loading skeleton (feels instant vs a blank wait) */}
+        {searching && vlist === null && (
+          <div className="space-y-3">
+            {[0, 1, 2].map((i) => (
+              <Card key={i}><div className="h-14 animate-pulse rounded-xl bg-black/5 dark:bg-white/5" /></Card>
+            ))}
+          </div>
+        )}
+
         {/* recent orders */}
-        {vlist === null && recent.filter((o) => o.id !== active?.id).length > 0 && (
+        {vlist === null && !searching && recent.filter((o) => o.id !== active?.id).length > 0 && (
           <div>
             <div className="mb-2 flex items-center justify-between">
               <h2 className="text-sm font-bold text-ink/70">{t('Your recent orders', 'Oda zako za hivi karibuni')}</h2>

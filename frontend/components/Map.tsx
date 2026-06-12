@@ -1,7 +1,12 @@
 'use client';
 
-import GoogleMap from './GoogleMap';
-import LeafletMap from './LeafletMap';
+import dynamic from 'next/dynamic';
+
+// Lazy-load ONLY the map engine actually in use — webpack splits each into its
+// own chunk, so we never download Leaflet (+CSS) when Google Maps is configured,
+// or the Google loader when it isn't. Big bundle/startup win on mobile.
+const GoogleMap  = dynamic(() => import('./GoogleMap'),  { ssr: false });
+const LeafletMap = dynamic(() => import('./LeafletMap'), { ssr: false });
 
 export interface MapMarker {
   lat: number;
