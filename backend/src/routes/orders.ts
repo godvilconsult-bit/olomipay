@@ -18,48 +18,35 @@ const orderInclude = {
   review:   true,
 } as const;
 
-// ── POST /api/orders ─ place an order (household) ────────────────────────────────
-router.post('/', requireRole('HOUSEHOLD'), async (req: AuthRequest, res) => {
-  const parse = z.object({
-    supplierId: z.string(),
-    addressId:  z.string(),
-    note:       z.string().max(300).optional(),
-    items:      z.array(z.object({ inventoryId: z.string(), qty: z.number().int().min(1).max(20) })).min(1),
-  }).safeParse(req.body);
-  if (!parse.success) return res.status(400).json({ error: parse.error.errors[0].message });
-
-  const { supplierId, addressId, note, items } = parse.data;
-
+// Core placement logic — shared by POST / (manual) and POST /:id/reorder (1-tap).
+// Throws Error with an `http` status code on validation failures.
+async function placeOrder(
+  userId: string, supplierId: string, addressId: string,
+  items: { inventoryId: string; qty: number }[], note?: string,
+) {
   const [supplier, address] = await Promise.all([
     prisma.supplierProfile.findUnique({ where: { id: supplierId } }),
-    prisma.address.findFirst({ where: { id: addressId, userId: req.userId } }),
+    prisma.address.findFirst({ where: { id: addressId, userId } }),
   ]);
-  if (!supplier || !supplier.isOpen) return res.status(404).json({ error: 'Vendor unavailable' });
-  if (!address) return res.status(404).json({ error: 'Delivery address not found' });
+  if (!supplier || !supplier.isOpen) throw Object.assign(new Error('Vendor unavailable'), { http: 404 });
+  if (!address) throw Object.assign(new Error('Delivery address not found'), { http: 404 });
 
-  // Load the chosen inventory rows and validate stock + ownership.
   const invIds = items.map(i => i.inventoryId);
   const invs   = await prisma.inventory.findMany({ where: { id: { in: invIds }, supplierId }, include: { product: true } });
-  if (invs.length !== invIds.length) return res.status(400).json({ error: 'Some items are not sold by this vendor' });
+  if (invs.length !== invIds.length) throw Object.assign(new Error('Some items are not sold by this vendor'), { http: 400 });
 
   const lineItems = items.map(i => {
     const inv = invs.find(v => v.id === i.inventoryId)!;
     if (inv.stock < i.qty) throw Object.assign(new Error(`${inv.product.brand} ${inv.product.name} is out of stock`), { http: 409 });
     return {
-      productId:   inv.productId,
-      productName: inv.product.name,
-      brand:       inv.product.brand,
-      sizeKg:      inv.product.sizeKg,
-      qty:         i.qty,
-      unitPrice:   inv.price,
-      lineTotal:   inv.price * i.qty,
+      productId: inv.productId, productName: inv.product.name, brand: inv.product.brand,
+      sizeKg: inv.product.sizeKg, qty: i.qty, unitPrice: inv.price, lineTotal: inv.price * i.qty,
     };
   });
 
   const itemsTotal = lineItems.reduce((s, l) => s + l.lineTotal, 0);
   const money = computeOrderMoney({
-    itemsTotal,
-    supplierLat: supplier.lat, supplierLng: supplier.lng,
+    itemsTotal, supplierLat: supplier.lat, supplierLng: supplier.lng,
     dropLat: address.lat, dropLng: address.lng,
   });
 
@@ -67,7 +54,7 @@ router.post('/', requireRole('HOUSEHOLD'), async (req: AuthRequest, res) => {
     const created = await tx.order.create({
       data: {
         orderNo:          makeOrderNo(),
-        householdId:      req.userId!,
+        householdId:      userId,
         supplierId,
         addressId,
         note:             note ?? null,
@@ -79,30 +66,79 @@ router.post('/', requireRole('HOUSEHOLD'), async (req: AuthRequest, res) => {
         commissionPct:    money.commissionPct,
         commissionAmount: money.commissionAmount,
         items:   { create: lineItems },
-        // Gas is paid upfront (mobile/cash); the rider fee is confirmed + settled later.
         payment: { create: { amount: money.itemsTotal, status: 'PENDING' } },
       },
       include: orderInclude,
     });
-    // Reserve stock immediately.
     for (const i of items) {
       await tx.inventory.update({ where: { id: i.inventoryId }, data: { stock: { decrement: i.qty } } });
     }
     return created;
   });
 
-  // Alert the vendor in real time.
   emitToUser(supplier.userId, 'order:new', order);
   await notify(supplier.userId, {
     title: 'New order! 🔔',
     body:  `${order.orderNo} · TZS ${money.total.toLocaleString()} · ${money.distanceKm} km`,
-    type:  'order',
-    data:  { orderId: order.id },
+    type:  'order', data: { orderId: order.id },
   });
-  // Confirm to the household.
-  await notify(req.userId!, { title: 'Order placed ✅', body: `${order.orderNo} sent to ${supplier.businessName}. Complete your payment.`, type: 'order', data: { orderId: order.id } });
+  await notify(userId, { title: 'Order placed ✅', body: `${order.orderNo} sent to ${supplier.businessName}. Complete your payment.`, type: 'order', data: { orderId: order.id } });
 
-  res.status(201).json({ order, money });
+  return { order, money };
+}
+
+// ── POST /api/orders ─ place an order (household) ────────────────────────────────
+router.post('/', requireRole('HOUSEHOLD'), async (req: AuthRequest, res) => {
+  const parse = z.object({
+    supplierId: z.string(),
+    addressId:  z.string(),
+    note:       z.string().max(300).optional(),
+    items:      z.array(z.object({ inventoryId: z.string(), qty: z.number().int().min(1).max(20) })).min(1),
+  }).safeParse(req.body);
+  if (!parse.success) return res.status(400).json({ error: parse.error.errors[0].message });
+
+  try {
+    const { order, money } = await placeOrder(req.userId!, parse.data.supplierId, parse.data.addressId, parse.data.items as { inventoryId: string; qty: number }[], parse.data.note);
+    res.status(201).json({ order, money });
+  } catch (e: any) {
+    res.status(e?.http ?? 500).json({ error: e?.message ?? 'Failed to place order' });
+  }
+});
+
+// ── POST /api/orders/:id/reorder ─ 1-tap reorder ─────────────────────────────────
+// Re-places a past order: re-resolves each item to the vendor's CURRENT in-stock
+// inventory (prices/stock may have changed) and delivers to the household's
+// current default address. Skips items no longer available and reports them.
+router.post('/:id/reorder', requireRole('HOUSEHOLD'), async (req: AuthRequest, res) => {
+  const past = await prisma.order.findFirst({
+    where: { id: req.params.id, householdId: req.userId }, include: { items: true },
+  });
+  if (!past) return res.status(404).json({ error: 'Order not found' });
+
+  const resolved: { inventoryId: string; qty: number }[] = [];
+  const unavailable: string[] = [];
+  for (const it of past.items) {
+    const inv = await prisma.inventory.findFirst({
+      where: { supplierId: past.supplierId, productId: it.productId, stock: { gte: it.qty } },
+    });
+    if (inv) resolved.push({ inventoryId: inv.id, qty: it.qty });
+    else unavailable.push(`${it.brand ?? ''} ${it.productName ?? ''}`.trim() || 'an item');
+  }
+  if (resolved.length === 0) {
+    return res.status(409).json({ error: `Not available from this vendor right now: ${unavailable.join(', ')}` });
+  }
+
+  // Deliver to the current default address, falling back to the past order's.
+  let addr = await prisma.address.findFirst({ where: { userId: req.userId, isDefault: true } });
+  if (!addr) addr = await prisma.address.findFirst({ where: { id: past.addressId, userId: req.userId } });
+  if (!addr) return res.status(400).json({ error: 'Set a delivery location first' });
+
+  try {
+    const { order, money } = await placeOrder(req.userId!, past.supplierId, addr.id, resolved, past.note ?? undefined);
+    res.status(201).json({ order, money, ...(unavailable.length ? { skipped: unavailable } : {}) });
+  } catch (e: any) {
+    res.status(e?.http ?? 500).json({ error: e?.message ?? 'Could not reorder' });
+  }
 });
 
 // ── GET /api/orders ─ my orders (household) ──────────────────────────────────────

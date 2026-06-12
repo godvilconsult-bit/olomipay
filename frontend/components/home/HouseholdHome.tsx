@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import toast from 'react-hot-toast';
-import { MapPin, Star, BadgeCheck, Search, Navigation, Package, List, Map as MapIcon, HandCoins, Bike, Smartphone, Banknote } from 'lucide-react';
+import { MapPin, Star, BadgeCheck, Search, Navigation, Package, List, Map as MapIcon, HandCoins, Bike, Smartphone, Banknote, RotateCcw } from 'lucide-react';
 import { vendors, orders, addresses, getAccessToken, JikoUser } from '../../lib/api';
 import { useSocket } from '../../lib/useSocket';
 import { useT } from '../../lib/i18n';
@@ -108,6 +108,22 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
       setSavedAddr(r.address); setMismatchM(null);
       toast.success(t('Delivery location updated', 'Eneo la kupokelea limesasishwa'));
     } catch { toast.error(t("Couldn't get your location", 'Imeshindwa kupata eneo')); } finally { setLocBusy(false); }
+  }
+
+  // 1-tap reorder: re-place a past order at the current vendor/stock + address.
+  const [reordering, setReordering] = useState<string | null>(null);
+  async function reorder(o: any) {
+    setReordering(o.id);
+    try {
+      const r = await orders.reorder(o.id);
+      toast.success(r.skipped?.length
+        ? t('Reordered — some items were unavailable', 'Imeagizwa tena — baadhi hayakupatikana')
+        : t('Reordered! Complete payment', 'Imeagizwa tena! Kamilisha malipo'));
+      loadOrders();
+      if (r.order?.id) router.push(`/order/${r.order.id}`);
+    } catch (e: any) {
+      toast.error(e?.message ?? t('Could not reorder', 'Imeshindwa kuagiza tena'));
+    } finally { setReordering(null); }
   }
 
   async function confirmFee() { if (!active) return; setBusy(true); try { await orders.confirmFee(active.id); toast.success(t('Fee confirmed — rider is on the way', 'Ada imethibitishwa — dereva anakuja')); loadOrders(); } catch (e: any) { toast.error(e?.message ?? t('Failed', 'Imeshindikana')); } finally { setBusy(false); } }
@@ -222,12 +238,15 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
             </div>
             <div className="space-y-2">
               {recent.filter((o) => o.id !== active?.id).slice(0, 3).map((o) => (
-                <Link key={o.id} href={`/order/${o.id}`}>
-                  <Card className="flex items-center justify-between !p-3">
-                    <div className="min-w-0"><div className="text-sm font-semibold">{o.orderNo}</div><div className="truncate text-xs text-ink/50">{o.supplier?.businessName}</div></div>
-                    <div className="flex-shrink-0 text-right"><Money value={o.total} className="text-sm" /><div className="mt-1"><Badge status={o.status} /></div></div>
-                  </Card>
-                </Link>
+                <Card key={o.id} className="flex items-center justify-between gap-3 !p-3">
+                  <Link href={`/order/${o.id}`} className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-semibold">{o.supplier?.businessName}</div>
+                    <div className="mt-0.5 flex items-center gap-1.5 text-xs text-ink/50"><Money value={o.total} className="text-xs" /> · <Badge status={o.status} /></div>
+                  </Link>
+                  <Button variant="primary" loading={reordering === o.id} onClick={() => reorder(o)} className="flex-shrink-0 !px-3.5">
+                    <RotateCcw size={15} /> {t('Reorder', 'Agiza tena')}
+                  </Button>
+                </Card>
               ))}
             </div>
           </div>

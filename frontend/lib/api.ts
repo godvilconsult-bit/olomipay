@@ -140,6 +140,7 @@ export const orders = {
     apiFetch('/api/orders', { method: 'POST', body: JSON.stringify(body) }),
   list:    () => apiFetch('/api/orders'),
   get:     (id: string) => apiFetch(`/api/orders/${id}`),
+  reorder: (id: string) => apiFetch(`/api/orders/${id}/reorder`, { method: 'POST' }),
   cancel:  (id: string) => apiFetch(`/api/orders/${id}/cancel`, { method: 'POST' }),
   confirmFee: (id: string) => apiFetch(`/api/orders/${id}/confirm-fee`, { method: 'POST' }),
   complete:(id: string) => apiFetch(`/api/orders/${id}/complete`, { method: 'POST' }),
