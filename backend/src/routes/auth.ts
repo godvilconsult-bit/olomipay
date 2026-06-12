@@ -45,7 +45,7 @@ async function publicUser(userId: string) {
       id: true, phone: true, role: true, name: true, region: true,
       kycStatus: true, profilePicUrl: true, isAdmin: true, createdAt: true,
       supplierProfile: { select: { id: true, businessName: true, isOpen: true, isVerified: true, tier: true } },
-      riderProfile:    { select: { id: true, vehicleType: true, status: true, isVerified: true, rating: true, totalDeliveries: true } },
+      riderProfile:    { select: { id: true, vehicleType: true, plateNo: true, status: true, isVerified: true, rating: true, totalDeliveries: true } },
     },
   });
 }
