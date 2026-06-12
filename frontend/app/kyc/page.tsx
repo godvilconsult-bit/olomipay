@@ -33,7 +33,7 @@ export default function KycPage() {
   const { t } = useT();
   const [status, setStatus] = useState<string | null>(null);
   const [role, setRole]     = useState<Role>('HOUSEHOLD');
-  const [form, setForm]     = useState({ name: '', idType: 'NIDA', idNumber: '', vehicleType: 'MOTORBIKE', plateNo: '' });
+  const [form, setForm]     = useState({ name: '', idType: 'NIDA', idNumber: '', vehicleType: 'MOTORBIKE', plateNo: '', businessName: '', description: '', payProvider: 'M-Pesa', payNumber: '', payName: '' });
   const [selfie, setSelfie] = useState<string>('');
   const [idImg, setIdImg]   = useState<string>('');
   const [busy, setBusy]     = useState(false);
@@ -42,7 +42,10 @@ export default function KycPage() {
   useEffect(() => {
     Promise.all([kyc.status().catch(() => null), auth.me().catch(() => null)]).then(([s, m]) => {
       setStatus(s?.kycStatus ?? 'PENDING');
-      if (m?.user) { setRole(m.user.role); setForm((f) => ({ ...f, name: m.user.name ?? '' })); }
+      if (m?.user) {
+        setRole(m.user.role);
+        setForm((f) => ({ ...f, name: m.user.name ?? '', businessName: m.user.supplierProfile?.businessName ?? '' }));
+      }
       setLoading(false);
     });
   }, []);
@@ -56,11 +59,16 @@ export default function KycPage() {
   async function submit() {
     if (!form.name || !form.idNumber) return toast.error(t('Fill your name and ID number', 'Jaza jina na namba ya kitambulisho'));
     if (role === 'RIDER' && !form.plateNo) return toast.error(t('Enter your vehicle registration number', 'Weka namba ya usajili wa chombo'));
+    if (role === 'SUPPLIER' && (!form.businessName || !form.payNumber)) return toast.error(t('Enter your business name and mobile money number', 'Weka jina la biashara na namba ya pesa za simu'));
     if (!selfie) return toast.error(t('Add a selfie photo', 'Weka picha ya uso'));
     if (!idImg) return toast.error(t('Add your ID photo', 'Weka picha ya kitambulisho'));
     setBusy(true);
     try {
-      await kyc.submit({ name: form.name, idType: form.idType, idNumber: form.idNumber, selfieUrl: selfie, idUrl: idImg, ...(role === 'RIDER' && { plateNo: form.plateNo, vehicleType: form.vehicleType }) });
+      await kyc.submit({
+        name: form.name, idType: form.idType, idNumber: form.idNumber, selfieUrl: selfie, idUrl: idImg,
+        ...(role === 'RIDER' && { plateNo: form.plateNo, vehicleType: form.vehicleType }),
+        ...(role === 'SUPPLIER' && { businessName: form.businessName, description: form.description, payProvider: form.payProvider, payNumber: form.payNumber, payName: form.payName }),
+      });
       toast.success(t('Submitted — KYC under review', 'Imewasilishwa — KYC inakaguliwa')); router.replace('/dashboard');
     }
     catch (e: any) { toast.error(e?.message ?? t('Failed', 'Imeshindikana')); } finally { setBusy(false); }
@@ -114,6 +122,25 @@ export default function KycPage() {
                   </label>
                   <Field label={t('Vehicle reg. number', 'Namba ya usajili')} placeholder="MC 123 ABC" value={form.plateNo} onChange={(e) => setForm((f) => ({ ...f, plateNo: e.target.value.toUpperCase() }))} />
                 </div>
+              )}
+              {role === 'SUPPLIER' && (
+                <>
+                  <Field label={t('Business name', 'Jina la biashara')} value={form.businessName} onChange={(e) => setForm((f) => ({ ...f, businessName: e.target.value }))} />
+                  <label className="block">
+                    <span className="mb-1.5 block text-sm font-medium text-ink/70">{t('Business details / landmark', 'Maelezo ya biashara / alama')}</span>
+                    <textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} rows={2} placeholder={t('e.g. Blue kiosk near Mikocheni market', 'mfano: Kibanda cha bluu karibu na soko la Mikocheni')} className="w-full rounded-2xl border border-black/10 bg-white px-4 py-2.5 text-ink outline-none focus:border-flame focus:ring-2 focus:ring-flame/20" />
+                  </label>
+                  <div>
+                    <span className="mb-1.5 block text-sm font-medium text-ink/70">{t('Mobile wallet payment (shown to customers)', 'Malipo ya pochi (wateja wataona)')}</span>
+                    <div className="grid grid-cols-2 gap-3">
+                      <select value={form.payProvider} onChange={(e) => setForm((f) => ({ ...f, payProvider: e.target.value }))} className="w-full min-h-touch rounded-2xl border border-black/15 bg-white px-3 text-ink outline-none focus:border-flame">
+                        <option value="M-Pesa">M-Pesa</option><option value="Tigo Pesa">Tigo Pesa (Mixx)</option><option value="Airtel Money">Airtel Money</option><option value="Halopesa">Halopesa</option>
+                      </select>
+                      <Field placeholder={t('Number / Lipa namba', 'Namba / Lipa namba')} value={form.payNumber} onChange={(e) => setForm((f) => ({ ...f, payNumber: e.target.value }))} />
+                    </div>
+                    <Field className="mt-3" placeholder={t('Account name on the wallet', 'Jina la akaunti ya pochi')} value={form.payName} onChange={(e) => setForm((f) => ({ ...f, payName: e.target.value }))} />
+                  </div>
+                </>
               )}
               <Shot url={selfie} on={(e: any) => pick(e, 'selfie')} label={t('Selfie photo', 'Picha ya uso')} icon={<Camera size={28} />} capture="user" />
               <Shot url={idImg} on={(e: any) => pick(e, 'id')} label={t('ID document photo', 'Picha ya kitambulisho')} icon={<CreditCard size={28} />} capture="environment" />

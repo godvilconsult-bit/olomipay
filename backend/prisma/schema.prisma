@@ -211,6 +211,14 @@ model SupplierProfile {
   rating        Float        @default(0)
   ratingCount   Int          @default(0)
   distributor   String?      // upstream depot/distributor name (middle-mile)
+
+  // Business + mobile-wallet payment details declared at KYC and shown to
+  // households when they open the vendor.
+  description   String?      @db.Text  // about / landmark / directions
+  payProvider   String?      // M-Pesa | Tigo Pesa | Airtel Money | Halopesa
+  payNumber     String?      // wallet number / Lipa Namba (till) to receive payment
+  payName       String?      // registered name on the wallet
+
   createdAt     DateTime     @default(now())
 
   user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)

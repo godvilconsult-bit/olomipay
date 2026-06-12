@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import toast from 'react-hot-toast';
-import { MapPin, Star, BadgeCheck, Search, Navigation, Package, List, Map as MapIcon, HandCoins, Bike, Smartphone, Banknote, RotateCcw } from 'lucide-react';
+import { MapPin, Star, BadgeCheck, Search, Navigation, Package, List, Map as MapIcon, HandCoins, Bike, Smartphone, Banknote, RotateCcw, Store, ChevronRight } from 'lucide-react';
 import { vendors, orders, addresses, ads, getAccessToken, JikoUser, type BrandAd } from '../../lib/api';
 import { useSocket } from '../../lib/useSocket';
 import { useT } from '../../lib/i18n';
@@ -296,25 +296,24 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
               view === 'map' ? (
                 <Card className="!p-1.5"><Map markers={markers} height={340} onMarkerClick={(id) => id && router.push(`/vendor/${id}`)} /></Card>
               ) : (
-                <div className="space-y-3">
+                /* Compact zero-boundary list: vendor name + distance. Tap a row
+                   to open the full vendor card (details + payment). */
+                <div className="divide-y divide-black/5 overflow-hidden rounded-ds-xl bg-white dark:bg-ink-2">
                   {vlist.map((v) => (
-                    <Link key={v.supplierId} href={`/vendor/${v.supplierId}`}>
-                      <Card>
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5"><span className="truncate font-bold">{v.businessName}</span>{v.isVerified && <BadgeCheck size={15} className="flex-shrink-0 text-leaf" />}</div>
-                            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-ink/50">
-                              <span className="inline-flex items-center gap-0.5"><Star size={12} className="fill-ember text-ember" /> {v.rating ? v.rating.toFixed(1) : t('New', 'Mpya')}</span>
-                              <span>·</span><span className="inline-flex items-center gap-0.5"><MapPin size={11} /> {v.distanceKm < 1 ? `${Math.round(v.distanceKm * 1000)} m` : `${v.distanceKm} km`}</span>
-                              <span>·</span><span>~{v.etaMin} {t('min', 'dak')}</span>
-                            </div>
-                          </div>
-                          {v.featured && <span className="flex-shrink-0 rounded-full bg-ember/15 px-2 py-0.5 text-[10px] font-bold text-ember">{t('FEATURED', 'FEATURED')}</span>}
+                    <Link key={v.supplierId} href={`/vendor/${v.supplierId}`} className="flex items-center gap-3 px-3 py-2.5 active:bg-black/[.03]">
+                      <span className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-full bg-flame/10 text-flame"><Store size={16} /></span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="truncate font-semibold">{v.businessName}</span>
+                          {v.isVerified && <BadgeCheck size={14} className="flex-shrink-0 text-leaf" />}
+                          {v.featured && <Star size={12} className="flex-shrink-0 fill-ember text-ember" />}
                         </div>
-                        <div className="mt-3 flex items-center justify-between border-t border-black/5 pt-3">
-                          <span className="text-xs text-ink/50">{t('From', 'Kuanzia')}</span><Money value={v.fromPrice ?? 0} className="text-flame" />
+                        <div className="flex items-center gap-2 text-xs text-ink/50">
+                          <span className="inline-flex items-center gap-0.5 font-medium text-ink/70"><MapPin size={11} /> {v.distanceKm < 1 ? `${Math.round(v.distanceKm * 1000)} m` : `${v.distanceKm} km`}</span>
+                          {v.fromPrice != null && <><span>·</span><span>{t('from', 'kuanzia')} <Money value={v.fromPrice} className="text-xs" /></span></>}
                         </div>
-                      </Card>
+                      </div>
+                      <ChevronRight size={18} className="flex-shrink-0 text-ink/30" />
                     </Link>
                   ))}
                 </div>

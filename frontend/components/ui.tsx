@@ -21,9 +21,11 @@ export function Button(
   { variant = 'primary', loading, className, children, ...rest }:
   ButtonHTMLAttributes<HTMLButtonElement> & { variant?: BtnVariant; loading?: boolean },
 ) {
-  // Compact + text always fits: smaller text, tighter padding, no wrapping
-  // (icons never shrink, long labels ellipsize instead of breaking the button).
-  const base = 'inline-flex items-center justify-center gap-1.5 rounded-2xl font-semibold text-sm leading-none min-h-touch px-4 whitespace-nowrap overflow-hidden transition active:scale-[.98] disabled:opacity-50 disabled:active:scale-100 [&>svg]:shrink-0';
+  // Text always fits on ONE horizontal line at any screen size: nowrap, tight
+  // padding, and the label auto-shrinks a step on very narrow buttons (EN/SW
+  // labels differ in length). Icons never shrink; the text truncates only as a
+  // last-resort safety net so a long label can never break the layout.
+  const base = 'inline-flex items-center justify-center gap-1.5 rounded-2xl font-semibold text-[13px] sm:text-sm leading-none min-h-touch px-3 min-w-0 whitespace-nowrap overflow-hidden transition active:scale-[.98] disabled:opacity-50 disabled:active:scale-100 [&>svg]:shrink-0';
   const styles: Record<BtnVariant, string> = {
     primary: 'bg-grad-brand text-white shadow-ds-btn',
     leaf:    'bg-grad-leaf text-white shadow-ds-btn',

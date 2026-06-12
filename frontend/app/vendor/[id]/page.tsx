@@ -62,14 +62,28 @@ export default function VendorPage() {
       </header>
 
       <div className="mx-auto max-w-md space-y-3 px-5 pt-4">
-        {/* vendor contact + payment methods */}
-        <Card className="!p-3">
-          <a href={`tel:${vendor.phone}`} className="flex items-center gap-2 text-sm font-semibold text-flame"><Phone size={15} /> {localPhone(vendor.phone)}</a>
-          <div className="mt-2 flex items-center gap-2 text-xs text-ink/60">
+        {/* vendor business details + payment (declared at KYC) */}
+        <Card className="space-y-2.5 !p-3">
+          <div className="flex items-center justify-between gap-2">
+            <a href={`tel:${vendor.phone}`} className="flex items-center gap-2 text-sm font-semibold text-flame"><Phone size={15} /> {localPhone(vendor.phone)}</a>
+            <span className="inline-flex items-center gap-1 text-xs text-ink/50"><MapPin size={12} /> {[vendor.ward, vendor.district, vendor.region].filter(Boolean).join(', ') || '—'}</span>
+          </div>
+          {vendor.description && <p className="text-xs leading-relaxed text-ink/60">{vendor.description}</p>}
+          <div className="flex flex-wrap items-center gap-2 text-xs text-ink/60">
             <span>{t('Accepts', 'Inakubali')}:</span>
             {vendor.acceptsMobile !== false && <span className="inline-flex items-center gap-1 rounded-full bg-leaf/10 px-2 py-0.5 text-leaf-dark"><Smartphone size={12} /> {t('Mobile money', 'Pesa za simu')}</span>}
             {vendor.acceptsCash !== false && <span className="inline-flex items-center gap-1 rounded-full bg-black/5 px-2 py-0.5"><Banknote size={12} /> {t('Cash', 'Cash')}</span>}
           </div>
+          {vendor.payNumber && (
+            <div className="flex items-center justify-between gap-2 rounded-xl bg-leaf/10 p-2.5">
+              <div className="min-w-0">
+                <div className="text-[10px] font-bold uppercase tracking-wide text-leaf-dark/70">{t('Mobile wallet payment', 'Malipo ya pochi')}</div>
+                <div className="truncate text-sm font-bold text-ink">{vendor.payProvider ?? t('Mobile money', 'Pesa za simu')} · <span className="tabular-nums">{vendor.payNumber}</span></div>
+                {vendor.payName && <div className="truncate text-xs text-ink/50">{vendor.payName}</div>}
+              </div>
+              <button onClick={() => { try { navigator.clipboard?.writeText(vendor.payNumber); toast.success(t('Number copied', 'Namba imenakiliwa')); } catch {} }} className="flex-shrink-0 rounded-lg bg-white px-2.5 py-1.5 text-xs font-bold text-leaf-dark">{t('Copy', 'Nakili')}</button>
+            </div>
+          )}
         </Card>
 
         {inv.length === 0 && <p className="py-10 text-center text-sm text-ink/50">{t('This vendor has no products right now.', 'Muuzaji huyu hana bidhaa kwa sasa.')}</p>}
@@ -99,8 +113,8 @@ export default function VendorPage() {
         <div className="fixed inset-x-0 bottom-0 z-30 space-y-2 border-t border-black/5 bg-white/95 px-5 py-3 backdrop-blur">
           <div className="mx-auto max-w-md">
             <div className="mb-2 flex items-center gap-2">
-              {vendor.acceptsMobile !== false && <button onClick={() => setPay('MOBILE')} className={cn('flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2.5 text-sm font-semibold', pay === 'MOBILE' ? 'bg-grad-leaf text-white' : 'bg-black/5 text-ink/70')}><Smartphone size={15} /> {t('Mobile money', 'Pesa za simu')}</button>}
-              {vendor.acceptsCash !== false && <button onClick={() => setPay('CASH')} className={cn('flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2.5 text-sm font-semibold', pay === 'CASH' ? 'bg-ink text-white' : 'bg-black/5 text-ink/70')}><Banknote size={15} /> {t('Cash', 'Cash')}</button>}
+              {vendor.acceptsMobile !== false && <button onClick={() => setPay('MOBILE')} className={cn('flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl py-2.5 text-[13px] sm:text-sm font-semibold', pay === 'MOBILE' ? 'bg-grad-leaf text-white' : 'bg-black/5 text-ink/70')}><Smartphone size={15} /> {t('Mobile money', 'Pesa za simu')}</button>}
+              {vendor.acceptsCash !== false && <button onClick={() => setPay('CASH')} className={cn('flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl py-2.5 text-[13px] sm:text-sm font-semibold', pay === 'CASH' ? 'bg-ink text-white' : 'bg-black/5 text-ink/70')}><Banknote size={15} /> {t('Cash', 'Cash')}</button>}
             </div>
             <div className="flex items-center gap-3">
               <div className="flex-1"><div className="text-xs text-ink/50">{t('Gas total (rider fee confirmed later)', 'Jumla ya gesi (ada ya dereva baadaye)')}</div><Money value={total} className="text-lg" /></div>

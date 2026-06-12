@@ -19,9 +19,15 @@ router.post('/submit', requireAuth, async (req: AuthRequest, res) => {
     // Riders: vehicle details captured during KYC
     plateNo:     z.string().max(20).optional(),
     vehicleType: z.enum(['MOTORBIKE', 'BAJAJI', 'CAR', 'TRUCK', 'BICYCLE']).optional(),
+    // Suppliers: business + mobile-wallet payment details (shown to households)
+    businessName: z.string().max(120).optional(),
+    description:  z.string().max(500).optional(),
+    payProvider:  z.string().max(40).optional(),
+    payNumber:    z.string().max(30).optional(),
+    payName:      z.string().max(120).optional(),
   }).safeParse(req.body);
   if (!parse.success) return res.status(400).json({ error: parse.error.errors[0].message });
-  const { name, idType, idNumber, selfieUrl, idUrl, plateNo, vehicleType } = parse.data;
+  const { name, idType, idNumber, selfieUrl, idUrl, plateNo, vehicleType, businessName, description, payProvider, payNumber, payName } = parse.data;
 
   const user = await prisma.user.update({
     where: { id: req.userId },
@@ -39,6 +45,21 @@ router.post('/submit', requireAuth, async (req: AuthRequest, res) => {
     await prisma.riderProfile.updateMany({
       where: { userId: user.id },
       data:  { ...(plateNo && { plateNo }), ...(vehicleType && { vehicleType: vehicleType as any }) },
+    }).catch(() => {});
+  }
+
+  // Suppliers: store business + mobile-wallet payment details so households see
+  // who they're buying from and how to pay.
+  if (user.role === 'SUPPLIER') {
+    await prisma.supplierProfile.updateMany({
+      where: { userId: user.id },
+      data:  {
+        ...(businessName && { businessName }),
+        ...(description  !== undefined && { description }),
+        ...(payProvider  !== undefined && { payProvider }),
+        ...(payNumber    !== undefined && { payNumber }),
+        ...(payName      !== undefined && { payName }),
+      },
     }).catch(() => {});
   }
 
