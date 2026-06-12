@@ -161,7 +161,7 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
               <div className="mt-3 rounded-xl bg-flame/5 p-3">
                 <div className="flex items-center gap-2 text-sm font-bold text-flame"><HandCoins size={16} /> {t('Confirm the rider fee', 'Thibitisha ada ya dereva')}</div>
                 <div className="my-1 text-center"><Money value={active.deliveryFee} className="text-2xl" /></div>
-                <Button variant="primary" loading={busy} onClick={confirmFee} className="w-full">{t('Confirm fee & start delivery', 'Thibitisha & anza')}</Button>
+                <Button variant="primary" loading={busy} onClick={confirmFee} className="w-full">{t('Confirm & start', 'Thibitisha & anza')}</Button>
               </div>
             ) : ['FEE_CONFIRMED', 'PICKED'].includes(active.status) ? (
               <div className="mt-3 flex items-center justify-between">
@@ -169,7 +169,7 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
                 <Link href={`/order/${active.id}`} className="text-xs font-semibold text-flame">{t('Track live', 'Fuatilia')}</Link>
               </div>
             ) : active.status === 'DELIVERED' ? (
-              <Link href={`/order/${active.id}`}><Button variant="leaf" className="mt-3 w-full">{t('Confirm receipt & rate', 'Thibitisha & toa nyota')}</Button></Link>
+              <Link href={`/order/${active.id}`}><Button variant="leaf" className="mt-3 w-full">{t('Confirm & rate', 'Thibitisha & toa nyota')}</Button></Link>
             ) : (
               <div className="mt-3 flex items-center justify-between">
                 <span className="text-sm text-ink/60">{['ACCEPTED', 'RIDER_OFFERED'].includes(active.status) ? t('Finding a rider…', 'Inatafuta dereva…') : t('Waiting for vendor…', 'Inasubiri muuzaji…')}</span>
