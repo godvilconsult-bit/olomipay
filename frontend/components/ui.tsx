@@ -21,7 +21,9 @@ export function Button(
   { variant = 'primary', loading, className, children, ...rest }:
   ButtonHTMLAttributes<HTMLButtonElement> & { variant?: BtnVariant; loading?: boolean },
 ) {
-  const base = 'inline-flex items-center justify-center gap-2 rounded-2xl font-semibold min-h-touch px-5 transition active:scale-[.98] disabled:opacity-50 disabled:active:scale-100';
+  // Compact + text always fits: smaller text, tighter padding, no wrapping
+  // (icons never shrink, long labels ellipsize instead of breaking the button).
+  const base = 'inline-flex items-center justify-center gap-1.5 rounded-2xl font-semibold text-sm leading-none min-h-touch px-4 whitespace-nowrap overflow-hidden transition active:scale-[.98] disabled:opacity-50 disabled:active:scale-100 [&>svg]:shrink-0';
   const styles: Record<BtnVariant, string> = {
     primary: 'bg-grad-brand text-white shadow-ds-btn',
     leaf:    'bg-grad-leaf text-white shadow-ds-btn',
@@ -43,7 +45,7 @@ export function Card({ children, className, onClick }: { children: ReactNode; cl
     <div
       onClick={onClick}
       className={cn(
-        'rounded-ds-xl bg-white dark:bg-ink-2 border border-black/5 dark:border-white/5 shadow-ds-card p-4',
+        'rounded-ds-xl bg-white dark:bg-ink-2 border border-black/5 dark:border-white/5 shadow-ds-card p-3.5',
         onClick && 'cursor-pointer hover:shadow-lg transition',
         className,
       )}

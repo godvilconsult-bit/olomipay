@@ -3,10 +3,14 @@
 import { useEffect, useState } from 'react';
 import { MapPin, X, AlertTriangle } from 'lucide-react';
 import { useT } from '../lib/i18n';
+import { ensureLocationPermission, getDeviceLocation } from '../lib/location';
 
 type State = 'hidden' | 'ask' | 'denied' | 'unavailable';
 
 const isIOS = () => typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
+async function isNative() {
+  try { const core: any = await import('@capacitor/core'); return !!core?.Capacitor?.isNativePlatform?.(); } catch { return false; }
+}
 
 export function LocationPrompt() {
   const { t } = useT();
@@ -14,25 +18,36 @@ export function LocationPrompt() {
   const [help, setHelp]   = useState(false);
 
   useEffect(() => {
-    if (typeof navigator === 'undefined' || !navigator.geolocation) { setState('unavailable'); return; }
-    const anyNav = navigator as any;
-    if (anyNav.permissions?.query) {
-      anyNav.permissions.query({ name: 'geolocation' }).then((p: any) => {
-        setState(p.state === 'granted' ? 'hidden' : p.state === 'denied' ? 'denied' : 'ask');
-        p.onchange = () => setState(p.state === 'granted' ? 'hidden' : p.state === 'denied' ? 'denied' : 'ask');
-      }).catch(() => setState('ask'));
-    } else {
-      setState('ask'); // iOS Safari has no Permissions API → just offer the button
-    }
+    (async () => {
+      // Native app: request the OS permission straight away (prompt on default,
+      // like every other map app). If granted we stay hidden; otherwise guide.
+      if (await isNative()) {
+        const granted = await ensureLocationPermission();
+        setState(granted ? 'hidden' : 'denied');
+        return;
+      }
+      // Browser: read the Permissions API to decide whether to show "Allow".
+      if (typeof navigator === 'undefined' || !navigator.geolocation) { setState('unavailable'); return; }
+      const anyNav = navigator as any;
+      if (anyNav.permissions?.query) {
+        anyNav.permissions.query({ name: 'geolocation' }).then((p: any) => {
+          setState(p.state === 'granted' ? 'hidden' : p.state === 'denied' ? 'denied' : 'ask');
+          p.onchange = () => setState(p.state === 'granted' ? 'hidden' : p.state === 'denied' ? 'denied' : 'ask');
+        }).catch(() => setState('ask'));
+      } else {
+        setState('ask');
+      }
+    })();
   }, []);
 
-  function request() {
-    if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition(
-      () => setState('hidden'),
-      (err) => setState(err.code === err.PERMISSION_DENIED ? 'denied' : 'denied'),
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
-    );
+  async function request() {
+    try {
+      await ensureLocationPermission();
+      await getDeviceLocation();   // triggers the browser prompt on web
+      setState('hidden');
+    } catch {
+      setState('denied');
+    }
   }
 
   if (state === 'hidden') return null;
