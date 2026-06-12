@@ -8,7 +8,7 @@ import { HouseholdHome } from '../../components/home/HouseholdHome';
 import { RiderHome } from '../../components/home/RiderHome';
 import { SupplierHome } from '../../components/home/SupplierHome';
 import { AdminHome } from '../../components/home/AdminHome';
-import { LocationPrompt } from '../../components/LocationPrompt';
+import { LocationGate } from '../../components/LocationGate';
 import { NotificationListener } from '../../components/NotificationListener';
 
 export default function Dashboard() {
@@ -27,5 +27,10 @@ export default function Dashboard() {
     : user.role === 'ADMIN' ? <AdminHome user={user} />
     : <HouseholdHome user={user} />;
 
-  return <>{home}<NotificationListener />{user.role !== 'ADMIN' && <LocationPrompt />}</>;
+  // Admin works without GPS; everyone else needs location for maps + live
+  // tracking, so the gate takes over the screen until permission is granted.
+  return <>
+    {user.role === 'ADMIN' ? home : <LocationGate>{home}</LocationGate>}
+    <NotificationListener />
+  </>;
 }

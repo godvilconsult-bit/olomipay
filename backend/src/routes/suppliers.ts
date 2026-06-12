@@ -138,8 +138,8 @@ router.post('/:orderId/assign-rider', requireRole('SUPPLIER'), async (req: AuthR
   await prisma.$transaction(async (tx) => {
     await tx.delivery.upsert({
       where:  { orderId: order.id },
-      update: { riderId: parse.data.riderId, status: 'PENDING', otp, riderFee: order.deliveryFee, pickupLat: profile.lat, pickupLng: profile.lng, dropLat: order.address.lat, dropLng: order.address.lng },
-      create: { orderId: order.id, riderId: parse.data.riderId, status: 'PENDING', otp, riderFee: order.deliveryFee, pickupLat: profile.lat, pickupLng: profile.lng, dropLat: order.address.lat, dropLng: order.address.lng },
+      update: { riderId: parse.data.riderId, status: 'PENDING', otp, riderFee: order.riderNet || order.deliveryFee, pickupLat: profile.lat, pickupLng: profile.lng, dropLat: order.address.lat, dropLng: order.address.lng },
+      create: { orderId: order.id, riderId: parse.data.riderId, status: 'PENDING', otp, riderFee: order.riderNet || order.deliveryFee, pickupLat: profile.lat, pickupLng: profile.lng, dropLat: order.address.lat, dropLng: order.address.lng },
     });
     await tx.order.update({ where: { id: order.id }, data: { status: 'RIDER_OFFERED' } });
   });
@@ -187,6 +187,21 @@ router.get('/payouts', requireRole('SUPPLIER'), async (req: AuthRequest, res) =>
   const pending = payouts.filter(p => p.status === 'PENDING').reduce((s, p) => s + p.amount, 0);
   const paid    = payouts.filter(p => p.status === 'PAID').reduce((s, p) => s + p.amount, 0);
   res.json({ payouts, pending, paid });
+});
+
+// ── POST /api/suppliers/upgrade-request ─ ask to move to a paid plan (Phase 2) ────
+router.post('/upgrade-request', requireRole('SUPPLIER'), async (req: AuthRequest, res) => {
+  const parse = z.object({ tier: z.enum(['STANDARD', 'PREMIUM']) }).safeParse(req.body);
+  if (!parse.success) return res.status(400).json({ error: 'tier must be STANDARD or PREMIUM' });
+  const profile = await myProfile(req.userId!);
+  if (!profile) return res.status(404).json({ error: 'No supplier profile' });
+  const admins = await prisma.user.findMany({ where: { role: 'ADMIN' }, select: { id: true } });
+  await Promise.all(admins.map(a => notify(a.id, {
+    title: 'Plan upgrade request 💼',
+    body:  `${profile.businessName} (${profile.region}) wants the ${parse.data.tier} plan.`,
+    type:  'account', data: { supplierId: profile.id, tier: parse.data.tier },
+  })));
+  res.json({ ok: true });
 });
 
 export { router as suppliersRouter };

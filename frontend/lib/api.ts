@@ -178,7 +178,15 @@ export const suppliers = {
   restock:   (body: { productId?: string; distributor?: string; qty: number; note?: string }) =>
     apiFetch('/api/suppliers/restock', { method: 'POST', body: JSON.stringify(body) }),
   payouts:   () => apiFetch('/api/suppliers/payouts'),
+  upgradeRequest: (tier: 'STANDARD' | 'PREMIUM') => apiFetch('/api/suppliers/upgrade-request', { method: 'POST', body: JSON.stringify({ tier }) }),
 };
+
+// Brand ads (Phase 3) — sponsored placements on the household home.
+export const ads = {
+  active: (region?: string) => apiFetch<{ ad: BrandAd | null }>(`/api/ads/active${region ? `?region=${encodeURIComponent(region)}` : ''}`),
+  click:  (id: string) => apiFetch(`/api/ads/${id}/click`, { method: 'POST' }),
+};
+export interface BrandAd { id: string; brand: string; title: string; subtitle?: string | null; imageUrl?: string | null; ctaLabel?: string | null; type?: string | null }
 
 export const adminApi = {
   stats:      () => apiFetch('/api/admin/stats'),
@@ -187,6 +195,14 @@ export const adminApi = {
   kycPending: () => apiFetch('/api/admin/kyc'),
   kyc:        (userId: string, status: 'APPROVED' | 'REJECTED') => apiFetch(`/api/admin/kyc/${userId}`, { method: 'POST', body: JSON.stringify({ status }) }),
   deleteUser: (userId: string) => apiFetch(`/api/admin/users/${userId}`, { method: 'DELETE' }),
+  // Phase 2 — supplier plans + featured slots
+  suppliers:  () => apiFetch<{ suppliers: any[] }>('/api/admin/suppliers'),
+  setTier:    (id: string, body: { tier?: 'FREE' | 'STANDARD' | 'PREMIUM'; featured?: boolean }) => apiFetch(`/api/admin/suppliers/${id}/tier`, { method: 'POST', body: JSON.stringify(body) }),
+  // Phase 3 — brand ads
+  ads:        () => apiFetch<{ ads: any[] }>('/api/admin/ads'),
+  createAd:   (body: { brand: string; title: string; subtitle?: string; imageUrl?: string; ctaLabel?: string; region?: string; type?: string; weight?: number }) => apiFetch('/api/admin/ads', { method: 'POST', body: JSON.stringify(body) }),
+  patchAd:    (id: string, body: { isActive?: boolean; weight?: number }) => apiFetch(`/api/admin/ads/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deleteAd:   (id: string) => apiFetch(`/api/admin/ads/${id}`, { method: 'DELETE' }),
 };
 
 export const notifications = {

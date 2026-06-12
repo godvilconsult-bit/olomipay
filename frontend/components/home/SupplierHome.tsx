@@ -27,6 +27,13 @@ export function SupplierHome({ user }: { user: JikoUser }) {
   const [mismatchM, setMismatchM] = useState<number | null>(null);
   const [noLoc, setNoLoc] = useState(false);
   const [locBusy, setLocBusy] = useState(false);
+  const [upBusy, setUpBusy] = useState(false);
+
+  async function upgrade(tier: 'STANDARD' | 'PREMIUM') {
+    setUpBusy(true);
+    try { await suppliers.upgradeRequest(tier); toast.success(t('Upgrade requested — admin will contact you', 'Ombi limetumwa — admin atawasiliana nawe')); }
+    catch (e: any) { toast.error(e?.message ?? t('Failed', 'Imeshindikana')); } finally { setUpBusy(false); }
+  }
 
   const refresh = useCallback(async () => {
     const [m, o] = await Promise.all([suppliers.me().catch(() => null), suppliers.orders().catch(() => ({ orders: [] }))]);
@@ -127,6 +134,29 @@ export function SupplierHome({ user }: { user: JikoUser }) {
           <Stat label={t('Today', 'Leo')} value={me.stats.today} />
           <Stat label={t('Low stock', 'Stock ndogo')} value={me.stats.lowStock} />
         </div>
+
+        {/* plan / featured slot (Phase 2 monetization) */}
+        <Card>
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-xs text-ink/50">{t('Your plan', 'Mpango wako')}</div>
+              <div className="flex items-center gap-2 font-bold">
+                {p.tier === 'PREMIUM' ? '⭐ Premium' : p.tier === 'STANDARD' ? 'Pro' : t('Free', 'Bure')}
+                {p.featured && <span className="rounded-full bg-ember/15 px-2 py-0.5 text-[10px] font-bold text-ember">{t('FEATURED', 'FEATURED')}</span>}
+              </div>
+            </div>
+            {p.tier !== 'PREMIUM' && (
+              <Button variant="primary" loading={upBusy} onClick={() => upgrade(p.tier === 'FREE' ? 'STANDARD' : 'PREMIUM')} className="flex-shrink-0 !px-3.5">
+                {p.tier === 'FREE' ? t('Go Pro', 'Pata Pro') : t('Go Premium', 'Pata Premium')}
+              </Button>
+            )}
+          </div>
+          <div className="mt-2 border-t border-black/5 pt-2 text-xs text-ink/50">
+            {p.tier === 'FREE'
+              ? t('Pro lowers your commission + lifts you up the search. Premium adds a featured top slot.', 'Pro hupunguza kamisheni + kukupandisha juu. Premium huongeza nafasi ya kwanza.')
+              : t('Thanks for being a paid partner. Contact admin to change your plan.', 'Asante kwa kuwa mshirika. Wasiliana na admin kubadili mpango.')}
+          </div>
+        </Card>
 
         {me.stats.lowStock > 0 && (
           <Card className="flex items-center gap-3 border-warning/30 !bg-warning/5">

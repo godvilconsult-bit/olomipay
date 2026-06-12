@@ -16,13 +16,22 @@ router.get('/stats', requireAdmin, async (_req: AuthRequest, res) => {
     prisma.order.count(),
     prisma.order.count({ where: { status: { in: ['DELIVERED', 'COMPLETED'] } } }),
     prisma.order.aggregate({ _sum: { total: true }, where: { status: { in: ['DELIVERED', 'COMPLETED'] } } }),
-    prisma.order.aggregate({ _sum: { commissionAmount: true }, where: { status: { in: ['DELIVERED', 'COMPLETED'] } } }),
+    prisma.order.aggregate({
+      _sum: { platformAmount: true, commissionAmount: true, serviceFee: true, deliveryFee: true },
+      where: { status: { in: ['DELIVERED', 'COMPLETED'] } },
+    }),
   ]);
+  const commission = platform._sum.commissionAmount ?? 0;
+  const service    = platform._sum.serviceFee ?? 0;
+  // Delivery margin isn't a column; derive it from gross delivery fees.
+  const deliveryMargin = Math.round((platform._sum.deliveryFee ?? 0) * Number(process.env.JIKO_DELIVERY_MARGIN_PCT ?? 0.15));
+  const platformRevenue = platform._sum.platformAmount ?? (commission + service + deliveryMargin);
   res.json({
     users: { households, suppliers, riders },
     orders: { total: orders, delivered },
     gmv: gmv._sum.total ?? 0,
-    platformRevenue: platform._sum.commissionAmount ?? 0,
+    platformRevenue,
+    revenueBreakdown: { commission, serviceFee: service, deliveryMargin },
   });
 });
 
@@ -145,6 +154,75 @@ router.post('/price-caps', requireAdmin, async (req: AuthRequest, res) => {
     create: { region, productId: productId ?? null, maxPrice },
   });
   res.json({ cap });
+});
+
+// ── POST /api/admin/suppliers/:id/tier ─ set plan + featured slot (Phase 2) ───────
+router.post('/suppliers/:id/tier', requireAdmin, async (req: AuthRequest, res) => {
+  const parse = z.object({
+    tier:     z.enum(['FREE', 'STANDARD', 'PREMIUM']).optional(),
+    featured: z.boolean().optional(),
+  }).safeParse(req.body);
+  if (!parse.success) return res.status(400).json({ error: parse.error.errors[0].message });
+  const profile = await prisma.supplierProfile.update({
+    where: { id: req.params.id },
+    data:  { ...(parse.data.tier && { tier: parse.data.tier }), ...(parse.data.featured !== undefined && { featured: parse.data.featured }) },
+  }).catch(() => null);
+  if (!profile) return res.status(404).json({ error: 'Supplier not found' });
+  await notify(profile.userId, {
+    title: parse.data.featured ? 'You are now Featured ⭐' : `Plan updated: ${profile.tier}`,
+    body:  parse.data.featured ? 'Your shop now appears at the top of nearby search.' : `Your JIKO CONNECT plan is now ${profile.tier}.`,
+    type:  'account',
+  }).catch(() => {});
+  res.json({ profile });
+});
+
+// ── GET /api/admin/suppliers ─ list suppliers with tier/featured for management ───
+router.get('/suppliers', requireAdmin, async (_req: AuthRequest, res) => {
+  const suppliers = await prisma.supplierProfile.findMany({
+    select:  { id: true, businessName: true, region: true, tier: true, featured: true, isVerified: true, rating: true, _count: { select: { orders: true } } },
+    orderBy: [{ featured: 'desc' }, { businessName: 'asc' }],
+    take:    200,
+  });
+  res.json({ suppliers });
+});
+
+// ── Brand ads (Phase 3) ───────────────────────────────────────────────────────────
+router.get('/ads', requireAdmin, async (_req: AuthRequest, res) => {
+  const ads = await prisma.brandAd.findMany({ orderBy: { createdAt: 'desc' } });
+  res.json({ ads });
+});
+
+router.post('/ads', requireAdmin, async (req: AuthRequest, res) => {
+  const parse = z.object({
+    brand:    z.string().min(1).max(60),
+    title:    z.string().min(1).max(120),
+    subtitle: z.string().max(160).optional(),
+    imageUrl: z.string().max(3_000_000).optional(),
+    ctaLabel: z.string().max(40).optional(),
+    region:   z.string().max(60).optional(),
+    type:     z.enum(['REFILL', 'CYLINDER', 'ACCESSORY']).optional(),
+    weight:   z.number().int().min(1).max(100).default(1),
+    isActive: z.boolean().default(true),
+  }).safeParse(req.body);
+  if (!parse.success) return res.status(400).json({ error: parse.error.errors[0].message });
+  const d = parse.data;
+  const ad = await prisma.brandAd.create({
+    data: { brand: d.brand, title: d.title, subtitle: d.subtitle, imageUrl: d.imageUrl, ctaLabel: d.ctaLabel, region: d.region, type: d.type, weight: d.weight, isActive: d.isActive },
+  });
+  res.status(201).json({ ad });
+});
+
+router.patch('/ads/:id', requireAdmin, async (req: AuthRequest, res) => {
+  const parse = z.object({ isActive: z.boolean().optional(), weight: z.number().int().min(1).max(100).optional() }).safeParse(req.body);
+  if (!parse.success) return res.status(400).json({ error: parse.error.errors[0].message });
+  const ad = await prisma.brandAd.update({ where: { id: req.params.id }, data: parse.data }).catch(() => null);
+  if (!ad) return res.status(404).json({ error: 'Ad not found' });
+  res.json({ ad });
+});
+
+router.delete('/ads/:id', requireAdmin, async (req: AuthRequest, res) => {
+  await prisma.brandAd.deleteMany({ where: { id: req.params.id } });
+  res.json({ ok: true });
 });
 
 // ── POST /api/admin/seed-demo ─ KYC-approved demo supplier + rider + household ────

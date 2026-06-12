@@ -45,8 +45,15 @@ async function placeOrder(
   });
 
   const itemsTotal = lineItems.reduce((s, l) => s + l.lineTotal, 0);
+  // Per-line types drive accessory-aware commission (Phase 3); tier drives the
+  // gas commission rate (Phase 2).
+  const moneyLines = items.map(i => {
+    const inv = invs.find(v => v.id === i.inventoryId)!;
+    return { type: inv.product.type, lineTotal: inv.price * i.qty };
+  });
   const money = computeOrderMoney({
-    itemsTotal, supplierLat: supplier.lat, supplierLng: supplier.lng,
+    itemsTotal, lines: moneyLines, tier: supplier.tier,
+    supplierLat: supplier.lat, supplierLng: supplier.lng,
     dropLat: address.lat, dropLng: address.lng,
   });
 
@@ -61,12 +68,17 @@ async function placeOrder(
         status:           'ALERTED',
         itemsTotal:       money.itemsTotal,
         deliveryFee:      money.deliveryFee,
+        serviceFee:       money.serviceFee,
         surgeMultiplier:  money.surgeMultiplier,
         total:            money.total,
         commissionPct:    money.commissionPct,
         commissionAmount: money.commissionAmount,
+        riderNet:         money.riderAmount,
+        platformAmount:   money.platformAmount,
         items:   { create: lineItems },
-        payment: { create: { amount: money.itemsTotal, status: 'PENDING' } },
+        // Collected now by mobile money: gas + service fee. The rider fee is
+        // settled on delivery; the platform's delivery margin is taken from it.
+        payment: { create: { amount: money.upfrontAmount, status: 'PENDING' } },
       },
       include: orderInclude,
     });
@@ -188,7 +200,7 @@ router.post('/:id/confirm-fee', requireRole('HOUSEHOLD'), async (req: AuthReques
   await prisma.order.update({ where: { id: order.id }, data: { status: 'FEE_CONFIRMED' } });
   if (order.delivery?.riderId) {
     emitToUser(order.delivery.riderId, 'fee:confirmed', { orderId: order.id });
-    await notify(order.delivery.riderId, { title: 'Fee confirmed — proceed 🏍️', body: `Household confirmed TZS ${order.deliveryFee.toLocaleString()}. Collect and deliver.`, type: 'order', data: { orderId: order.id } });
+    await notify(order.delivery.riderId, { title: 'Fee confirmed — proceed 🏍️', body: `You'll earn TZS ${(order.riderNet || order.deliveryFee).toLocaleString()}. Collect and deliver.`, type: 'order', data: { orderId: order.id } });
   }
   emitToUser(order.supplier.userId, 'order:tracking', { orderId: order.id });
   await notify(order.supplier.userId, { title: 'Delivery starting 🏍️', body: `${order.orderNo}: household confirmed the rider fee. Rider is collecting.`, type: 'order', data: { orderId: order.id } });

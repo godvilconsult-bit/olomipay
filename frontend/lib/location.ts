@@ -46,6 +46,37 @@ export async function ensureLocationPermission(): Promise<boolean> {
   return true;
 }
 
+export type PermState = 'granted' | 'denied' | 'prompt' | 'unsupported';
+
+/**
+ * Read the current permission WITHOUT prompting. Native uses the Capacitor
+ * plugin's checkPermissions(); web uses the Permissions API when available
+ * (older Safari lacks it → 'prompt', and the real prompt appears on first read).
+ */
+export async function getPermissionState(): Promise<PermState> {
+  const c = await cap();
+  if (c.isNative && c.Geolocation) {
+    try {
+      const p = await c.Geolocation.checkPermissions();
+      const v = p.location ?? p.coarseLocation;
+      return v === 'granted' ? 'granted' : v === 'denied' ? 'denied' : 'prompt';
+    } catch { return 'prompt'; }
+  }
+  if (typeof navigator === 'undefined' || !navigator.geolocation) return 'unsupported';
+  const anyNav = navigator as any;
+  if (anyNav.permissions?.query) {
+    try { const p = await anyNav.permissions.query({ name: 'geolocation' }); return p.state as PermState; }
+    catch { return 'prompt'; }
+  }
+  return 'prompt';
+}
+
+/** True on a real native (Capacitor) build. */
+export async function isNativePlatform(): Promise<boolean> {
+  const c = await cap();
+  return c.isNative;
+}
+
 /** Get the device's CURRENT position at high accuracy (fresh fix). */
 export async function getDeviceLocation(opts?: { timeout?: number }): Promise<DeviceLocation> {
   const timeout = opts?.timeout ?? 15000;

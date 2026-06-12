@@ -11,7 +11,8 @@ import { useSocket } from '../../lib/useSocket';
 import { useT } from '../../lib/i18n';
 import { localPhone } from '../../lib/utils';
 import { primeAudio } from '../../lib/sound';
-import { getDeviceLocation, watchDeviceLocation } from '../../lib/location';
+import { getDeviceLocation } from '../../lib/location';
+import { useRiderTracking } from '../../lib/useRiderTracking';
 import { AppHeader } from '../AppHeader';
 import { RoleNav } from '../RoleNav';
 import { Card, Button, Spinner, EmptyState, Money, Stat, cn } from '../ui';
@@ -44,24 +45,20 @@ export function RiderHome({ user }: { user: JikoUser }) {
   }, []);
   useEffect(() => { refresh(); }, [refresh]);
 
-  // Real-time location: while online, continuously share the rider's live GPS so
-  // vendors see fresh positions and the household can track an active delivery.
-  // Uses the native-aware watcher (Capacitor plugin on the app, geolocation on
-  // web). Created ONCE and reads live state via refs so it never restarts the
-  // GPS when an order updates. Nothing is "saved" — the position is live.
-  useEffect(() => {
-    let cleanup: (() => void) | null = null;
-    let cancelled = false;
-    watchDeviceLocation((loc) => {
+  // Real-time location: ONLY while online, continuously share the rider's live
+  // GPS so vendors see fresh positions and the household can track an active
+  // delivery. The watcher tears down the instant the rider goes offline (the
+  // delivery is done) — no background battery drain. Native-aware (Capacitor
+  // plugin on the app, navigator.geolocation on web). Nothing is "saved".
+  useRiderTracking({
+    enabled: online,
+    onUpdate: (loc) => {
       coordsRef.current = { lat: loc.lat, lng: loc.lng };
-      if (onlineRef.current) {
-        const a = activeRef.current;
-        const enroute = a && ['FEE_CONFIRMED', 'PICKED'].includes(a.order?.status);
-        emit('rider:location', { lat: loc.lat, lng: loc.lng, deliveryId: enroute ? a.id : undefined });
-      }
-    }).then((c) => { cancelled ? c() : (cleanup = c); });
-    return () => { cancelled = true; cleanup?.(); };
-  }, [emit]);
+      const a = activeRef.current;
+      const enroute = a && ['FEE_CONFIRMED', 'PICKED'].includes(a.order?.status);
+      emit('rider:location', { lat: loc.lat, lng: loc.lng, deliveryId: enroute ? a.id : undefined });
+    },
+  });
 
   useEffect(() => {
     // Sound + toast come from the global NotificationListener; here we just refresh the feed.

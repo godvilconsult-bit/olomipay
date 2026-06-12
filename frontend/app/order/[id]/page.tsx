@@ -141,6 +141,7 @@ export default function OrderPage() {
           {order.items?.map((it: any) => <div key={it.id} className="flex justify-between gap-2 text-sm"><span className="min-w-0 truncate text-ink/70">{it.qty}× {it.brand} {it.productName}</span><Money value={it.lineTotal} className="flex-shrink-0 text-xs" /></div>)}
           <div className="mt-2 border-t border-black/5 pt-2 text-sm">
             <div className="flex justify-between text-ink/60"><span>{t('Gas', 'Gesi')}</span><Money value={order.itemsTotal} className="text-xs" /></div>
+            {order.serviceFee > 0 && <div className="flex justify-between text-ink/60"><span>{t('Service fee', 'Ada ya huduma')}</span><Money value={order.serviceFee} className="text-xs" /></div>}
             <div className="flex justify-between text-ink/60"><span>{t('Rider fee', 'Ada ya dereva')}</span><Money value={order.deliveryFee} className="text-xs" /></div>
             <div className="mt-1 flex justify-between font-bold"><span>{t('Total', 'Jumla')}</span><Money value={order.total} /></div>
           </div>

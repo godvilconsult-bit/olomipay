@@ -54,7 +54,7 @@ router.get('/offers', requireRole('RIDER'), async (req: AuthRequest, res) => {
       pickup: { lat: o.order!.supplier.lat, lng: o.order!.supplier.lng, district: o.order!.supplier.district },
       drop:   { lat: o.order!.address.lat, lng: o.order!.address.lng, label: o.order!.address.label, ward: o.order!.address.ward },
       itemCount: o.order!.items.reduce((s, i) => s + i.qty, 0),
-      fee: o.order!.deliveryFee, tripKm: tripKm != null ? Math.round(tripKm * 10) / 10 : null,
+      fee: o.order!.riderNet || o.order!.deliveryFee, tripKm: tripKm != null ? Math.round(tripKm * 10) / 10 : null,
       tripEtaMin: tripKm != null ? etaMinutes(tripKm) : null,
     };
   });
@@ -78,7 +78,7 @@ router.post('/:orderId/accept-offer', requireRole('RIDER'), async (req: AuthRequ
   emitToUser(order.supplier.userId, 'order:rider-accepted', { orderId: order.id });
   await notify(order.householdId, { title: 'Confirm the rider fee', body: `Rider fee is TZS ${order.deliveryFee.toLocaleString()}. Confirm to start delivery.`, type: 'order', data: { orderId: order.id } });
   await notify(order.supplier.userId, { title: 'Rider accepted 🏍️', body: `${order.orderNo}: a rider accepted. Waiting for the household to confirm the fee.`, type: 'order', data: { orderId: order.id } });
-  res.json({ ok: true, fee: order.deliveryFee });
+  res.json({ ok: true, fee: order.riderNet || order.deliveryFee });
 });
 
 // ── POST /api/jobs/:orderId/decline-offer ─ release back to the supplier ──────────
@@ -120,7 +120,7 @@ router.post('/:orderId/deliver', requireRole('RIDER'), async (req: AuthRequest, 
 
   const order = await prisma.order.findUnique({ where: { id: req.params.orderId }, include: { supplier: true, payment: true } });
   if (!order) return res.status(404).json({ error: 'Order not found' });
-  const split = settlementSplit({ itemsTotal: order.itemsTotal, deliveryFee: order.deliveryFee, commissionAmount: order.commissionAmount });
+  const split = settlementSplit({ itemsTotal: order.itemsTotal, deliveryFee: order.deliveryFee, serviceFee: order.serviceFee, commissionAmount: order.commissionAmount });
 
   await prisma.$transaction(async (tx) => {
     await tx.delivery.update({ where: { id: delivery.id }, data: { status: 'DELIVERED', deliveredAt: new Date(), proofPhotoUrl: parse.data.proofPhotoUrl ?? null } });
@@ -153,7 +153,7 @@ router.get('/active', requireRole('RIDER'), async (req: AuthRequest, res) => {
 router.get('/earnings', requireRole('RIDER'), async (req: AuthRequest, res) => {
   const [profile, history] = await Promise.all([
     prisma.riderProfile.findUnique({ where: { userId: req.userId } }),
-    prisma.delivery.findMany({ where: { riderId: req.userId, status: 'DELIVERED' }, include: { order: { select: { orderNo: true, deliveryFee: true, deliveredAt: true } } }, orderBy: { deliveredAt: 'desc' }, take: 50 }),
+    prisma.delivery.findMany({ where: { riderId: req.userId, status: 'DELIVERED' }, include: { order: { select: { orderNo: true, deliveryFee: true, riderNet: true, deliveredAt: true } } }, orderBy: { deliveredAt: 'desc' }, take: 50 }),
   ]);
   res.json({ totalDeliveries: profile?.totalDeliveries ?? 0, totalEarnings: profile?.totalEarnings ?? 0, rating: profile?.rating ?? 0, status: profile?.status ?? 'OFFLINE', history });
 });

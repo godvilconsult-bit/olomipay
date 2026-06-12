@@ -287,11 +287,14 @@ model Order {
   status           OrderStatus @default(PLACED)
 
   itemsTotal       Float       @default(0)
-  deliveryFee      Float       @default(0)
+  deliveryFee      Float       @default(0)   // gross rider fee paid by household
+  serviceFee       Float       @default(0)   // platform convenience fee (Phase 1)
   surgeMultiplier  Float       @default(1)
   total            Float       @default(0)
   commissionPct    Float       @default(0)
-  commissionAmount Float       @default(0)
+  commissionAmount Float       @default(0)   // platform cut of itemsTotal
+  riderNet         Float       @default(0)   // deliveryFee − platform delivery margin
+  platformAmount   Float       @default(0)   // commission + serviceFee + delivery margin
 
   note             String?
   placedAt         DateTime    @default(now())
@@ -457,6 +460,30 @@ model PriceCap {
   updatedAt DateTime @updatedAt
 
   @@unique([region, productId])
+}
+
+// ── Brand advertising (Phase 3 monetization) ────────────────────────────────────
+// LPG brands (Oryx, Taifa, Lake, O-Gas…) and accessory sellers pay for a
+// "Sponsored" slot on the household home. Tapping filters search to that brand.
+
+model BrandAd {
+  id        String   @id @default(cuid())
+  brand     String                       // links to Product.brand for the filter tap
+  title     String                       // headline shown on the banner
+  subtitle  String?
+  imageUrl  String?  @db.Text            // logo / banner art (data URL or hosted)
+  ctaLabel  String?                       // e.g. "Order Oryx 15kg"
+  region    String?                       // null = nationwide
+  type      ProductType?                  // optional: deep-link the search type
+  weight    Int      @default(1)          // higher = shown more often
+  isActive  Boolean  @default(true)
+  impressions Int    @default(0)
+  clicks    Int      @default(0)
+  startsAt  DateTime?
+  endsAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([isActive, region])
 }
 
 // ── Notifications ────────────────────────────────────────────────────────────────

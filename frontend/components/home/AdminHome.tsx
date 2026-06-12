@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Users, ShieldCheck, Activity, Phone, Home, Store, Bike, Trash2 } from 'lucide-react';
+import { Users, ShieldCheck, Activity, Phone, Home, Store, Bike, Trash2, Star, Megaphone, Plus, TrendingUp } from 'lucide-react';
 import { adminApi, JikoUser } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 import { localPhone, timeAgo } from '../../lib/utils';
@@ -13,18 +13,49 @@ const ROLE_ICON: Record<string, any> = { HOUSEHOLD: Home, SUPPLIER: Store, RIDER
 
 export function AdminHome({ user }: { user: JikoUser }) {
   const { t } = useT();
-  const [tab, setTab]     = useState<'overview' | 'users' | 'flow'>('overview');
+  const [tab, setTab]     = useState<'overview' | 'users' | 'flow' | 'growth'>('overview');
   const [stats, setStats] = useState<any>(null);
   const [users, setUsers] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [kycList, setKyc] = useState<any[]>([]);
   const [zoom, setZoom]   = useState<string | null>(null);
+  const [sups, setSups]   = useState<any[]>([]);
+  const [adList, setAdList] = useState<any[]>([]);
+  const [adForm, setAdForm] = useState({ brand: '', title: '', subtitle: '', ctaLabel: '', region: '', type: '', weight: '1' });
+  const [adBusy, setAdBusy] = useState(false);
 
   async function load() {
-    const [s, u, o, k] = await Promise.all([adminApi.stats().catch(() => null), adminApi.users().catch(() => ({ users: [] })), adminApi.orders().catch(() => ({ orders: [] })), adminApi.kycPending().catch(() => ({ pending: [] }))]);
+    const [s, u, o, k, sp, ad] = await Promise.all([
+      adminApi.stats().catch(() => null), adminApi.users().catch(() => ({ users: [] })),
+      adminApi.orders().catch(() => ({ orders: [] })), adminApi.kycPending().catch(() => ({ pending: [] })),
+      adminApi.suppliers().catch(() => ({ suppliers: [] })), adminApi.ads().catch(() => ({ ads: [] })),
+    ]);
     setStats(s); setUsers(u.users ?? []); setOrders(o.orders ?? []); setKyc(k.pending ?? []);
+    setSups(sp.suppliers ?? []); setAdList(ad.ads ?? []);
   }
   useEffect(() => { load(); }, []);
+
+  async function setTier(id: string, tier: string) {
+    setSups((arr) => arr.map((s) => s.id === id ? { ...s, tier } : s));
+    try { await adminApi.setTier(id, { tier: tier as any }); } catch { toast.error(t('Failed', 'Imeshindikana')); load(); }
+  }
+  async function toggleFeatured(s: any) {
+    const featured = !s.featured;
+    setSups((arr) => arr.map((x) => x.id === s.id ? { ...x, featured } : x));
+    try { await adminApi.setTier(s.id, { featured }); } catch { toast.error(t('Failed', 'Imeshindikana')); load(); }
+  }
+  async function createAd() {
+    if (!adForm.brand.trim() || !adForm.title.trim()) return toast.error(t('Brand and title are required', 'Brand na kichwa vinahitajika'));
+    setAdBusy(true);
+    try {
+      await adminApi.createAd({ brand: adForm.brand.trim(), title: adForm.title.trim(), subtitle: adForm.subtitle || undefined, ctaLabel: adForm.ctaLabel || undefined, region: adForm.region || undefined, type: adForm.type || undefined, weight: Number(adForm.weight) || 1 });
+      toast.success(t('Ad published', 'Tangazo limewekwa'));
+      setAdForm({ brand: '', title: '', subtitle: '', ctaLabel: '', region: '', type: '', weight: '1' });
+      load();
+    } catch (e: any) { toast.error(e?.message ?? t('Failed', 'Imeshindikana')); } finally { setAdBusy(false); }
+  }
+  async function toggleAd(a: any) { try { await adminApi.patchAd(a.id, { isActive: !a.isActive }); load(); } catch { toast.error(t('Failed', 'Imeshindikana')); } }
+  async function delAd(id: string) { try { await adminApi.deleteAd(id); load(); } catch { toast.error(t('Failed', 'Imeshindikana')); } }
 
   async function decide(id: string, status: 'APPROVED' | 'REJECTED') {
     try { await adminApi.kyc(id, status); toast.success(status === 'APPROVED' ? t('Approved', 'Imethibitishwa') : t('Rejected', 'Imekataliwa')); load(); }
@@ -39,8 +70,9 @@ export function AdminHome({ user }: { user: JikoUser }) {
   if (!stats) return <Spinner />;
 
   const TabBtn = ({ id, label }: { id: typeof tab; label: string }) => (
-    <button onClick={() => setTab(id)} className={cn('flex-1 rounded-xl py-2 text-sm font-semibold transition', tab === id ? 'bg-grad-brand text-white' : 'bg-black/5 text-ink/60')}>{label}</button>
+    <button onClick={() => setTab(id)} className={cn('flex-1 rounded-xl py-2 text-xs font-semibold transition', tab === id ? 'bg-grad-brand text-white' : 'bg-black/5 text-ink/60')}>{label}</button>
   );
+  const inputCls = 'w-full rounded-xl border border-black/15 bg-white px-3 py-2 text-sm text-ink outline-none focus:border-flame';
 
   return (
     <div className="min-h-screen pb-10">
@@ -52,16 +84,27 @@ export function AdminHome({ user }: { user: JikoUser }) {
           <TabBtn id="overview" label={t('Overview', 'Muhtasari')} />
           <TabBtn id="users" label={`${t('Users', 'Watumiaji')} (${users.length})`} />
           <TabBtn id="flow" label={`${t('Flow', 'Mtiririko')} (${orders.length})`} />
+          <TabBtn id="growth" label={t('Grow', 'Kuza')} />
         </div>
 
         {tab === 'overview' && (
           <>
             <div className="grid grid-cols-2 gap-2.5">
               <Stat label={t('GMV', 'GMV')} value={<Money value={stats.gmv} className="text-base" />} accent />
-              <Stat label={t('Commission revenue', 'Mapato (komisheni)')} value={<Money value={stats.platformRevenue} className="text-base" />} />
+              <Stat label={t('Platform revenue', 'Mapato ya jukwaa')} value={<Money value={stats.platformRevenue} className="text-base" />} />
               <Stat label={t('Total orders', 'Oda zote')} value={stats.orders.total} />
               <Stat label={t('Delivered', 'Zimefika')} value={stats.orders.delivered} />
             </div>
+            {stats.revenueBreakdown && (
+              <Card className="!p-3">
+                <div className="mb-2 flex items-center gap-1.5 text-xs font-bold text-ink/60"><TrendingUp size={14} className="text-leaf" /> {t('Revenue streams', 'Vyanzo vya mapato')}</div>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div><Money value={stats.revenueBreakdown.commission} className="text-sm" /><div className="text-[10px] text-ink/50">{t('Commission', 'Komisheni')}</div></div>
+                  <div><Money value={stats.revenueBreakdown.serviceFee} className="text-sm" /><div className="text-[10px] text-ink/50">{t('Service fees', 'Ada za huduma')}</div></div>
+                  <div><Money value={stats.revenueBreakdown.deliveryMargin} className="text-sm" /><div className="text-[10px] text-ink/50">{t('Delivery margin', 'Faida ya usafiri')}</div></div>
+                </div>
+              </Card>
+            )}
             <Card>
               <div className="mb-3 flex items-center gap-2 font-bold"><Users size={18} className="text-flame" /> {t('Users', 'Watumiaji')}</div>
               <div className="grid grid-cols-3 gap-2 text-center text-sm">
@@ -141,6 +184,67 @@ export function AdminHome({ user }: { user: JikoUser }) {
                 </Card>
               ))
             }
+          </div>
+        )}
+
+        {tab === 'growth' && (
+          <div className="space-y-5">
+            {/* Supplier plans + featured slots (Phase 2) */}
+            <div>
+              <h2 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-ink/70"><Star size={15} /> {t('Supplier plans & featured', 'Mipango ya wauzaji')}</h2>
+              {sups.length === 0 ? <p className="py-4 text-center text-sm text-ink/50">{t('No suppliers yet.', 'Hakuna wauzaji bado.')}</p> :
+                <div className="space-y-2">
+                  {sups.map((s) => (
+                    <Card key={s.id} className="!p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0"><div className="truncate font-semibold">{s.businessName}</div><div className="text-xs text-ink/50">{s.region} · {s._count?.orders ?? 0} {t('orders', 'oda')}</div></div>
+                        <button onClick={() => toggleFeatured(s)} className={cn('flex flex-shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold', s.featured ? 'bg-ember/15 text-ember' : 'bg-black/5 text-ink/40')}><Star size={12} className={s.featured ? 'fill-ember' : ''} /> {t('Featured', 'Featured')}</button>
+                      </div>
+                      <div className="mt-2 flex gap-1.5">
+                        {['FREE', 'STANDARD', 'PREMIUM'].map((tr) => (
+                          <button key={tr} onClick={() => setTier(s.id, tr)} className={cn('flex-1 rounded-lg py-1.5 text-xs font-semibold', s.tier === tr ? 'bg-grad-brand text-white' : 'bg-black/5 text-ink/50')}>{tr === 'STANDARD' ? 'Pro' : tr === 'PREMIUM' ? 'Premium' : t('Free', 'Bure')}</button>
+                        ))}
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              }
+            </div>
+
+            {/* Sponsored brand ads (Phase 3) */}
+            <div>
+              <h2 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-ink/70"><Megaphone size={15} /> {t('Sponsored brand ads', 'Matangazo ya brand')}</h2>
+              <Card className="space-y-2 !p-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <input value={adForm.brand} onChange={(e) => setAdForm((f) => ({ ...f, brand: e.target.value }))} placeholder={t('Brand e.g. Oryx', 'Brand k.m. Oryx')} className={inputCls} />
+                  <select value={adForm.type} onChange={(e) => setAdForm((f) => ({ ...f, type: e.target.value }))} className={inputCls}>
+                    <option value="">{t('Any type', 'Aina yoyote')}</option>
+                    <option value="REFILL">{t('Refill', 'Refill')}</option>
+                    <option value="CYLINDER">{t('New cylinder', 'Mtungi mpya')}</option>
+                    <option value="ACCESSORY">{t('Accessories', 'Vifaa')}</option>
+                  </select>
+                </div>
+                <input value={adForm.title} onChange={(e) => setAdForm((f) => ({ ...f, title: e.target.value }))} placeholder={t('Headline', 'Kichwa')} className={inputCls} />
+                <input value={adForm.subtitle} onChange={(e) => setAdForm((f) => ({ ...f, subtitle: e.target.value }))} placeholder={t('Subtitle (optional)', 'Maelezo (hiari)')} className={inputCls} />
+                <div className="grid grid-cols-3 gap-2">
+                  <input value={adForm.ctaLabel} onChange={(e) => setAdForm((f) => ({ ...f, ctaLabel: e.target.value }))} placeholder={t('Button', 'Kitufe')} className={inputCls} />
+                  <input value={adForm.region} onChange={(e) => setAdForm((f) => ({ ...f, region: e.target.value }))} placeholder={t('Region/all', 'Mkoa/zote')} className={inputCls} />
+                  <input value={adForm.weight} onChange={(e) => setAdForm((f) => ({ ...f, weight: e.target.value.replace(/\D/g, '') }))} placeholder={t('Weight', 'Uzito')} inputMode="numeric" className={inputCls} />
+                </div>
+                <Button variant="primary" loading={adBusy} onClick={createAd} className="w-full"><Plus size={15} /> {t('Publish ad', 'Weka tangazo')}</Button>
+              </Card>
+              {adList.length > 0 && (
+                <div className="mt-2 space-y-2">
+                  {adList.map((a) => (
+                    <Card key={a.id} className="flex items-center gap-3 !p-3">
+                      <div className="min-w-0 flex-1"><div className="truncate font-semibold">{a.brand} — {a.title}</div><div className="text-xs text-ink/50">{a.impressions} {t('views', 'mionekano')} · {a.clicks} {t('clicks', 'mibofyo')}{a.region ? ` · ${a.region}` : ''}</div></div>
+                      <button onClick={() => toggleAd(a)} className={cn('flex-shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold', a.isActive ? 'bg-leaf/15 text-leaf-dark' : 'bg-black/10 text-ink/40')}>{a.isActive ? t('Live', 'Hai') : t('Off', 'Imezimwa')}</button>
+                      <button onClick={() => delAd(a.id)} className="grid h-8 w-8 flex-shrink-0 place-items-center rounded-lg text-danger"><Trash2 size={15} /></button>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>

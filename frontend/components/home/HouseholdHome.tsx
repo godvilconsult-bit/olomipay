@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import toast from 'react-hot-toast';
 import { MapPin, Star, BadgeCheck, Search, Navigation, Package, List, Map as MapIcon, HandCoins, Bike, Smartphone, Banknote, RotateCcw } from 'lucide-react';
-import { vendors, orders, addresses, getAccessToken, JikoUser } from '../../lib/api';
+import { vendors, orders, addresses, ads, getAccessToken, JikoUser, type BrandAd } from '../../lib/api';
 import { useSocket } from '../../lib/useSocket';
 import { useT } from '../../lib/i18n';
 import { getDeviceLocation, distanceM, prettyDistance } from '../../lib/location';
@@ -35,6 +35,7 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
   const [searching, setSearching] = useState(false);
   const [view, setView]         = useState<'list' | 'map'>('list');
   const [busy, setBusy]         = useState(false);
+  const [ad, setAd]             = useState<BrandAd | null>(null); // sponsored brand (Phase 3)
 
   const TYPES = [
     { v: 'REFILL', l: t('Refill', 'Refill') },
@@ -65,9 +66,19 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
 
   useEffect(() => {
     vendors.products().then((r) => { setBrands(r.brands ?? []); setSizes(r.sizes ?? []); }).catch(() => {});
+    ads.active(user.region ?? undefined).then((r) => setAd(r.ad)).catch(() => {});
     loadOrders();
     loadSaved();
-  }, [loadOrders, loadSaved]);
+  }, [loadOrders, loadSaved, user.region]);
+
+  // Tap a sponsored brand → filter search to it (re-runs via the filter effect)
+  // and attribute the click for the advertiser's billing.
+  function openAd() {
+    if (!ad) return;
+    ads.click(ad.id).catch(() => {});
+    setFilter((f) => ({ ...f, brand: ad.brand, type: (ad.type as string) || f.type }));
+    toast.success(t(`Showing ${ad.brand} vendors`, `Inaonyesha wauzaji wa ${ad.brand}`));
+  }
 
   // ── Compare device position to the saved one → prompt if far apart ─────────────
   useEffect(() => {
@@ -146,6 +157,25 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
           </div>
           <button onClick={useCurrentLocation} disabled={locBusy} className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-xl bg-flame/10 text-flame disabled:opacity-50"><Navigation size={17} className={locBusy ? 'animate-pulse' : ''} /></button>
         </Card>
+
+        {/* sponsored brand (Phase 3 monetization) */}
+        {ad && (
+          <button onClick={openAd} className="block w-full text-left">
+            <div className="relative overflow-hidden rounded-2xl bg-grad-brand p-4 text-white shadow-ds-card">
+              <span className="absolute right-2 top-2 rounded-full bg-white/20 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide">{t('Sponsored', 'Tangazo')}</span>
+              <div className="flex items-center gap-3">
+                {ad.imageUrl
+                  ? <img src={ad.imageUrl} alt={ad.brand} className="h-12 w-12 flex-shrink-0 rounded-xl bg-white/10 object-cover" />
+                  : <span className="grid h-12 w-12 flex-shrink-0 place-items-center rounded-xl bg-white/15 text-lg font-extrabold">{ad.brand.slice(0, 2).toUpperCase()}</span>}
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-extrabold">{ad.title}</div>
+                  {ad.subtitle && <div className="truncate text-xs text-white/80">{ad.subtitle}</div>}
+                </div>
+                <span className="flex-shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-bold text-flame">{ad.ctaLabel || t('Shop', 'Nunua')}</span>
+              </div>
+            </div>
+          </button>
+        )}
 
         {/* mismatch prompt — device is somewhere else */}
         {mismatchM != null && savedAddr && (
