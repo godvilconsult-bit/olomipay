@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 import { ArrowLeft, Package, RotateCcw } from 'lucide-react';
 import { orders } from '../../lib/api';
 import { useT } from '../../lib/i18n';
-import { Card, Spinner, EmptyState, Money, Badge, Button } from '../../components/ui';
+import { Spinner, EmptyState, Money, Badge, Button, ListGroup } from '../../components/ui';
 import { RoleNav } from '../../components/RoleNav';
 
 export default function OrdersPage() {
@@ -39,20 +39,22 @@ export default function OrdersPage() {
       <div className="mx-auto max-w-md space-y-2.5 px-5 pt-4">
         {list === null ? <Spinner /> :
           list.length === 0 ? <EmptyState icon={<Package size={36} />} title={t('No orders yet', 'Bado huna oda')} sub={t('Order your first gas from the home screen.', 'Agiza gesi yako ya kwanza kutoka ukurasa wa mwanzo.')} /> :
-          list.map((o) => {
-            const finished = ['COMPLETED', 'CANCELLED'].includes(o.status);
-            return (
-              <Card key={o.id} className="flex items-center justify-between gap-3 !p-3.5">
-                <Link href={`/order/${o.id}`} className="min-w-0 flex-1">
-                  <div className="truncate font-semibold">{o.supplier?.businessName}</div>
-                  <div className="mt-0.5 flex items-center gap-1.5 text-xs text-ink/50"><Money value={o.total} className="text-xs" /> · <Badge status={o.status} /></div>
-                </Link>
-                {finished
-                  ? <Button variant="primary" loading={reordering === o.id} onClick={() => reorder(o.id)} className="flex-shrink-0 !px-3.5"><RotateCcw size={15} /> {t('Reorder', 'Agiza tena')}</Button>
-                  : <Link href={`/order/${o.id}`} className="flex-shrink-0 text-xs font-semibold text-flame">{t('View', 'Angalia')}</Link>}
-              </Card>
-            );
-          })
+          <ListGroup>
+            {list.map((o) => {
+              const finished = ['COMPLETED', 'CANCELLED'].includes(o.status);
+              return (
+                <div key={o.id} className="flex items-center justify-between gap-3 px-3 py-3">
+                  <Link href={`/order/${o.id}`} className="min-w-0 flex-1">
+                    <div className="truncate font-semibold">{o.supplier?.businessName}</div>
+                    <div className="mt-0.5 flex items-center gap-1.5 text-xs text-ink/50"><Money value={o.total} className="text-xs" /> · <Badge status={o.status} /></div>
+                  </Link>
+                  {finished
+                    ? <Button variant="primary" loading={reordering === o.id} onClick={() => reorder(o.id)} className="flex-shrink-0 !px-3"><RotateCcw size={15} /> {t('Reorder', 'Agiza tena')}</Button>
+                    : <Link href={`/order/${o.id}`} className="flex-shrink-0 text-xs font-semibold text-flame">{t('View', 'Angalia')}</Link>}
+                </div>
+              );
+            })}
+          </ListGroup>
         }
       </div>
       <RoleNav role="HOUSEHOLD" />

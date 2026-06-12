@@ -13,7 +13,7 @@ import { getDeviceLocation, distanceM, prettyDistance } from '../../lib/location
 import { reverseGeocode } from '../../lib/geocode';
 import { AppHeader } from '../AppHeader';
 import { RoleNav } from '../RoleNav';
-import { Card, Button, Spinner, EmptyState, Money, Stat, Badge, cn } from '../ui';
+import { Card, Button, Spinner, EmptyState, Money, Stat, Badge, ListGroup, cn } from '../ui';
 
 const ACTIVE = ['ALERTED', 'PLACED', 'ACCEPTED', 'RIDER_OFFERED', 'RIDER_ACCEPTED', 'FEE_CONFIRMED', 'PICKED'];
 
@@ -168,12 +168,12 @@ export function SupplierHome({ user }: { user: JikoUser }) {
         <div>
           <h2 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-ink/70"><Bell size={15} /> {t('Orders needing action', 'Oda zinazohitaji hatua')}</h2>
           {queue.length === 0 ? <EmptyState icon={<Store size={36} />} title={t('No orders right now', 'Hakuna oda kwa sasa')} sub={t('New orders appear here the instant they arrive.', 'Oda mpya zitaonekana papo hapo.')} /> :
-            <div className="space-y-3">
+            <ListGroup>
               {queue.map((o) => {
                 const pay = payInfo(o);
                 const PayIcon = pay.icon;
                 return (
-                  <Card key={o.id} className={cn(['ALERTED', 'PLACED'].includes(o.status) && 'border-flame/40')}>
+                  <div key={o.id} className={cn('p-3.5', ['ALERTED', 'PLACED'].includes(o.status) && 'bg-flame/5')}>
                     <div className="flex items-start justify-between">
                       <div className="min-w-0"><div className="font-bold">{o.orderNo}</div><div className="truncate text-xs text-ink/50">{o.household?.name} · {localPhone(o.household?.phone)}</div></div>
                       <Badge status={o.status} />
@@ -207,10 +207,10 @@ export function SupplierHome({ user }: { user: JikoUser }) {
                         <Button variant="ghost" className="w-full" onClick={() => router.push(`/supplier/dispatch/${o.id}`)}><MapPin size={16} /> {o.status === 'PICKED' ? t('Track delivery', 'Fuatilia') : t('On the way — track', 'Njiani — fuatilia')}</Button>
                       )}
                     </div>
-                  </Card>
+                  </div>
                 );
               })}
-            </div>
+            </ListGroup>
           }
         </div>
       </div>

@@ -18,6 +18,7 @@ export default function VendorPage() {
   const [cart, setCart]     = useState<Record<string, number>>({});
   const [pay, setPay]       = useState<'MOBILE' | 'CASH' | ''>('');
   const [placing, setPlacing] = useState(false);
+  const [showPay, setShowPay] = useState(false); // reveal the wallet number on tap
 
   useEffect(() => {
     vendors.get(id).then((r) => setVendor(r.vendor)).catch(() => toast.error(t('Vendor not found', 'Muuzaji hapatikani')));
@@ -32,6 +33,8 @@ export default function VendorPage() {
   const total = items.reduce((s, [invId, q]) => { const i = inv.find((x) => x.id === invId); return s + (i ? i.price * q : 0); }, 0);
   const set = (invId: string, delta: number) => setCart((c) => ({ ...c, [invId]: Math.max(0, (c[invId] ?? 0) + delta) }));
   const typeLabel = (ty: string) => ty === 'REFILL' ? t('Refill', 'Kujaza') : ty === 'CYLINDER' ? t('New cylinder', 'Mtungi mpya') : t('Accessory', 'Kifaa');
+  const maskNumber = (n: string) => (n && n.length > 4 ? `${n.slice(0, 4)} ••• ${n.slice(-2)}` : n);
+  const copyPay = () => { try { navigator.clipboard?.writeText(vendor.payNumber); toast.success(t('Number copied', 'Namba imenakiliwa')); } catch {} };
 
   async function place() {
     if (!defaultAddr) return toast.error(t('Add an address first (Home → GPS)', 'Ongeza anwani kwanza (Nyumbani → GPS)'));
@@ -78,10 +81,12 @@ export default function VendorPage() {
             <div className="flex items-center justify-between gap-2 rounded-xl bg-leaf/10 p-2.5">
               <div className="min-w-0">
                 <div className="text-[10px] font-bold uppercase tracking-wide text-leaf-dark/70">{t('Mobile wallet payment', 'Malipo ya pochi')}</div>
-                <div className="truncate text-sm font-bold text-ink">{vendor.payProvider ?? t('Mobile money', 'Pesa za simu')} · <span className="tabular-nums">{vendor.payNumber}</span></div>
+                <div className="truncate text-sm font-bold text-ink">{vendor.payProvider ?? t('Mobile money', 'Pesa za simu')} · <span className="tabular-nums">{showPay ? vendor.payNumber : maskNumber(vendor.payNumber)}</span></div>
                 {vendor.payName && <div className="truncate text-xs text-ink/50">{vendor.payName}</div>}
               </div>
-              <button onClick={() => { try { navigator.clipboard?.writeText(vendor.payNumber); toast.success(t('Number copied', 'Namba imenakiliwa')); } catch {} }} className="flex-shrink-0 rounded-lg bg-white px-2.5 py-1.5 text-xs font-bold text-leaf-dark">{t('Copy', 'Nakili')}</button>
+              {showPay
+                ? <button onClick={copyPay} className="flex-shrink-0 rounded-lg bg-white px-2.5 py-1.5 text-xs font-bold text-leaf-dark">{t('Copy', 'Nakili')}</button>
+                : <button onClick={() => setShowPay(true)} className="flex-shrink-0 rounded-lg bg-white px-2.5 py-1.5 text-xs font-bold text-leaf-dark">{t('Show', 'Onyesha')}</button>}
             </div>
           )}
         </Card>

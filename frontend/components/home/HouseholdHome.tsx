@@ -13,7 +13,7 @@ import { getDeviceLocation, distanceM, prettyDistance } from '../../lib/location
 import { reverseGeocode } from '../../lib/geocode';
 import { AppHeader } from '../AppHeader';
 import { RoleNav } from '../RoleNav';
-import { Card, Pill, Spinner, EmptyState, Money, Badge, Button, cn } from '../ui';
+import { Card, Pill, Spinner, EmptyState, Money, Badge, Button, ListGroup, cn } from '../ui';
 
 const Map = dynamic(() => import('../Map'), { ssr: false });
 const DAR = { lat: -6.7924, lng: 39.2083 };
@@ -266,19 +266,19 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
               <h2 className="text-sm font-bold text-ink/70">{t('Your recent orders', 'Oda zako za hivi karibuni')}</h2>
               <Link href="/orders" className="text-xs font-semibold text-flame">{t('All', 'Zote')}</Link>
             </div>
-            <div className="space-y-2">
+            <ListGroup>
               {recent.filter((o) => o.id !== active?.id).slice(0, 3).map((o) => (
-                <Card key={o.id} className="flex items-center justify-between gap-3 !p-3">
+                <div key={o.id} className="flex items-center justify-between gap-3 px-3 py-2.5">
                   <Link href={`/order/${o.id}`} className="min-w-0 flex-1">
                     <div className="truncate text-sm font-semibold">{o.supplier?.businessName}</div>
                     <div className="mt-0.5 flex items-center gap-1.5 text-xs text-ink/50"><Money value={o.total} className="text-xs" /> · <Badge status={o.status} /></div>
                   </Link>
-                  <Button variant="primary" loading={reordering === o.id} onClick={() => reorder(o)} className="flex-shrink-0 !px-3.5">
+                  <Button variant="primary" loading={reordering === o.id} onClick={() => reorder(o)} className="flex-shrink-0 !px-3">
                     <RotateCcw size={15} /> {t('Reorder', 'Agiza tena')}
                   </Button>
-                </Card>
+                </div>
               ))}
-            </div>
+            </ListGroup>
           </div>
         )}
 

@@ -13,7 +13,7 @@ const orderInclude = {
   items:    true,
   payment:  true,
   delivery: { include: { rider: { select: { id: true, name: true, phone: true, profilePicUrl: true, riderProfile: { select: { vehicleType: true, plateNo: true, rating: true } } } } } },
-  supplier: { select: { id: true, businessName: true, phone: true, lat: true, lng: true, region: true } },
+  supplier: { select: { id: true, businessName: true, phone: true, lat: true, lng: true, region: true, payProvider: true, payNumber: true, payName: true } },
   address:  true,
   review:   true,
 } as const;

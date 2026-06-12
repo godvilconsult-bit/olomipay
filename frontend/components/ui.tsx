@@ -57,6 +57,17 @@ export function Card({ children, className, onClick }: { children: ReactNode; cl
   );
 }
 
+// ── Flat list ────────────────────────────────────────────────────────────────
+// Zero-boundary rows grouped in one subtle container (dividers, no per-item
+// card border/shadow) — compact and easy to scan on small screens.
+export function ListGroup({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <div className={cn('divide-y divide-black/5 dark:divide-white/5 overflow-hidden rounded-ds-xl bg-white dark:bg-ink-2', className)}>
+      {children}
+    </div>
+  );
+}
+
 // ── Field ────────────────────────────────────────────────────────────────────
 export function Field(
   { label, hint, className, ...rest }:

@@ -103,7 +103,20 @@ export default function OrderPage() {
         {!cancelled && (
           paid ? <div className="flex items-center justify-center gap-1.5 text-sm font-semibold text-leaf-dark"><Check size={16} /> {t('Gas paid', 'Gesi imelipwa')}</div> :
           order.payment?.provider === 'CASH' ? <div className="flex items-center justify-center gap-1.5 text-sm font-semibold text-ink/60"><Banknote size={15} /> {t('Cash on delivery', 'Cash ukipokea')}</div> :
-          <Card><div className="mb-2 text-sm font-semibold">{t('Complete payment', 'Kamilisha malipo')}</div><div className="grid grid-cols-2 gap-2"><Button variant="primary" loading={busy} onClick={() => pay('MPESA')}><Smartphone size={16} /> {t('Mobile money', 'Pesa za simu')}</Button><Button variant="ghost" loading={busy} onClick={() => pay('CASH')}><Banknote size={16} /> {t('Cash', 'Cash')}</Button></div></Card>
+          <Card>
+            <div className="mb-2 text-sm font-semibold">{t('Complete payment', 'Kamilisha malipo')}</div>
+            <div className="grid grid-cols-2 gap-2"><Button variant="primary" loading={busy} onClick={() => pay('MPESA')}><Smartphone size={16} /> {t('Mobile money', 'Pesa za simu')}</Button><Button variant="ghost" loading={busy} onClick={() => pay('CASH')}><Banknote size={16} /> {t('Cash', 'Cash')}</Button></div>
+            {order.supplier?.payNumber && (
+              <div className="mt-3 flex items-center justify-between gap-2 rounded-xl bg-leaf/10 p-2.5">
+                <div className="min-w-0">
+                  <div className="text-[10px] font-bold uppercase tracking-wide text-leaf-dark/70">{t('Or pay the vendor directly', 'Au mlipe muuzaji moja kwa moja')}</div>
+                  <div className="truncate text-sm font-bold text-ink">{order.supplier.payProvider ?? t('Mobile money', 'Pesa za simu')} · <span className="tabular-nums">{order.supplier.payNumber}</span></div>
+                  {order.supplier.payName && <div className="truncate text-xs text-ink/50">{order.supplier.payName}</div>}
+                </div>
+                <button onClick={() => { try { navigator.clipboard?.writeText(order.supplier.payNumber); toast.success(t('Number copied', 'Namba imenakiliwa')); } catch {} }} className="flex-shrink-0 rounded-lg bg-white px-2.5 py-1.5 text-xs font-bold text-leaf-dark">{t('Copy', 'Nakili')}</button>
+              </div>
+            )}
+          </Card>
         )}
 
         {/* rider card once assigned */}
