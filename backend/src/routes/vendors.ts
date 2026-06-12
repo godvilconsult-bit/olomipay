@@ -36,9 +36,10 @@ router.get('/search', requireAuth, async (req, res) => {
   const suppliers = await prisma.supplierProfile.findMany({
     where: {
       isOpen: true,
-      isVerified: true, // KYC-approved vendors only
       lat: { not: null },
       lng: { not: null },
+      // Show any open vendor with stock + a location. KYC adds a verified badge
+      // (returned below) but does not hide the vendor from search.
       inventory: { some: { isAvailable: true, stock: { gt: 0 }, ...(Object.keys(productWhere).length ? { product: productWhere } : {}) } },
     },
     include: {

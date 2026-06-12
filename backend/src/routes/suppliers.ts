@@ -93,7 +93,7 @@ router.get('/riders/nearby', requireRole('SUPPLIER'), async (req: AuthRequest, r
   const profile = await myProfile(req.userId!);
   if (!profile) return res.status(404).json({ error: 'No supplier profile' });
   const riders = await prisma.riderProfile.findMany({
-    where:   { status: 'ONLINE', isVerified: true, region: profile.region },
+    where:   { status: 'ONLINE', region: profile.region },
     include: { user: { select: { id: true, name: true, phone: true, profilePicUrl: true } } },
   });
   const list = riders.map(r => {

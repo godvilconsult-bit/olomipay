@@ -11,6 +11,7 @@ import { useSocket } from '../../lib/useSocket';
 import { useT } from '../../lib/i18n';
 import { localPhone } from '../../lib/utils';
 import { playAlert, primeAudio } from '../../lib/sound';
+import { getDeviceLocation } from '../../lib/location';
 import { AppHeader } from '../AppHeader';
 import { RoleNav } from '../RoleNav';
 import { Card, Button, Spinner, EmptyState, Money, Stat, cn } from '../ui';
@@ -67,12 +68,17 @@ export function RiderHome({ user }: { user: JikoUser }) {
   }, [on, refresh, t]);
 
   async function toggleOnline() {
-    if (!online && !verified) { router.push('/kyc'); return; }
     primeAudio(); // unlock the alert sound from this user gesture
     try {
-      if (online) { await jobs.offline(); emit('rider:status', { status: 'OFFLINE' }); setOnline(false); }
-      else { const c = coordsRef.current; await jobs.online(c?.lat, c?.lng); emit('rider:status', { status: 'ONLINE' }); setOnline(true); await refresh(); }
-    } catch (e: any) { if (e?.message?.includes('KYC')) router.push('/kyc'); else toast.error(t('Failed', 'Imeshindikana')); }
+      if (online) { await jobs.offline(); emit('rider:status', { status: 'OFFLINE' }); setOnline(false); return; }
+      // Going online: get a fresh accurate fix and share it immediately so vendors see you now.
+      let c = coordsRef.current;
+      try { const d = await getDeviceLocation(); c = { lat: d.lat, lng: d.lng }; coordsRef.current = c; }
+      catch { toast.error(t('Turn on location to receive jobs', 'Washa eneo kupokea kazi')); }
+      await jobs.online(c?.lat, c?.lng); emit('rider:status', { status: 'ONLINE' });
+      if (c) emit('rider:location', { lat: c.lat, lng: c.lng });
+      setOnline(true); await refresh();
+    } catch (e: any) { toast.error(e?.message ?? t('Failed', 'Imeshindikana')); }
   }
   async function accept(orderId: string) { setBusy(true); try { await jobs.acceptOffer(orderId); toast.success(t('Accepted — fee sent to household', 'Umekubali — ada imetumwa kwa kaya')); await refresh(); } catch (e: any) { toast.error(e?.message ?? t('Failed', 'Imeshindikana')); } finally { setBusy(false); } }
   async function decline(orderId: string) { setBusy(true); try { await jobs.declineOffer(orderId); await refresh(); } finally { setBusy(false); } }
@@ -112,12 +118,12 @@ export function RiderHome({ user }: { user: JikoUser }) {
         {!verified && (
           <Link href="/kyc"><Card className="flex items-center gap-3 border-warning/40 !bg-warning/5">
             <ShieldAlert className="text-warning flex-shrink-0" size={22} />
-            <div className="flex-1 text-sm"><span className="font-semibold">{t('Verify your identity (KYC)', 'Thibitisha utambulisho (KYC)')}</span> — {t('required before you can go online.', 'lazima kabla ya kuanza kazi.')}</div>
+            <div className="flex-1 text-sm"><span className="font-semibold">{t('Verify your identity (KYC)', 'Thibitisha utambulisho (KYC)')}</span> — {t('to earn your verified badge.', 'kupata beji ya uthibitisho.')}</div>
             <span className="flex-shrink-0 rounded-full bg-warning px-3 py-1 text-xs font-bold text-white">{t('Verify', 'Thibitisha')}</span>
           </Card></Link>
         )}
 
-        <button onClick={toggleOnline} disabled={!verified && !online} className={cn('flex w-full items-center justify-center gap-2 rounded-ds-xl py-4 text-base font-bold shadow-ds-btn transition active:scale-[.99] disabled:opacity-50', online ? 'bg-ink/80 text-white' : 'bg-grad-leaf text-white')}>
+        <button onClick={toggleOnline} className={cn('flex w-full items-center justify-center gap-2 rounded-ds-xl py-4 text-base font-bold shadow-ds-btn transition active:scale-[.99]', online ? 'bg-ink/80 text-white' : 'bg-grad-leaf text-white')}>
           <Power size={20} /> {online ? t('Go offline', 'Maliza (Offline)') : t('Go online — receive jobs', 'Anza kupokea kazi (Online)')}
         </button>
 

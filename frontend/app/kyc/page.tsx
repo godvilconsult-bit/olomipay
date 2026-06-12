@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Camera, IdCard, ShieldCheck, Clock, Upload } from 'lucide-react';
+import { ArrowLeft, Camera, CreditCard, ShieldCheck, Clock, Upload } from 'lucide-react';
 import { kyc, auth, Role } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 import { Card, Button, Field, Spinner, cn } from '../../components/ui';
@@ -101,7 +101,7 @@ export default function KycPage() {
                 <Field label={t('ID number', 'Namba ya kitambulisho')} value={form.idNumber} onChange={(e) => setForm((f) => ({ ...f, idNumber: e.target.value }))} />
               </div>
               <Shot url={selfie} on={(e: any) => pick(e, 'selfie')} label={t('Selfie photo', 'Picha ya uso')} icon={<Camera size={28} />} capture="user" />
-              <Shot url={idImg} on={(e: any) => pick(e, 'id')} label={t('ID document photo', 'Picha ya kitambulisho')} icon={<IdCard size={28} />} capture="environment" />
+              <Shot url={idImg} on={(e: any) => pick(e, 'id')} label={t('ID document photo', 'Picha ya kitambulisho')} icon={<CreditCard size={28} />} capture="environment" />
               <Button variant="primary" className="w-full" loading={busy} onClick={submit}><Upload size={17} /> {t('Submit for verification', 'Wasilisha kwa uthibitisho')}</Button>
             </Card>
           </>
