@@ -62,6 +62,7 @@ router.post('/register', authLimiter, async (req, res) => {
     vehicleType:  z.enum(['MOTORBIKE', 'BAJAJI', 'CAR', 'TRUCK', 'BICYCLE']).optional(),
     lat:          z.number().optional(),
     lng:          z.number().optional(),
+    referralCode: z.string().max(20).optional(),
   }).safeParse(req.body);
 
   if (!parse.success) return res.status(400).json({ error: parse.error.errors[0].message });
@@ -90,6 +91,15 @@ router.post('/register', authLimiter, async (req, res) => {
       }),
     },
   });
+
+  // Link a referral if a valid invite code was supplied (rewarded on first completed order).
+  if (parse.data.referralCode) {
+    const referrer = await prisma.user.findUnique({ where: { referralCode: parse.data.referralCode.toUpperCase() }, select: { id: true } });
+    if (referrer && referrer.id !== user.id) {
+      await prisma.user.update({ where: { id: user.id }, data: { referredById: referrer.id } }).catch(() => {});
+      await prisma.referral.create({ data: { referrerId: referrer.id, refereeId: user.id } }).catch(() => {});
+    }
+  }
 
   const accessToken  = signAccess(user.id, phone, user.role);
   const refreshToken = signRefresh(user.id);

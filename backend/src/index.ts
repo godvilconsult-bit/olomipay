@@ -49,6 +49,8 @@ async function loadRoutes() {
     ['/api/kyc',       () => import('./routes/kyc'),       'kycRouter'],
     ['/api/ads',       () => import('./routes/ads'),       'adsRouter'],
     ['/api/wallet',    () => import('./routes/wallet'),    'walletRouter'],
+    ['/api/subscriptions', () => import('./routes/subscriptions'), 'subscriptionsRouter'],
+    ['/api/referrals', () => import('./routes/referrals'), 'referralsRouter'],
     ['/api/admin',     () => import('./routes/admin'),     'adminRouter'],
   ];
   for (const [path, load, name] of mounts) {
@@ -94,6 +96,10 @@ httpServer.listen(PORT, async () => {
     const { seedIfEmpty } = await import('./services/seedData');
     await seedIfEmpty();
   } catch (e: any) { console.error('[seed]', e.message); }
+  try {
+    const { startSubscriptionScheduler } = await import('./services/subscriptions');
+    startSubscriptionScheduler();
+  } catch (e: any) { console.error('[subscriptions]', e.message); }
 });
 
 export default app;

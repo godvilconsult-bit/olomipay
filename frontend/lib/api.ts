@@ -109,7 +109,7 @@ async function tryRefresh(token: string): Promise<boolean> {
 // ── Endpoints ─────────────────────────────────────────────────────────────────
 
 export const auth = {
-  register: (body: { phone: string; pin: string; role: Role; name?: string; region?: string; businessName?: string; vehicleType?: string }) =>
+  register: (body: { phone: string; pin: string; role: Role; name?: string; region?: string; businessName?: string; vehicleType?: string; lat?: number; lng?: number; referralCode?: string }) =>
     apiFetch('/api/auth/register', { method: 'POST', body: JSON.stringify(body), skipAuth: true }),
   login: (phone: string, pin: string) =>
     apiFetch('/api/auth/login', { method: 'POST', body: JSON.stringify({ phone, pin }), skipAuth: true }),
@@ -179,6 +179,20 @@ export const suppliers = {
     apiFetch('/api/suppliers/restock', { method: 'POST', body: JSON.stringify(body) }),
   payouts:   () => apiFetch('/api/suppliers/payouts'),
   upgradeRequest: (tier: 'STANDARD' | 'PREMIUM') => apiFetch('/api/suppliers/upgrade-request', { method: 'POST', body: JSON.stringify({ tier }) }),
+};
+
+// Auto-refill subscriptions (Tier 3)
+export const subscriptions = {
+  list:      () => apiFetch<{ subscriptions: any[] }>('/api/subscriptions'),
+  fromOrder: (orderId: string, intervalDays: number) => apiFetch(`/api/subscriptions/from-order/${orderId}`, { method: 'POST', body: JSON.stringify({ intervalDays }) }),
+  pause:     (id: string, isActive: boolean) => apiFetch(`/api/subscriptions/${id}`, { method: 'PATCH', body: JSON.stringify({ isActive }) }),
+  cancel:    (id: string) => apiFetch(`/api/subscriptions/${id}`, { method: 'DELETE' }),
+};
+
+// Referrals + loyalty (Tier 3)
+export const referrals = {
+  me:     () => apiFetch<{ code: string; invited: number; rewarded: number; loyaltyPoints: number; redeemRate: number; minRedeem: number }>('/api/referrals/me'),
+  redeem: (points: number) => apiFetch<{ ok: boolean; credited: number; balance: number }>('/api/referrals/redeem', { method: 'POST', body: JSON.stringify({ points }) }),
 };
 
 // Wallet / ledger (riders + suppliers)

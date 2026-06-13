@@ -7,6 +7,7 @@ import { makeOrderNo } from '../lib/ids';
 import { notify } from '../services/notify';
 import { refundPayment } from '../services/payments';
 import { sendSms } from '../services/sms';
+import { onOrderCompleted } from '../services/rewards';
 import { emitToUser } from '../socket';
 
 const router = Router();
@@ -20,9 +21,10 @@ const orderInclude = {
   review:   true,
 } as const;
 
-// Core placement logic — shared by POST / (manual) and POST /:id/reorder (1-tap).
+// Core placement logic — shared by POST / (manual), POST /:id/reorder (1-tap),
+// and the auto-refill subscription scheduler.
 // Throws Error with an `http` status code on validation failures.
-async function placeOrder(
+export async function placeOrder(
   userId: string, supplierId: string, addressId: string,
   items: { inventoryId: string; qty: number }[], note?: string,
 ) {
@@ -219,6 +221,7 @@ router.post('/:id/complete', requireRole('HOUSEHOLD'), async (req: AuthRequest, 
   if (!order) return res.status(404).json({ error: 'Order not found' });
   if (order.status !== 'DELIVERED') return res.status(409).json({ error: 'Order is not awaiting confirmation' });
   const updated = await prisma.order.update({ where: { id: order.id }, data: { status: 'COMPLETED', completedAt: new Date() }, include: orderInclude });
+  onOrderCompleted(order.id).catch(() => {}); // loyalty points + referral bonus (best-effort)
   res.json({ order: updated });
 });
 

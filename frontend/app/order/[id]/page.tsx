@@ -4,8 +4,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Check, Bike, Phone, ShieldCheck, Star, Smartphone, Banknote, HandCoins } from 'lucide-react';
-import { orders, getAccessToken } from '../../../lib/api';
+import { ArrowLeft, Check, Bike, Phone, ShieldCheck, Star, Smartphone, Banknote, HandCoins, RefreshCw } from 'lucide-react';
+import { orders, subscriptions, getAccessToken } from '../../../lib/api';
 import { useSocket } from '../../../lib/useSocket';
 import { useT } from '../../../lib/i18n';
 import { localPhone } from '../../../lib/utils';
@@ -37,6 +37,7 @@ export default function OrderPage() {
   const [order, setOrder] = useState<any>(null);
   const [stars, setStars] = useState(0);
   const [busy, setBusy]   = useState(false);
+  const [subBusy, setSubBusy] = useState(false);
   const [riderPos, setRiderPos] = useState<{ lat: number; lng: number } | null>(null);
 
   const STEPS = [t('Placed', 'Imetumwa'), t('Confirmed', 'Imethibitishwa'), t('Rider found', 'Dereva amepatikana'), t('Fee confirmed', 'Ada imethibitishwa'), t('On the way', 'Njiani'), t('Arrived', 'Imefika')];
@@ -64,6 +65,7 @@ export default function OrderPage() {
   async function pay(provider: string) { setBusy(true); try { await orders.pay(id, { provider }); toast.success(provider === 'CASH' ? t("You'll pay cash", 'Utalipa cash') : t('Check your phone to pay', 'Angalia simu kulipa')); setTimeout(load, 2000); } catch (e: any) { toast.error(e?.message); } finally { setBusy(false); } }
   async function complete() { try { await orders.complete(id); toast.success(t('Thank you!', 'Asante!')); load(); } catch (e: any) { toast.error(e?.message); } }
   async function review(n: number) { setStars(n); try { await orders.review(id, { supplierRating: n, riderRating: n }); toast.success(t('Thanks for the rating!', 'Asante!')); } catch {} }
+  async function autoRefill(days: number) { setSubBusy(true); try { await subscriptions.fromOrder(id, days); toast.success(t('Auto-refill scheduled 🔁', 'Urejeshaji umewekwa 🔁')); } catch (e: any) { toast.error(e?.message ?? t('Failed', 'Imeshindikana')); } finally { setSubBusy(false); } }
 
   const markers: MapMarker[] = [];
   if (order.address) markers.push({ lat: order.address.lat, lng: order.address.lng, kind: 'dest', label: t('Your location', 'Eneo lako'), name: t('Your location', 'Eneo lako') });
@@ -165,6 +167,18 @@ export default function OrderPage() {
           <Card className="text-center">
             <div className="mb-2 text-sm font-semibold">{t('Rate the rider and vendor', 'Mpe nyota dereva na muuzaji')}</div>
             <div className="flex justify-center gap-1">{[1, 2, 3, 4, 5].map((n) => <button key={n} onClick={() => review(n)}><Star size={30} className={cn(n <= stars ? 'fill-ember text-ember' : 'text-black/20')} /></button>)}</div>
+          </Card>
+        )}
+
+        {['DELIVERED', 'COMPLETED'].includes(order.status) && (
+          <Card>
+            <div className="flex items-center gap-2 text-sm font-bold"><RefreshCw size={16} className="text-leaf-dark" /> {t('Never run out — auto-refill', 'Usiishiwe — rejesha otomatiki')}</div>
+            <p className="mt-1 text-xs text-ink/50">{t('Re-order this automatically and pay each time it arrives.', 'Agiza hii kiotomatiki na ulipe kila inapofika.')}</p>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              {[14, 30, 45].map((d) => (
+                <Button key={d} variant="ghost" loading={subBusy} onClick={() => autoRefill(d)}>{t('Every', 'Kila')} {d}d</Button>
+              ))}
+            </div>
           </Card>
         )}
       </div>

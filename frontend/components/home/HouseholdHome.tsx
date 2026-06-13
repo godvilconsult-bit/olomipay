@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import toast from 'react-hot-toast';
-import { MapPin, Star, BadgeCheck, Search, Navigation, Package, List, Map as MapIcon, HandCoins, Bike, Smartphone, Banknote, RotateCcw, Store, ChevronRight } from 'lucide-react';
+import { MapPin, Star, BadgeCheck, Search, Navigation, Package, List, Map as MapIcon, HandCoins, Bike, Smartphone, Banknote, RotateCcw, Store, ChevronRight, RefreshCw, Gift, Wallet } from 'lucide-react';
 import { vendors, orders, addresses, ads, getAccessToken, JikoUser, type BrandAd } from '../../lib/api';
 import { useSocket } from '../../lib/useSocket';
 import { useT } from '../../lib/i18n';
@@ -224,6 +224,13 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
             )}
           </Card>
         )}
+
+        {/* quick links */}
+        <div className="grid grid-cols-3 gap-2">
+          <Link href="/subscriptions" className="flex flex-col items-center gap-1 rounded-2xl bg-white p-3 text-center shadow-ds-card"><RefreshCw size={18} className="text-leaf-dark" /><span className="text-[11px] font-semibold">{t('Auto-refill', 'Rejesha')}</span></Link>
+          <Link href="/invite" className="flex flex-col items-center gap-1 rounded-2xl bg-white p-3 text-center shadow-ds-card"><Gift size={18} className="text-flame" /><span className="text-[11px] font-semibold">{t('Invite', 'Alika')}</span></Link>
+          <Link href="/wallet" className="flex flex-col items-center gap-1 rounded-2xl bg-white p-3 text-center shadow-ds-card"><Wallet size={18} className="text-ink" /><span className="text-[11px] font-semibold">{t('Wallet', 'Pochi')}</span></Link>
+        </div>
 
         {/* filters */}
         <div className="flex gap-2">

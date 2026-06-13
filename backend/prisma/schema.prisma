@@ -149,6 +149,11 @@ model User {
   isFrozen        Boolean   @default(false)
   isAdmin         Boolean   @default(false)
 
+  // Growth: referrals + loyalty (Tier 3)
+  referralCode    String?   @unique
+  referredById    String?
+  loyaltyPoints   Int       @default(0)
+
   // Login lockout
   failedLoginCount Int      @default(0)
   lockedUntil      DateTime?
@@ -171,6 +176,8 @@ model User {
   reviews           Review[]           @relation("ReviewAuthor")
   wallet            Wallet?
   cashoutRequests   CashoutRequest[]
+  subscriptions     Subscription[]
+  referralsMade     Referral[]         @relation("Referrer")
 }
 
 model RefreshToken {
@@ -461,6 +468,39 @@ model CashoutRequest {
 
   @@index([userId, status])
   @@index([status, createdAt])
+}
+
+// ── Auto-refill subscriptions (Tier 3 retention) ─────────────────────────────────
+model Subscription {
+  id           String   @id @default(cuid())
+  householdId  String
+  supplierId   String
+  addressId    String
+  items        Json     // [{ productId, qty }] — re-resolved to live stock each run
+  intervalDays Int      @default(30)
+  nextRunAt    DateTime
+  isActive     Boolean  @default(true)
+  lastOrderId  String?
+  lastRunAt    DateTime?
+  createdAt    DateTime @default(now())
+  household    User     @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@index([isActive, nextRunAt])
+  @@index([householdId])
+}
+
+// ── Referrals (Tier 3 growth) ────────────────────────────────────────────────────
+model Referral {
+  id          String       @id @default(cuid())
+  referrerId  String
+  refereeId   String       @unique          // one reward per referred user
+  status      PayoutStatus @default(PENDING) // PENDING until referee's 1st completed order
+  reward      Float        @default(0)
+  createdAt   DateTime     @default(now())
+  rewardedAt  DateTime?
+  referrer    User         @relation("Referrer", fields: [referrerId], references: [id], onDelete: Cascade)
+
+  @@index([referrerId])
 }
 
 // ── Supply-chain (middle-mile restock) ──────────────────────────────────────────

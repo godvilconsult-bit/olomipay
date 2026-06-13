@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
@@ -18,8 +18,12 @@ export default function RegisterPage() {
   const router = useRouter();
   const { t } = useT();
   const [role, setRole] = useState<Role>('HOUSEHOLD');
-  const [form, setForm] = useState({ name: '', phone: '', pin: '', region: 'Dar es Salaam', businessName: '', vehicleType: 'MOTORBIKE' });
+  const [form, setForm] = useState({ name: '', phone: '', pin: '', region: 'Dar es Salaam', businessName: '', vehicleType: 'MOTORBIKE', referralCode: '' });
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  // Pre-fill an invite code from a shared link (/auth/register?ref=CODE).
+  useEffect(() => {
+    try { const ref = new URLSearchParams(window.location.search).get('ref'); if (ref) setForm((f) => ({ ...f, referralCode: ref.toUpperCase() })); } catch {}
+  }, []);
   const [locating, setLocating] = useState(false);
   const [loading, setLoading] = useState(false);
   const set = (k: string) => (e: any) => setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -64,6 +68,7 @@ export default function RegisterPage() {
         ...(role === 'SUPPLIER' && { businessName: form.businessName || form.name }),
         ...(role === 'RIDER' && { vehicleType: form.vehicleType }),
         ...(coords && { lat: coords.lat, lng: coords.lng }),
+        ...(form.referralCode && { referralCode: form.referralCode }),
       } as any);
       setTokens(res.accessToken, res.refreshToken);
       toast.success(t('Account created!', 'Akaunti imefunguliwa!'));
@@ -135,6 +140,7 @@ export default function RegisterPage() {
           </div>
 
           <Field label={t('Create a 4-digit PIN', 'Weka PIN ya tarakimu 4')} type="password" inputMode="numeric" maxLength={4} placeholder="••••" value={form.pin} onChange={(e) => setForm((f) => ({ ...f, pin: e.target.value.replace(/\D/g, '') }))} required />
+          <Field label={t('Invite code (optional)', 'Namba ya mwaliko (hiari)')} placeholder="JKXXXXX" value={form.referralCode} onChange={(e) => setForm((f) => ({ ...f, referralCode: e.target.value.toUpperCase() }))} />
           <Button type="submit" loading={loading} className="w-full">{t('Create account', 'Fungua akaunti')}</Button>
         </form>
 

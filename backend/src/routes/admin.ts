@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma';
 import { requireAdmin, AuthRequest } from '../middleware/auth';
 import { notify } from '../services/notify';
 import { postTxn } from '../services/wallet';
+import { runDueSubscriptions } from '../services/subscriptions';
 import { hashPin } from '../lib/pin';
 
 const router = Router();
@@ -253,6 +254,12 @@ router.post('/cashouts/:id/reject', requireAdmin, async (req: AuthRequest, res) 
   await prisma.cashoutRequest.update({ where: { id: cr.id }, data: { status: 'FAILED' } });
   await notify(cr.userId, { title: 'Cash-out declined', body: `Your TZS ${cr.amount.toLocaleString()} request was declined and returned to your balance.`, type: 'payout' });
   res.json({ ok: true });
+});
+
+// ── POST /api/admin/run-subscriptions ─ fire due auto-refills now (ops/testing) ──
+router.post('/run-subscriptions', requireAdmin, async (_req: AuthRequest, res) => {
+  const placed = await runDueSubscriptions();
+  res.json({ ok: true, placed });
 });
 
 // ── POST /api/admin/seed-demo ─ KYC-approved demo supplier + rider + household ────
