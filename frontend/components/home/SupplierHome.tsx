@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { Store, Bell, AlertTriangle, Check, X, MapPin, Bike, Smartphone, Banknote, Clock, ShieldAlert, Navigation } from 'lucide-react';
+import { Store, Bell, AlertTriangle, Check, X, MapPin, Bike, Smartphone, Banknote, Clock, ShieldAlert, Navigation, Wallet, ChevronRight } from 'lucide-react';
 import { suppliers, getAccessToken, JikoUser } from '../../lib/api';
 import { useSocket } from '../../lib/useSocket';
 import { useT } from '../../lib/i18n';
@@ -157,6 +157,8 @@ export function SupplierHome({ user }: { user: JikoUser }) {
               : t('Thanks for being a paid partner. Contact admin to change your plan.', 'Asante kwa kuwa mshirika. Wasiliana na admin kubadili mpango.')}
           </div>
         </Card>
+
+        <Link href="/wallet"><Card className="flex items-center justify-between !p-3.5"><span className="flex items-center gap-2 font-semibold"><Wallet size={17} className="text-leaf-dark" /> {t('Wallet & cash-out', 'Pochi & toa pesa')}</span><ChevronRight size={18} className="text-ink/30" /></Card></Link>
 
         {me.stats.lowStock > 0 && (
           <Card className="flex items-center gap-3 border-warning/30 !bg-warning/5">

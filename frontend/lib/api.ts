@@ -181,6 +181,14 @@ export const suppliers = {
   upgradeRequest: (tier: 'STANDARD' | 'PREMIUM') => apiFetch('/api/suppliers/upgrade-request', { method: 'POST', body: JSON.stringify({ tier }) }),
 };
 
+// Wallet / ledger (riders + suppliers)
+export interface WalletTxn { id: string; type: string; amount: number; balanceAfter: number; note?: string | null; orderId?: string | null; createdAt: string }
+export const wallet = {
+  get:     () => apiFetch<{ balance: number; currency: string; txns: WalletTxn[]; pendingCashouts: any[] }>('/api/wallet'),
+  cashout: (body: { amount: number; phone?: string; provider?: string }) => apiFetch('/api/wallet/cashout', { method: 'POST', body: JSON.stringify(body) }),
+  settle:  () => apiFetch<{ ok: boolean; balance: number; settled: number }>('/api/wallet/settle', { method: 'POST' }),
+};
+
 // Brand ads (Phase 3) — sponsored placements on the household home.
 export const ads = {
   active: (region?: string) => apiFetch<{ ad: BrandAd | null }>(`/api/ads/active${region ? `?region=${encodeURIComponent(region)}` : ''}`),
@@ -203,6 +211,10 @@ export const adminApi = {
   createAd:   (body: { brand: string; title: string; subtitle?: string; imageUrl?: string; ctaLabel?: string; region?: string; type?: string; weight?: number }) => apiFetch('/api/admin/ads', { method: 'POST', body: JSON.stringify(body) }),
   patchAd:    (id: string, body: { isActive?: boolean; weight?: number }) => apiFetch(`/api/admin/ads/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   deleteAd:   (id: string) => apiFetch(`/api/admin/ads/${id}`, { method: 'DELETE' }),
+  // T1 — cash-out disbursements
+  cashouts:     () => apiFetch<{ requests: any[] }>('/api/admin/cashouts'),
+  payCashout:   (id: string, ref?: string) => apiFetch(`/api/admin/cashouts/${id}/paid`, { method: 'POST', body: JSON.stringify({ ref }) }),
+  rejectCashout:(id: string) => apiFetch(`/api/admin/cashouts/${id}/reject`, { method: 'POST' }),
 };
 
 export const notifications = {

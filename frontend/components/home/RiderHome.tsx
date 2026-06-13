@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import toast from 'react-hot-toast';
-import { Power, Bike, MapPin, Package, Star, CheckCircle2, Navigation, Phone, Camera, Clock, ShieldAlert, BadgeCheck } from 'lucide-react';
+import { Power, Bike, MapPin, Package, Star, CheckCircle2, Navigation, Phone, Camera, Clock, ShieldAlert, BadgeCheck, Wallet, ChevronRight } from 'lucide-react';
 import { jobs, getAccessToken, JikoUser } from '../../lib/api';
 import { useSocket } from '../../lib/useSocket';
 import { useT } from '../../lib/i18n';
@@ -136,6 +136,8 @@ export function RiderHome({ user }: { user: JikoUser }) {
           <Stat label={t('Trips', 'Safari')} value={earn.totalDeliveries} />
           <Stat label={t('Rating', 'Nyota')} value={<span className="inline-flex items-center gap-1"><Star size={16} className="fill-ember text-ember" />{earn.rating ? earn.rating.toFixed(1) : '—'}</span>} />
         </div>
+
+        <Link href="/wallet"><Card className="flex items-center justify-between !p-3.5"><span className="flex items-center gap-2 font-semibold"><Wallet size={17} className="text-leaf-dark" /> {t('Wallet & cash-out', 'Pochi & toa pesa')}</span><ChevronRight size={18} className="text-ink/30" /></Card></Link>
 
         {/* ACTIVE JOB */}
         {o ? (

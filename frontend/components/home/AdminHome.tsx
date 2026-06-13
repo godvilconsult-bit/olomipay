@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Users, ShieldCheck, Activity, Phone, Home, Store, Bike, Trash2, Star, Megaphone, Plus, TrendingUp } from 'lucide-react';
+import { Users, ShieldCheck, Activity, Phone, Home, Store, Bike, Trash2, Star, Megaphone, Plus, TrendingUp, Banknote, Check, X } from 'lucide-react';
 import { adminApi, JikoUser } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 import { localPhone, timeAgo } from '../../lib/utils';
@@ -23,17 +23,22 @@ export function AdminHome({ user }: { user: JikoUser }) {
   const [adList, setAdList] = useState<any[]>([]);
   const [adForm, setAdForm] = useState({ brand: '', title: '', subtitle: '', ctaLabel: '', region: '', type: '', weight: '1' });
   const [adBusy, setAdBusy] = useState(false);
+  const [cashouts, setCashouts] = useState<any[]>([]);
 
   async function load() {
-    const [s, u, o, k, sp, ad] = await Promise.all([
+    const [s, u, o, k, sp, ad, co] = await Promise.all([
       adminApi.stats().catch(() => null), adminApi.users().catch(() => ({ users: [] })),
       adminApi.orders().catch(() => ({ orders: [] })), adminApi.kycPending().catch(() => ({ pending: [] })),
       adminApi.suppliers().catch(() => ({ suppliers: [] })), adminApi.ads().catch(() => ({ ads: [] })),
+      adminApi.cashouts().catch(() => ({ requests: [] })),
     ]);
     setStats(s); setUsers(u.users ?? []); setOrders(o.orders ?? []); setKyc(k.pending ?? []);
-    setSups(sp.suppliers ?? []); setAdList(ad.ads ?? []);
+    setSups(sp.suppliers ?? []); setAdList(ad.ads ?? []); setCashouts(co.requests ?? []);
   }
   useEffect(() => { load(); }, []);
+
+  async function payCashout(id: string) { try { await adminApi.payCashout(id); toast.success(t('Marked paid', 'Imelipwa')); load(); } catch (e: any) { toast.error(e?.message ?? t('Failed', 'Imeshindikana')); } }
+  async function rejectCashout(id: string) { try { await adminApi.rejectCashout(id); toast(t('Refunded to wallet', 'Imerejeshwa')); load(); } catch (e: any) { toast.error(e?.message ?? t('Failed', 'Imeshindikana')); } }
 
   async function setTier(id: string, tier: string) {
     setSups((arr) => arr.map((s) => s.id === id ? { ...s, tier } : s));
@@ -189,6 +194,24 @@ export function AdminHome({ user }: { user: JikoUser }) {
 
         {tab === 'growth' && (
           <div className="space-y-5">
+            {/* Cash-out disbursements (T1) */}
+            <div>
+              <h2 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-ink/70"><Banknote size={15} /> {t('Cash-out requests', 'Maombi ya kutoa pesa')} ({cashouts.length})</h2>
+              {cashouts.length === 0 ? <p className="py-3 text-center text-sm text-ink/50">{t('No pending cash-outs.', 'Hakuna maombi.')}</p> :
+                <div className="space-y-2">
+                  {cashouts.map((c) => (
+                    <Card key={c.id} className="flex items-center gap-2 !p-3">
+                      <div className="min-w-0 flex-1">
+                        <Money value={c.amount} className="text-sm" />
+                        <div className="truncate text-xs text-ink/50">{c.user?.name ?? '—'} · {c.user?.role} · {c.phone ?? localPhone(c.user?.phone)}</div>
+                      </div>
+                      <button onClick={() => rejectCashout(c.id)} className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-lg bg-black/5 text-danger"><X size={16} /></button>
+                      <Button variant="leaf" onClick={() => payCashout(c.id)} className="flex-shrink-0 !px-3"><Check size={16} /> {t('Paid', 'Lipa')}</Button>
+                    </Card>
+                  ))}
+                </div>}
+            </div>
+
             {/* Supplier plans + featured slots (Phase 2) */}
             <div>
               <h2 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-ink/70"><Star size={15} /> {t('Supplier plans & featured', 'Mipango ya wauzaji')}</h2>

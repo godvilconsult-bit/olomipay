@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { requireRole, AuthRequest } from '../middleware/auth';
 import { settlementSplit } from '../lib/fees';
+import { walletPost } from '../services/wallet';
 import { haversineKm, etaMinutes } from '../lib/geo';
 import { notify } from '../services/notify';
 import { emitToUser } from '../socket';
@@ -121,11 +122,22 @@ router.post('/:orderId/deliver', requireRole('RIDER'), async (req: AuthRequest, 
   const order = await prisma.order.findUnique({ where: { id: req.params.orderId }, include: { supplier: true, payment: true } });
   if (!order) return res.status(404).json({ error: 'Order not found' });
   const split = settlementSplit({ itemsTotal: order.itemsTotal, deliveryFee: order.deliveryFee, serviceFee: order.serviceFee, commissionAmount: order.commissionAmount });
+  // Cash the rider physically collected on delivery:
+  //   CASH order   → the whole total (gas + service + delivery)
+  //   prepaid order → just the delivery fee
+  const cashCollected = order.payment?.provider === 'CASH' ? order.total : order.deliveryFee;
+  // Net change to the rider's wallet. Negative = the rider is holding the
+  // platform's (and supplier's) money as cash and owes it back — the cash float.
+  const riderNetToWallet = Math.round(split.riderAmount - cashCollected);
 
   await prisma.$transaction(async (tx) => {
     await tx.delivery.update({ where: { id: delivery.id }, data: { status: 'DELIVERED', deliveredAt: new Date(), proofPhotoUrl: parse.data.proofPhotoUrl ?? null } });
     await tx.order.update({ where: { id: order.id }, data: { status: 'DELIVERED', deliveredAt: new Date() } });
     if (order.payment && order.payment.status !== 'PAID') await tx.payment.update({ where: { id: order.payment.id }, data: { status: 'PAID', paidAt: new Date(), provider: order.payment.provider ?? 'CASH' } });
+    // Supplier is owed their cut; rider's fee is credited and the cash they hold debited.
+    await walletPost(tx, order.supplier.userId, 'EARNING', split.supplierAmount, order.id, `Sale ${order.orderNo}`);
+    await walletPost(tx, req.userId!, riderNetToWallet >= 0 ? 'EARNING' : 'CASH_FLOAT', riderNetToWallet, order.id, `Delivery ${order.orderNo}`);
+    // Keep a per-order payout record for history/reconciliation.
     await tx.payout.createMany({ data: [
       { userId: order.supplier.userId, orderId: order.id, role: 'SUPPLIER', amount: split.supplierAmount, status: 'PENDING' },
       { userId: req.userId!,           orderId: order.id, role: 'RIDER',    amount: split.riderAmount,    status: 'PENDING' },

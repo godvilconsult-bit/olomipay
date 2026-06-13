@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { requireAdmin, AuthRequest } from '../middleware/auth';
 import { notify } from '../services/notify';
+import { postTxn } from '../services/wallet';
 import { hashPin } from '../lib/pin';
 
 const router = Router();
@@ -222,6 +223,35 @@ router.patch('/ads/:id', requireAdmin, async (req: AuthRequest, res) => {
 
 router.delete('/ads/:id', requireAdmin, async (req: AuthRequest, res) => {
   await prisma.brandAd.deleteMany({ where: { id: req.params.id } });
+  res.json({ ok: true });
+});
+
+// ── Cash-out disbursements (T1) ───────────────────────────────────────────────────
+router.get('/cashouts', requireAdmin, async (_req: AuthRequest, res) => {
+  const requests = await prisma.cashoutRequest.findMany({
+    where:   { status: 'PENDING' },
+    include: { user: { select: { name: true, phone: true, role: true } } },
+    orderBy: { createdAt: 'asc' },
+  });
+  res.json({ requests });
+});
+
+router.post('/cashouts/:id/paid', requireAdmin, async (req: AuthRequest, res) => {
+  const cr = await prisma.cashoutRequest.findUnique({ where: { id: req.params.id } });
+  if (!cr || cr.status !== 'PENDING') return res.status(404).json({ error: 'Request not found or already handled' });
+  // Funds were already debited from the wallet at request time — just record the payout.
+  await prisma.cashoutRequest.update({ where: { id: cr.id }, data: { status: 'PAID', paidAt: new Date(), providerRef: req.body?.ref ?? null } });
+  await notify(cr.userId, { title: 'Cash-out paid ✅', body: `TZS ${cr.amount.toLocaleString()} has been sent to your mobile wallet.`, type: 'payout' });
+  res.json({ ok: true });
+});
+
+router.post('/cashouts/:id/reject', requireAdmin, async (req: AuthRequest, res) => {
+  const cr = await prisma.cashoutRequest.findUnique({ where: { id: req.params.id } });
+  if (!cr || cr.status !== 'PENDING') return res.status(404).json({ error: 'Request not found or already handled' });
+  // Return the reserved funds to the user's wallet.
+  await postTxn(cr.userId, 'ADJUSTMENT', cr.amount, { note: 'Cash-out rejected — refunded' });
+  await prisma.cashoutRequest.update({ where: { id: cr.id }, data: { status: 'FAILED' } });
+  await notify(cr.userId, { title: 'Cash-out declined', body: `Your TZS ${cr.amount.toLocaleString()} request was declined and returned to your balance.`, type: 'payout' });
   res.json({ ok: true });
 });
 

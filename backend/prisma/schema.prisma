@@ -79,6 +79,17 @@ enum PayoutStatus {
   FAILED
 }
 
+enum WalletTxnType {
+  EARNING        // delivery / sale earnings credited to the user
+  CASH_FLOAT     // rider collected cash → owes the platform its share (debit)
+  PAYOUT         // disbursed to the user (debit)
+  SETTLEMENT     // rider/supplier paid the platform what they owed (credit)
+  REFERRAL       // referral bonus credit
+  LOYALTY        // loyalty redemption
+  REFUND         // refund credited
+  ADJUSTMENT     // manual admin correction
+}
+
 enum RestockStatus {
   REQUESTED
   ACCEPTED
@@ -158,6 +169,8 @@ model User {
   deliveries        Delivery[]         @relation("RiderDeliveries")
   payouts           Payout[]
   reviews           Review[]           @relation("ReviewAuthor")
+  wallet            Wallet?
+  cashoutRequests   CashoutRequest[]
 }
 
 model RefreshToken {
@@ -404,6 +417,50 @@ model Payout {
   user User @relation(fields: [userId], references: [id])
 
   @@index([userId, status])
+}
+
+// ── Wallet + ledger (rider/supplier balances + rider cash float) ─────────────────
+// balance = net TZS the platform owes the user. NEGATIVE means the user owes the
+// platform (e.g. a rider who collected cash-on-delivery owes the platform its cut).
+model Wallet {
+  id        String      @id @default(cuid())
+  userId    String      @unique
+  balance   Float       @default(0)
+  currency  String      @default("TZS")
+  updatedAt DateTime    @updatedAt
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  txns      WalletTxn[]
+}
+
+model WalletTxn {
+  id           String        @id @default(cuid())
+  walletId     String
+  type         WalletTxnType
+  amount       Float         // signed: + credit to user, − debit
+  balanceAfter Float
+  orderId      String?
+  note         String?
+  createdAt    DateTime      @default(now())
+  wallet       Wallet        @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@index([walletId, createdAt])
+}
+
+model CashoutRequest {
+  id          String       @id @default(cuid())
+  userId      String
+  amount      Float
+  status      PayoutStatus @default(PENDING)
+  provider    String?      // mobile wallet network
+  phone       String?
+  note        String?
+  providerRef String?
+  createdAt   DateTime     @default(now())
+  paidAt      DateTime?
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([status, createdAt])
 }
 
 // ── Supply-chain (middle-mile restock) ──────────────────────────────────────────
