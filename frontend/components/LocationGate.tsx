@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import { MapPin, ShieldAlert, Loader2, RefreshCw, Navigation, Lock } from 'lucide-react';
 import { useT } from '../lib/i18n';
 import { useLocationPermission, type DeviceInfo } from '../lib/useLocationPermission';
@@ -53,8 +53,17 @@ function Shell({ children }: { children: ReactNode }) {
 export function LocationGate({ children, softFallback }: { children: ReactNode; softFallback?: ReactNode }) {
   const { t } = useT();
   const { status, device, error, requesting, request, retry } = useLocationPermission();
+  const [bypass, setBypass] = useState(false);
 
-  if (status === 'granted') return <>{children}</>;
+  // Granted, or the user chose to continue without it (safety valve so a broken
+  // native plugin / blocked permission can never fully trap them in the app).
+  if (status === 'granted' || bypass) return <>{children}</>;
+
+  const SkipLink = () => (
+    <button onClick={() => setBypass(true)} className="mx-auto mt-4 block text-xs font-medium text-ink/40 underline underline-offset-2">
+      {t('Continue without location', 'Endelea bila eneo')}
+    </button>
+  );
 
   if (status === 'checking') {
     return <Shell><Loader2 className="mx-auto animate-spin text-flame" size={34} /><p className="mt-4 text-sm text-ink/60">{t('Checking location…', 'Inakagua eneo…')}</p></Shell>;
@@ -72,6 +81,7 @@ export function LocationGate({ children, softFallback }: { children: ReactNode; 
             : t('This browser does not provide location. Try Chrome or Safari, or install the app.', 'Browser hii haitoi eneo. Tumia Chrome au Safari, au sakinisha programu.')}
         </p>
         {softFallback && <div className="mt-6">{softFallback}</div>}
+        <SkipLink />
       </Shell>
     );
   }
@@ -113,6 +123,7 @@ export function LocationGate({ children, softFallback }: { children: ReactNode; 
       </button>
 
       <p className="mt-3 text-xs text-ink/40">{t('Your location is only used to match orders and show live delivery.', 'Eneo lako hutumika kuunganisha oda na kuonyesha usafirishaji pekee.')}</p>
+      <SkipLink />
     </Shell>
   );
 }

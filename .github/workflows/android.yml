@@ -32,8 +32,14 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Add Android platform
-        run: npx cap add android || npx cap sync android
+      - name: Add Android platform + sync native plugins
+        # `cap add` scaffolds the platform; the explicit `cap sync` AFTER it is
+        # what guarantees every plugin in package.json (incl. @capacitor/
+        # geolocation) is registered into the Gradle build. `add` alone has
+        # been shipping APKs without the geolocation native module.
+        run: |
+          npx cap add android || true
+          npx cap sync android
 
       - name: Add location permissions to manifest
         run: |
@@ -42,6 +48,17 @@ jobs:
             perl -0pi -e 's/(<application)/<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"\/>\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"\/>\n    $1/' "$MANIFEST"
           fi
           cat "$MANIFEST"
+
+      - name: Verify Geolocation plugin is in the build
+        # Fail the build (instead of the user) if the native module is missing.
+        run: |
+          if grep -riq "geolocation" android/capacitor.settings.gradle android/app/capacitor.build.gradle; then
+            echo "✓ @capacitor/geolocation registered in the Android build"
+          else
+            echo "::error::@capacitor/geolocation is NOT registered — the APK would fail with 'not implemented on android'"
+            echo '--- capacitor.settings.gradle ---'; cat android/capacitor.settings.gradle || true
+            exit 1
+          fi
 
       - name: Build debug APK
         run: |
