@@ -22,7 +22,9 @@ router.post('/:orderId/initiate', requireRole('HOUSEHOLD'), async (req: AuthRequ
   const provider = parse.data.provider ?? providerFromPhone(phone);
 
   if (provider === 'CASH') {
-    // Pay the rider in cash on delivery — nothing to collect now.
+    // Cash on delivery — nothing to collect now, but mark the order CASH so the
+    // supplier can confirm it (and settlement treats it as a cash collection).
+    await prisma.payment.update({ where: { orderId: order.id }, data: { provider: 'CASH' } });
     return res.json({ ok: true, status: 'PENDING', method: 'CASH' });
   }
 
