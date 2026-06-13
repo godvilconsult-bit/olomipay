@@ -5,6 +5,8 @@ import { requireRole, AuthRequest } from '../middleware/auth';
 import { makeOtp } from '../lib/ids';
 import { haversineKm, etaMinutes } from '../lib/geo';
 import { notify } from '../services/notify';
+import { refundPayment } from '../services/payments';
+import { sendSms } from '../services/sms';
 import { emitToUser } from '../socket';
 
 const router = Router();
@@ -145,6 +147,9 @@ router.post('/:orderId/assign-rider', requireRole('SUPPLIER'), async (req: AuthR
   });
   emitToUser(parse.data.riderId, 'job:offered', { orderId: order.id, vendor: profile.businessName });
   await notify(parse.data.riderId, { title: 'New pickup offer 🏍️', body: `${profile.businessName} → ${order.address.label}`, type: 'order', data: { orderId: order.id } });
+  // SMS the rider too — they may not have the app open / push set up yet.
+  const rider = await prisma.user.findUnique({ where: { id: parse.data.riderId }, select: { phone: true } });
+  if (rider) sendSms(rider.phone, `JIKO: New delivery from ${profile.businessName} to ${order.address.label}. Open the app to accept.`).catch(() => {});
   res.json({ ok: true });
 });
 
@@ -161,7 +166,9 @@ router.post('/:id/reject', requireRole('SUPPLIER'), async (req: AuthRequest, res
   });
   emitToUser(order.householdId, 'order:rejected', { orderId: order.id });
   await notify(order.householdId, { title: 'Order declined', body: `Sorry, ${profile.businessName} can't fulfil this order now.`, type: 'order', data: { orderId: order.id } });
-  res.json({ ok: true });
+  const refunded = await refundPayment(order.id);
+  if (refunded) await notify(order.householdId, { title: 'Refund initiated 💸', body: `TZS ${refunded.toLocaleString()} for ${order.orderNo} is being returned to your mobile money.`, type: 'payment', data: { orderId: order.id } });
+  res.json({ ok: true, refunded });
 });
 
 // ── Restock (middle-mile) ────────────────────────────────────────────────────────

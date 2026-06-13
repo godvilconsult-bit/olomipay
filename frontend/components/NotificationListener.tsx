@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import { getAccessToken } from '../lib/api';
 import { useSocket } from '../lib/useSocket';
 import { playAlert, primeAudio } from '../lib/sound';
+import { registerPush } from '../lib/push';
 
 // Global: every live notification (order, payment, pickup, delivery, KYC…) plays
 // a chime + shows a toast for whichever party it's sent to.
@@ -12,8 +13,9 @@ export function NotificationListener() {
   const { on } = useSocket(getAccessToken());
 
   useEffect(() => {
-    // Browsers block audio until the user interacts — unlock on the first tap.
-    const unlock = () => { primeAudio(); window.removeEventListener('pointerdown', unlock); };
+    // Browsers block audio until the user interacts — unlock on the first tap,
+    // and use that same gesture to register for background push notifications.
+    const unlock = () => { primeAudio(); registerPush(); window.removeEventListener('pointerdown', unlock); };
     window.addEventListener('pointerdown', unlock);
 
     const off = on('notification', (n: any) => {

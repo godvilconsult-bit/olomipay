@@ -221,6 +221,8 @@ export const notifications = {
   list:    () => apiFetch<{ notifications: any[]; unread: number }>('/api/notifications'),
   readAll: () => apiFetch('/api/notifications/read-all', { method: 'POST' }),
   read:    (id: string) => apiFetch(`/api/notifications/${id}/read`, { method: 'POST' }),
+  vapid:     () => apiFetch<{ publicKey: string | null }>('/api/notifications/vapid'),
+  subscribe: (body: { endpoint: string; keys: { p256dh: string; auth: string } }) => apiFetch('/api/notifications/subscribe', { method: 'POST', body: JSON.stringify(body) }),
 };
 
 export const kyc = {

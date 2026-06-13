@@ -5,6 +5,8 @@ import { requireRole, AuthRequest } from '../middleware/auth';
 import { computeOrderMoney } from '../lib/fees';
 import { makeOrderNo } from '../lib/ids';
 import { notify } from '../services/notify';
+import { refundPayment } from '../services/payments';
+import { sendSms } from '../services/sms';
 import { emitToUser } from '../socket';
 
 const router = Router();
@@ -188,7 +190,9 @@ router.post('/:id/cancel', requireRole('HOUSEHOLD'), async (req: AuthRequest, re
 
   emitToUser(order.supplier.userId, 'order:cancelled', { orderId: order.id });
   await notify(order.supplier.userId, { title: 'Order cancelled', body: `${order.orderNo} was cancelled by the household.`, type: 'order', data: { orderId: order.id } });
-  res.json({ ok: true });
+  const refunded = await refundPayment(order.id);
+  if (refunded) await notify(order.householdId, { title: 'Refund initiated 💸', body: `TZS ${refunded.toLocaleString()} for ${order.orderNo} is being returned to your mobile money.`, type: 'payment', data: { orderId: order.id } });
+  res.json({ ok: true, refunded });
 });
 
 // ── POST /api/orders/:id/confirm-fee ─ household agrees to the rider fee ──────────
@@ -204,6 +208,8 @@ router.post('/:id/confirm-fee', requireRole('HOUSEHOLD'), async (req: AuthReques
   }
   emitToUser(order.supplier.userId, 'order:tracking', { orderId: order.id });
   await notify(order.supplier.userId, { title: 'Delivery starting 🏍️', body: `${order.orderNo}: household confirmed the rider fee. Rider is collecting.`, type: 'order', data: { orderId: order.id } });
+  // SMS the household their delivery code as a fallback (works without data/push).
+  if (order.delivery?.otp && req.userPhone) sendSms(req.userPhone, `JIKO: Your delivery code is ${order.delivery.otp}. Give it to the rider when your gas arrives.`).catch(() => {});
   res.json({ ok: true });
 });
 

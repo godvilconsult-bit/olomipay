@@ -72,6 +72,18 @@ export async function initiatePayment(params: {
 }
 
 /**
+ * Refund a paid (mobile-money) order. No-op for unpaid or cash orders. Returns
+ * the refunded amount (0 if nothing to refund). In live mode this is where a
+ * provider reversal call would go; the record is marked REFUNDED either way.
+ */
+export async function refundPayment(orderId: string): Promise<number> {
+  const p = await prisma.payment.findUnique({ where: { orderId } });
+  if (!p || p.status !== 'PAID' || p.provider === 'CASH') return 0;
+  await prisma.payment.update({ where: { orderId }, data: { status: 'REFUNDED' } });
+  return p.amount;
+}
+
+/**
  * Mark a payment paid/failed by provider reference and notify the parties.
  * Called by the mock timer and by the live webhook (`/api/payments/callback`).
  */
