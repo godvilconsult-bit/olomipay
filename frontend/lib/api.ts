@@ -133,6 +133,8 @@ export const vendors = {
     return apiFetch(`/api/vendors/search?${params.toString()}`);
   },
   get: (id: string) => apiFetch(`/api/vendors/${id}`),
+  favorite:  (id: string) => apiFetch<{ favorited: boolean }>(`/api/vendors/${id}/favorite`, { method: 'POST' }),
+  favorites: () => apiFetch<{ vendors: any[] }>('/api/vendors/favorites'),
 };
 
 export const orders = {

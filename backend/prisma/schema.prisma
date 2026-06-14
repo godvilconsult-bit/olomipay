@@ -184,6 +184,19 @@ model User {
   cashoutRequests   CashoutRequest[]
   subscriptions     Subscription[]
   referralsMade     Referral[]         @relation("Referrer")
+  favorites         Favorite[]
+}
+
+// ── Favourite vendors (Tier 3 retention) ─────────────────────────────────────────
+model Favorite {
+  id         String   @id @default(cuid())
+  userId     String
+  supplierId String
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, supplierId])
+  @@index([userId])
 }
 
 model RefreshToken {
@@ -244,6 +257,9 @@ model SupplierProfile {
   payProvider   String?      // M-Pesa | Tigo Pesa | Airtel Money | Halopesa
   payNumber     String?      // wallet number / Lipa Namba (till) to receive payment
   payName       String?      // registered name on the wallet
+
+  openHour      Int?         // 0–23: auto-close outside these hours when set
+  closeHour     Int?
 
   createdAt     DateTime     @default(now())
 

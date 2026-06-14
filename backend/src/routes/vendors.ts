@@ -1,10 +1,20 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, AuthRequest } from '../middleware/auth';
 import { haversineKm, etaMinutes } from '../lib/geo';
 
 const router = Router();
+
+/** Is the vendor open right now? Master toggle + optional EAT (UTC+3) hours. */
+function openNow(s: { isOpen: boolean; openHour: number | null; closeHour: number | null }): boolean {
+  if (!s.isOpen) return false;
+  if (s.openHour == null || s.closeHour == null) return true;
+  const hour = (new Date().getUTCHours() + 3) % 24; // East Africa Time, no DST
+  return s.openHour <= s.closeHour
+    ? hour >= s.openHour && hour < s.closeHour
+    : hour >= s.openHour || hour < s.closeHour;      // overnight window
+}
 
 // ── GET /api/vendors/products ─ catalog for search filters (brands/sizes) ────────
 router.get('/products', async (_req, res) => {
@@ -15,7 +25,7 @@ router.get('/products', async (_req, res) => {
 });
 
 // ── GET /api/vendors/search ─ nearby vendors that HAVE stock, with price + ETA ───
-router.get('/search', requireAuth, async (req, res) => {
+router.get('/search', requireAuth, async (req: AuthRequest, res) => {
   const parse = z.object({
     lat:      z.coerce.number(),
     lng:      z.coerce.number(),
@@ -55,6 +65,9 @@ router.get('/search', requireAuth, async (req, res) => {
   const capFor = (region: string, productId: string) =>
     caps.find(c => c.region === region && (c.productId === productId || c.productId === null))?.maxPrice ?? null;
 
+  // The household's favourite vendors (to flag in results).
+  const favIds = new Set((await prisma.favorite.findMany({ where: { userId: req.userId }, select: { supplierId: true } })).map(f => f.supplierId));
+
   const results = suppliers
     .map(s => {
       const km = haversineKm(lat, lng, s.lat!, s.lng!);
@@ -89,12 +102,15 @@ router.get('/search', requireAuth, async (req, res) => {
         distanceKm:   Math.round(km * 10) / 10,
         etaMin:       etaMinutes(km),
         fromPrice:    items[0]?.price ?? null,
+        openNow:      openNow(s),
+        favorited:    favIds.has(s.id),
         items,
       };
     })
-    .filter(s => s.distanceKm <= radiusKm)
-    // Featured + verified float up, then nearest, then cheapest.
+    .filter(s => s.distanceKm <= radiusKm && s.openNow)
+    // Favourites + featured + verified float up, then nearest, then cheapest.
     .sort((a, b) =>
+      Number(b.favorited) - Number(a.favorited) ||
       Number(b.featured) - Number(a.featured) ||
       a.distanceKm - b.distanceKm ||
       (a.fromPrice ?? 1e9) - (b.fromPrice ?? 1e9),
@@ -103,14 +119,33 @@ router.get('/search', requireAuth, async (req, res) => {
   res.json({ count: results.length, vendors: results });
 });
 
+// ── GET /api/vendors/favorites ─ my favourite vendors (before /:id) ──────────────
+router.get('/favorites', requireAuth, async (req: AuthRequest, res) => {
+  const favs = await prisma.favorite.findMany({ where: { userId: req.userId }, orderBy: { createdAt: 'desc' } });
+  const sups = await prisma.supplierProfile.findMany({
+    where: { id: { in: favs.map(f => f.supplierId) } },
+    select: { id: true, businessName: true, region: true, district: true, isVerified: true, rating: true, lat: true, lng: true, isOpen: true, openHour: true, closeHour: true },
+  });
+  res.json({ vendors: sups.map(s => ({ ...s, favorited: true, openNow: openNow(s) })) });
+});
+
+// ── POST /api/vendors/:id/favorite ─ toggle favourite ────────────────────────────
+router.post('/:id/favorite', requireAuth, async (req: AuthRequest, res) => {
+  const existing = await prisma.favorite.findUnique({ where: { userId_supplierId: { userId: req.userId!, supplierId: req.params.id } } });
+  if (existing) { await prisma.favorite.delete({ where: { id: existing.id } }); return res.json({ favorited: false }); }
+  await prisma.favorite.create({ data: { userId: req.userId!, supplierId: req.params.id } }).catch(() => {});
+  res.json({ favorited: true });
+});
+
 // ── GET /api/vendors/:id ─ full vendor profile + catalog ─────────────────────────
-router.get('/:id', requireAuth, async (req, res) => {
+router.get('/:id', requireAuth, async (req: AuthRequest, res) => {
   const s = await prisma.supplierProfile.findUnique({
     where:   { id: req.params.id },
     include: { inventory: { where: { isAvailable: true }, include: { product: true } } },
   });
   if (!s) return res.status(404).json({ error: 'Vendor not found' });
-  res.json({ vendor: s });
+  const fav = await prisma.favorite.findUnique({ where: { userId_supplierId: { userId: req.userId!, supplierId: s.id } } });
+  res.json({ vendor: { ...s, openNow: openNow(s), favorited: !!fav } });
 });
 
 export { router as vendorsRouter };

@@ -41,6 +41,8 @@ router.put('/me', requireRole('SUPPLIER'), async (req: AuthRequest, res) => {
     acceptsCash:  z.boolean().optional(),
     acceptsMobile: z.boolean().optional(),
     distributor:  z.string().max(120).optional(),
+    openHour:     z.number().int().min(0).max(23).nullable().optional(),
+    closeHour:    z.number().int().min(0).max(23).nullable().optional(),
   }).safeParse(req.body);
   if (!parse.success) return res.status(400).json({ error: parse.error.errors[0].message });
   const profile = await prisma.supplierProfile.update({ where: { userId: req.userId }, data: parse.data });

@@ -100,6 +100,13 @@ export async function placeOrder(
   });
   await notify(userId, { title: 'Order placed ✅', body: `${order.orderNo} sent to ${supplier.businessName}. Complete your payment.`, type: 'order', data: { orderId: order.id } });
 
+  // Low-stock auto-nudge: tell the supplier to reorder anything this order drained.
+  const LOW = Number(process.env.JIKO_LOW_STOCK ?? 3);
+  const lowItems = items
+    .map(i => { const inv = invs.find(v => v.id === i.inventoryId)!; return { name: `${inv.product.brand} ${inv.product.name}`, left: inv.stock - i.qty }; })
+    .filter(x => x.left <= LOW);
+  if (lowItems.length) await notify(supplier.userId, { title: 'Low stock ⚠️', body: `${lowItems.map(x => `${x.name} (${x.left} left)`).join(', ')}. Reorder soon.`, type: 'restock' }).catch(() => {});
+
   return { order, money };
 }
 

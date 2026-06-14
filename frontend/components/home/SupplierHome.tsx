@@ -68,6 +68,10 @@ export function SupplierHome({ user }: { user: JikoUser }) {
     return () => offs.forEach((o) => o?.());
   }, [on, refresh, t]);
 
+  async function setHours(openHour: number | null, closeHour: number | null) {
+    setMe((m: any) => ({ ...m, profile: { ...m.profile, openHour, closeHour } }));
+    try { await suppliers.update({ openHour, closeHour }); toast.success(t('Hours updated', 'Saa zimewekwa')); } catch { refresh(); }
+  }
   async function toggleOpen() {
     const next = !me.profile.isOpen;
     setMe((m: any) => ({ ...m, profile: { ...m.profile, isOpen: next } }));
@@ -159,6 +163,24 @@ export function SupplierHome({ user }: { user: JikoUser }) {
         </Card>
 
         <Link href="/wallet"><Card className="flex items-center justify-between !p-3.5"><span className="flex items-center gap-2 font-semibold"><Wallet size={17} className="text-leaf-dark" /> {t('Wallet & cash-out', 'Pochi & toa pesa')}</span><ChevronRight size={18} className="text-ink/30" /></Card></Link>
+
+        {/* operating hours — auto open/close (Tier 4) */}
+        <Card className="!p-3">
+          <div className="flex items-center justify-between gap-2">
+            <span className="flex items-center gap-2 text-sm font-semibold"><Clock size={15} className="text-flame" /> {t('Open hours', 'Saa za kazi')}</span>
+            <div className="flex items-center gap-1.5 text-sm">
+              <select value={p.openHour ?? ''} onChange={(e) => setHours(e.target.value === '' ? null : Number(e.target.value), p.closeHour ?? null)} className="rounded-lg border border-black/15 bg-white px-2 py-1 text-ink outline-none focus:border-flame">
+                <option value="">{t('Always', 'Saa zote')}</option>
+                {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>)}
+              </select>
+              <span className="text-ink/40">–</span>
+              <select value={p.closeHour ?? ''} onChange={(e) => setHours(p.openHour ?? null, e.target.value === '' ? null : Number(e.target.value))} className="rounded-lg border border-black/15 bg-white px-2 py-1 text-ink outline-none focus:border-flame">
+                <option value="">{t('Always', 'Saa zote')}</option>
+                {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>)}
+              </select>
+            </div>
+          </div>
+        </Card>
 
         {me.stats.lowStock > 0 && (
           <Card className="flex items-center gap-3 border-warning/30 !bg-warning/5">

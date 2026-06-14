@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { ArrowLeft, BadgeCheck, Minus, Plus, Star, MapPin, Phone, Smartphone, Banknote } from 'lucide-react';
+import { ArrowLeft, BadgeCheck, Minus, Plus, Star, MapPin, Phone, Smartphone, Banknote, Heart, Clock } from 'lucide-react';
 import { vendors, addresses, orders } from '../../../lib/api';
 import { useT } from '../../../lib/i18n';
 import { localPhone } from '../../../lib/utils';
@@ -19,11 +19,16 @@ export default function VendorPage() {
   const [pay, setPay]       = useState<'MOBILE' | 'CASH' | ''>('');
   const [placing, setPlacing] = useState(false);
   const [showPay, setShowPay] = useState(false); // reveal the wallet number on tap
+  const [fav, setFav] = useState(false);
 
   useEffect(() => {
-    vendors.get(id).then((r) => setVendor(r.vendor)).catch(() => toast.error(t('Vendor not found', 'Muuzaji hapatikani')));
+    vendors.get(id).then((r) => { setVendor(r.vendor); setFav(!!r.vendor.favorited); }).catch(() => toast.error(t('Vendor not found', 'Muuzaji hapatikani')));
     addresses.list().then((r) => setAddrs(r.addresses ?? [])).catch(() => {});
   }, [id]);
+
+  async function toggleFav() {
+    try { const r = await vendors.favorite(id); setFav(r.favorited); toast.success(r.favorited ? t('Saved to favourites ❤️', 'Imehifadhiwa ❤️') : t('Removed', 'Imeondolewa')); } catch {}
+  }
 
   if (!vendor) return <div className="min-h-screen bg-sand"><Spinner /></div>;
 
@@ -60,8 +65,10 @@ export default function VendorPage() {
           <div className="flex items-center gap-2 text-xs text-ink/50">
             <span className="inline-flex items-center gap-0.5"><Star size={11} className="fill-ember text-ember" />{vendor.rating ? vendor.rating.toFixed(1) : t('New', 'Mpya')}</span>
             <span className="inline-flex items-center gap-0.5"><MapPin size={11} />{vendor.district ?? vendor.region}</span>
+            {vendor.openNow === false && <span className="inline-flex items-center gap-0.5 font-semibold text-danger"><Clock size={11} />{t('Closed', 'Imefungwa')}</span>}
           </div>
         </div>
+        <button onClick={toggleFav} className="ml-auto grid h-9 w-9 flex-shrink-0 place-items-center rounded-xl bg-black/5"><Heart size={18} className={fav ? 'fill-flame text-flame' : 'text-ink/40'} /></button>
       </header>
 
       <div className="mx-auto max-w-md space-y-3 px-5 pt-4">

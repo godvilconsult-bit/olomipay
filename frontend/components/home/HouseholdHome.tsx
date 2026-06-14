@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import toast from 'react-hot-toast';
-import { MapPin, Star, BadgeCheck, Search, Navigation, Package, List, Map as MapIcon, HandCoins, Bike, Smartphone, Banknote, RotateCcw, Store, ChevronRight, RefreshCw, Gift, Wallet } from 'lucide-react';
+import { MapPin, Star, BadgeCheck, Search, Navigation, Package, List, Map as MapIcon, HandCoins, Bike, Smartphone, Banknote, RotateCcw, Store, ChevronRight, RefreshCw, Gift, Wallet, Heart } from 'lucide-react';
 import { vendors, orders, addresses, ads, getAccessToken, JikoUser, type BrandAd } from '../../lib/api';
 import { useSocket } from '../../lib/useSocket';
 import { useT } from '../../lib/i18n';
@@ -139,6 +139,11 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
 
   async function confirmFee() { if (!active) return; setBusy(true); try { await orders.confirmFee(active.id); toast.success(t('Fee confirmed — rider is on the way', 'Ada imethibitishwa — dereva anakuja')); loadOrders(); } catch (e: any) { toast.error(e?.message ?? t('Failed', 'Imeshindikana')); } finally { setBusy(false); } }
   async function payNow(provider: string) { if (!active) return; setBusy(true); try { await orders.pay(active.id, { provider }); toast.success(provider === 'CASH' ? t("You'll pay cash", 'Utalipa cash') : t('Check your phone to pay', 'Angalia simu kulipa')); setTimeout(loadOrders, 2000); } catch (e: any) { toast.error(e?.message); } finally { setBusy(false); } }
+
+  async function toggleFav(supplierId: string, e: React.MouseEvent) {
+    e.preventDefault(); e.stopPropagation();
+    try { const r = await vendors.favorite(supplierId); setVlist((cur) => (cur ?? []).map((x) => x.supplierId === supplierId ? { ...x, favorited: r.favorited } : x)); } catch {}
+  }
 
   const markers = (vlist ?? []).filter((v) => v.lat != null).map((v) => ({ lat: v.lat, lng: v.lng, kind: 'vendor' as const, label: v.businessName, id: v.supplierId, shop: v.businessName }))
     .concat([{ lat: center.lat, lng: center.lng, kind: 'me' as const, label: savedAddr?.label ?? t('You', 'Wewe'), id: '', shop: '' }]);
@@ -320,6 +325,7 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
                           {v.fromPrice != null && <><span>·</span><span>{t('from', 'kuanzia')} <Money value={v.fromPrice} className="text-xs" /></span></>}
                         </div>
                       </div>
+                      <button onClick={(e) => toggleFav(v.supplierId, e)} className="grid h-8 w-8 flex-shrink-0 place-items-center"><Heart size={16} className={v.favorited ? 'fill-flame text-flame' : 'text-ink/25'} /></button>
                       <ChevronRight size={18} className="flex-shrink-0 text-ink/30" />
                     </Link>
                   ))}
