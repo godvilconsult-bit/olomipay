@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { requireRole, AuthRequest } from '../middleware/auth';
 import { settlementSplit } from '../lib/fees';
+import { weeklyBonusDue, RIDER_WEEKLY_TARGET, RIDER_WEEKLY_BONUS } from '../lib/incentives';
 import { walletPost } from '../services/wallet';
 import { haversineKm, etaMinutes } from '../lib/geo';
 import { notify } from '../services/notify';
@@ -149,6 +150,16 @@ router.post('/:orderId/deliver', requireRole('RIDER'), async (req: AuthRequest, 
   await notify(order.householdId, { title: 'Gas delivered ✅', body: `Thanks for using JIKO CONNECT. Please rate your rider.`, type: 'order', data: { orderId: order.id } });
   await notify(order.supplier.userId, { title: 'Order delivered ✅', body: `${order.orderNo} was delivered. Your payout of TZS ${split.supplierAmount.toLocaleString()} is pending.`, type: 'payment', data: { orderId: order.id } });
   await notify(req.userId!, { title: 'Delivery complete 🎉', body: `You earned TZS ${split.riderAmount.toLocaleString()} for ${order.orderNo}.`, type: 'payment', data: { orderId: order.id } });
+  // Weekly incentive — credit a bonus the instant the rider hits the target.
+  try {
+    const weekStart = new Date(Date.now() - 7 * 864e5);
+    const weekTrips = await prisma.delivery.count({ where: { riderId: req.userId, status: 'DELIVERED', deliveredAt: { gte: weekStart } } });
+    const bonus = weeklyBonusDue(weekTrips);
+    if (bonus > 0) {
+      await walletPost(prisma, req.userId!, 'EARNING', bonus, undefined, `Weekly bonus 🎯 (${weekTrips} trips)`);
+      await notify(req.userId!, { title: 'Weekly bonus! 🎯', body: `You hit ${weekTrips} trips this week — TZS ${bonus.toLocaleString()} added to your wallet.`, type: 'payment' });
+    }
+  } catch { /* incentive is best-effort */ }
   res.json({ ok: true, earned: split.riderAmount });
 });
 
@@ -176,6 +187,7 @@ router.get('/earnings', requireRole('RIDER'), async (req: AuthRequest, res) => {
     rating: profile?.rating ?? 0, status: profile?.status ?? 'OFFLINE', history,
     today: { earnings: today._sum.riderFee ?? 0, trips: today._count },
     week:  { earnings: week._sum.riderFee ?? 0,  trips: week._count },
+    incentive: { target: RIDER_WEEKLY_TARGET, bonus: RIDER_WEEKLY_BONUS, trips: week._count },
   });
 });
 

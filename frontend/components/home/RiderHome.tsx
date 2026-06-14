@@ -148,6 +148,19 @@ export function RiderHome({ user }: { user: JikoUser }) {
           </div>
         )}
 
+        {earn.incentive && (
+          <Card className="!p-3">
+            <div className="mb-1.5 flex items-center justify-between text-xs">
+              <span className="font-semibold text-ink/70">🎯 {t('Weekly goal', 'Lengo la wiki')}</span>
+              <span className="text-ink/50">{Math.min(earn.incentive.trips, earn.incentive.target)}/{earn.incentive.target} · <Money value={earn.incentive.bonus} className="text-xs" /> {t('bonus', 'bonasi')}</span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-black/5">
+              <div className="h-full rounded-full bg-grad-leaf transition-all" style={{ width: `${Math.min(100, (earn.incentive.trips / earn.incentive.target) * 100)}%` }} />
+            </div>
+            {earn.incentive.trips >= earn.incentive.target && <div className="mt-1 text-[10px] font-semibold text-leaf-dark">{t('Bonus earned this week! 🎉', 'Umepata bonasi wiki hii! 🎉')}</div>}
+          </Card>
+        )}
+
         <Link href="/wallet"><Card className="flex items-center justify-between !p-3.5"><span className="flex items-center gap-2 font-semibold"><Wallet size={17} className="text-leaf-dark" /> {t('Wallet & cash-out', 'Pochi & toa pesa')}</span><ChevronRight size={18} className="text-ink/30" /></Card></Link>
 
         {/* ACTIVE JOB */}
