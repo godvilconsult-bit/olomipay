@@ -112,6 +112,12 @@ enum RiderStatus {
   ON_JOB
 }
 
+enum DisputeStatus {
+  OPEN
+  RESOLVED
+  REJECTED
+}
+
 enum VehicleType {
   MOTORBIKE   // boda-boda / pikipiki
   BAJAJI      // three-wheeler
@@ -339,10 +345,41 @@ model Order {
   delivery  Delivery?
   payment   Payment?
   review    Review?
+  messages  ChatMessage[]
+  disputes  Dispute[]
 
   @@index([householdId, status])
   @@index([supplierId, status])
   @@index([status, placedAt])
+}
+
+// ── In-app chat (order-scoped: household ↔ rider ↔ supplier) ─────────────────────
+model ChatMessage {
+  id        String   @id @default(cuid())
+  orderId   String
+  senderId  String
+  body      String
+  createdAt DateTime @default(now())
+  readAt    DateTime?
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+}
+
+// ── Disputes / issue reports (Tier 2 trust) ──────────────────────────────────────
+model Dispute {
+  id         String        @id @default(cuid())
+  orderId    String
+  raisedById String
+  reason     String
+  detail     String?
+  status     DisputeStatus @default(OPEN)
+  resolution String?
+  createdAt  DateTime      @default(now())
+  resolvedAt DateTime?
+  order      Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
 }
 
 model OrderItem {

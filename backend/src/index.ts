@@ -51,6 +51,8 @@ async function loadRoutes() {
     ['/api/wallet',    () => import('./routes/wallet'),    'walletRouter'],
     ['/api/subscriptions', () => import('./routes/subscriptions'), 'subscriptionsRouter'],
     ['/api/referrals', () => import('./routes/referrals'), 'referralsRouter'],
+    ['/api/chat',      () => import('./routes/chat'),      'chatRouter'],
+    ['/api/support',   () => import('./routes/support'),   'supportRouter'],
     ['/api/admin',     () => import('./routes/admin'),     'adminRouter'],
   ];
   for (const [path, load, name] of mounts) {

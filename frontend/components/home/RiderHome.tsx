@@ -5,8 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import toast from 'react-hot-toast';
-import { Power, Bike, MapPin, Package, Star, CheckCircle2, Navigation, Phone, Camera, Clock, ShieldAlert, BadgeCheck, Wallet, ChevronRight } from 'lucide-react';
-import { jobs, getAccessToken, JikoUser } from '../../lib/api';
+import { Power, Bike, MapPin, Package, Star, CheckCircle2, Navigation, Phone, Camera, Clock, ShieldAlert, BadgeCheck, Wallet, ChevronRight, MessageCircle, Siren } from 'lucide-react';
+import { jobs, support, getAccessToken, JikoUser } from '../../lib/api';
 import { useSocket } from '../../lib/useSocket';
 import { useT } from '../../lib/i18n';
 import { localPhone } from '../../lib/utils';
@@ -88,6 +88,10 @@ export function RiderHome({ user }: { user: JikoUser }) {
     try { const r = await jobs.deliver(active.orderId, otp); toast.success(`${t('Well done! You earned', 'Hongera! Umepata')} TZS ${r.earned?.toLocaleString()}`); setOtp(''); await refresh(); }
     catch (e: any) { toast.error(e?.message ?? t('Wrong code', 'Namba si sahihi')); } finally { setBusy(false); }
   }
+  async function sos() {
+    try { const c = coordsRef.current; await support.sos(c?.lat, c?.lng); toast.success(t('SOS sent — admin alerted 🚨', 'SOS imetumwa 🚨')); }
+    catch { toast.error(t('Failed to send SOS', 'Imeshindwa kutuma SOS')); }
+  }
   function onPhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]; if (!f) return;
     const reader = new FileReader();
@@ -156,10 +160,12 @@ export function RiderHome({ user }: { user: JikoUser }) {
                   <div className="flex items-start gap-2"><span className="mt-0.5 grid h-6 w-6 flex-shrink-0 place-items-center rounded-full bg-leaf/15 text-leaf"><MapPin size={13} /></span><div><div className="font-semibold">{t('Deliver to', 'Peleka')}: {o.address?.label}{o.address?.ward ? ` · ${o.address.ward}` : ''}</div><div className="text-xs text-ink/50">{o.household?.name}</div></div></div>
                 </div>
                 {destMarkers.length > 0 && <div className="mt-3"><Map markers={destMarkers} height={160} /></div>}
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  <a href={`tel:${o.household?.phone}`} className="flex items-center justify-center gap-1.5 rounded-2xl bg-black/5 py-3 text-sm font-semibold"><Phone size={15} /> {t('Call household', 'Piga kaya')}</a>
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  <button onClick={() => router.push(`/chat/${o.orderId}`)} className="flex items-center justify-center gap-1.5 rounded-2xl bg-flame/15 py-3 text-sm font-semibold text-flame"><MessageCircle size={15} /> {t('Chat', 'Ongea')}</button>
+                  <a href={`tel:${o.household?.phone}`} className="flex items-center justify-center gap-1.5 rounded-2xl bg-black/5 py-3 text-sm font-semibold"><Phone size={15} /> {t('Call', 'Piga')}</a>
                   <a href={destUrl} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-1.5 rounded-2xl bg-leaf/15 py-3 text-sm font-semibold text-leaf-dark"><Navigation size={15} /> {t('Navigate', 'Ramani')}</a>
                 </div>
+                <button onClick={sos} className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-2xl border border-danger/40 py-2.5 text-sm font-bold text-danger active:bg-danger/5"><Siren size={16} /> {t('Emergency SOS', 'Dharura SOS')}</button>
                 <div className="mt-2 flex items-center justify-between border-t border-black/5 pt-2 text-sm"><span className="text-ink/50">{t('Your fee', 'Ada yako')}</span><Money value={o.deliveryFee} className="text-leaf-dark" /></div>
                 <div className="mt-3">
                   {status === 'FEE_CONFIRMED' && <Button variant="primary" loading={busy} onClick={pick} className="w-full">{t('Picked up the gas ✓', 'Nimechukua gesi ✓')}</Button>}

@@ -181,6 +181,16 @@ export const suppliers = {
   upgradeRequest: (tier: 'STANDARD' | 'PREMIUM') => apiFetch('/api/suppliers/upgrade-request', { method: 'POST', body: JSON.stringify({ tier }) }),
 };
 
+// In-app chat (Tier 3) + support/disputes/SOS (Tier 2)
+export const chat = {
+  list: (orderId: string) => apiFetch<{ messages: any[]; me: string }>(`/api/chat/${orderId}`),
+  send: (orderId: string, body: string) => apiFetch(`/api/chat/${orderId}`, { method: 'POST', body: JSON.stringify({ body }) }),
+};
+export const support = {
+  dispute: (orderId: string, reason: string, detail?: string) => apiFetch('/api/support/dispute', { method: 'POST', body: JSON.stringify({ orderId, reason, detail }) }),
+  sos:     (lat?: number, lng?: number) => apiFetch('/api/support/sos', { method: 'POST', body: JSON.stringify({ lat, lng }) }),
+};
+
 // Auto-refill subscriptions (Tier 3)
 export const subscriptions = {
   list:      () => apiFetch<{ subscriptions: any[] }>('/api/subscriptions'),
@@ -229,6 +239,9 @@ export const adminApi = {
   cashouts:     () => apiFetch<{ requests: any[] }>('/api/admin/cashouts'),
   payCashout:   (id: string, ref?: string) => apiFetch(`/api/admin/cashouts/${id}/paid`, { method: 'POST', body: JSON.stringify({ ref }) }),
   rejectCashout:(id: string) => apiFetch(`/api/admin/cashouts/${id}/reject`, { method: 'POST' }),
+  // T2 — disputes
+  disputes:      () => apiFetch<{ disputes: any[] }>('/api/admin/disputes'),
+  resolveDispute:(id: string, status: 'RESOLVED' | 'REJECTED', resolution?: string) => apiFetch(`/api/admin/disputes/${id}/resolve`, { method: 'POST', body: JSON.stringify({ status, resolution }) }),
 };
 
 export const notifications = {

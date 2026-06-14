@@ -4,8 +4,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Check, Bike, Phone, ShieldCheck, Star, Smartphone, Banknote, HandCoins, RefreshCw } from 'lucide-react';
-import { orders, subscriptions, getAccessToken } from '../../../lib/api';
+import { ArrowLeft, Check, Bike, Phone, ShieldCheck, Star, Smartphone, Banknote, HandCoins, RefreshCw, MessageCircle, Flag } from 'lucide-react';
+import { orders, subscriptions, support, getAccessToken } from '../../../lib/api';
 import { useSocket } from '../../../lib/useSocket';
 import { useT } from '../../../lib/i18n';
 import { localPhone } from '../../../lib/utils';
@@ -38,6 +38,7 @@ export default function OrderPage() {
   const [stars, setStars] = useState(0);
   const [busy, setBusy]   = useState(false);
   const [subBusy, setSubBusy] = useState(false);
+  const [reporting, setReporting] = useState(false);
   const [riderPos, setRiderPos] = useState<{ lat: number; lng: number } | null>(null);
 
   const STEPS = [t('Placed', 'Imetumwa'), t('Confirmed', 'Imethibitishwa'), t('Rider found', 'Dereva amepatikana'), t('Fee confirmed', 'Ada imethibitishwa'), t('On the way', 'Njiani'), t('Arrived', 'Imefika')];
@@ -66,6 +67,7 @@ export default function OrderPage() {
   async function complete() { try { await orders.complete(id); toast.success(t('Thank you!', 'Asante!')); load(); } catch (e: any) { toast.error(e?.message); } }
   async function review(n: number) { setStars(n); try { await orders.review(id, { supplierRating: n, riderRating: n }); toast.success(t('Thanks for the rating!', 'Asante!')); } catch {} }
   async function autoRefill(days: number) { setSubBusy(true); try { await subscriptions.fromOrder(id, days); toast.success(t('Auto-refill scheduled 🔁', 'Urejeshaji umewekwa 🔁')); } catch (e: any) { toast.error(e?.message ?? t('Failed', 'Imeshindikana')); } finally { setSubBusy(false); } }
+  async function report(reason: string) { try { await support.dispute(id, reason); toast.success(t('Reported — our team will review', 'Imewasilishwa — timu itakagua')); setReporting(false); } catch (e: any) { toast.error(e?.message ?? t('Failed', 'Imeshindikana')); } }
 
   const markers: MapMarker[] = [];
   if (order.address) markers.push({ lat: order.address.lat, lng: order.address.lng, kind: 'dest', label: t('Your location', 'Eneo lako'), name: t('Your location', 'Eneo lako') });
@@ -126,6 +128,7 @@ export default function OrderPage() {
           <Card className="flex items-center gap-3">
             <Avatar name={rd.name} url={rd.profilePicUrl} />
             <div className="flex-1 min-w-0"><div className="font-semibold">{rd.name}</div><div className="text-xs text-ink/50">{rd.riderProfile?.plateNo ?? rd.riderProfile?.vehicleType} · ⭐ {rd.riderProfile?.rating ? rd.riderProfile.rating.toFixed(1) : t('New', 'Mpya')}</div></div>
+            <button onClick={() => router.push(`/chat/${id}`)} className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-xl bg-flame/15 text-flame"><MessageCircle size={18} /></button>
             <a href={`tel:${rd.phone}`} className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-xl bg-leaf/15 text-leaf"><Phone size={18} /></a>
           </Card>
         )}
@@ -179,6 +182,23 @@ export default function OrderPage() {
                 <Button key={d} variant="ghost" loading={subBusy} onClick={() => autoRefill(d)}>{t('Every', 'Kila')} {d}d</Button>
               ))}
             </div>
+          </Card>
+        )}
+
+        {!cancelled && (
+          <Card>
+            {!reporting ? (
+              <button onClick={() => setReporting(true)} className="flex w-full items-center justify-center gap-2 text-sm font-semibold text-ink/50"><Flag size={15} /> {t('Report an issue', 'Ripoti tatizo')}</button>
+            ) : (
+              <div>
+                <div className="mb-2 text-sm font-semibold">{t('What went wrong?', 'Tatizo ni lipi?')}</div>
+                <div className="flex flex-wrap gap-2">
+                  {[t("Didn't arrive", 'Haikufika'), t('Wrong item', 'Bidhaa si sahihi'), t('Leaking cylinder', 'Mtungi unavuja'), t('Overcharged', 'Nimetozwa zaidi'), t('Other', 'Nyingine')].map((r) => (
+                    <button key={r} onClick={() => report(r)} className="rounded-full bg-black/5 px-3 py-1.5 text-xs font-semibold">{r}</button>
+                  ))}
+                </div>
+              </div>
+            )}
           </Card>
         )}
       </div>

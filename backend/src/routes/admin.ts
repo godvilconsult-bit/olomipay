@@ -256,6 +256,29 @@ router.post('/cashouts/:id/reject', requireAdmin, async (req: AuthRequest, res) 
   res.json({ ok: true });
 });
 
+// ── Disputes (Tier 2) ─────────────────────────────────────────────────────────────
+router.get('/disputes', requireAdmin, async (_req: AuthRequest, res) => {
+  const disputes = await prisma.dispute.findMany({
+    where:   { status: 'OPEN' },
+    include: { order: { select: { orderNo: true, household: { select: { name: true, phone: true } }, supplier: { select: { businessName: true } } } } },
+    orderBy: { createdAt: 'desc' },
+  });
+  res.json({ disputes });
+});
+
+router.post('/disputes/:id/resolve', requireAdmin, async (req: AuthRequest, res) => {
+  const parse = z.object({ status: z.enum(['RESOLVED', 'REJECTED']), resolution: z.string().max(500).optional() }).safeParse(req.body);
+  if (!parse.success) return res.status(400).json({ error: 'status must be RESOLVED or REJECTED' });
+  const d = await prisma.dispute.update({ where: { id: req.params.id }, data: { status: parse.data.status, resolution: parse.data.resolution ?? null, resolvedAt: new Date() } }).catch(() => null);
+  if (!d) return res.status(404).json({ error: 'Dispute not found' });
+  await notify(d.raisedById, {
+    title: parse.data.status === 'RESOLVED' ? 'Issue resolved ✅' : 'Issue reviewed',
+    body:  parse.data.resolution ?? 'Our team has reviewed your report.',
+    type:  'dispute',
+  }).catch(() => {});
+  res.json({ ok: true });
+});
+
 // ── POST /api/admin/run-subscriptions ─ fire due auto-refills now (ops/testing) ──
 router.post('/run-subscriptions', requireAdmin, async (_req: AuthRequest, res) => {
   const placed = await runDueSubscriptions();

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Users, ShieldCheck, Activity, Phone, Home, Store, Bike, Trash2, Star, Megaphone, Plus, TrendingUp, Banknote, Check, X } from 'lucide-react';
+import { Users, ShieldCheck, Activity, Phone, Home, Store, Bike, Trash2, Star, Megaphone, Plus, TrendingUp, Banknote, Check, X, Flag } from 'lucide-react';
 import { adminApi, JikoUser } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 import { localPhone, timeAgo } from '../../lib/utils';
@@ -24,18 +24,24 @@ export function AdminHome({ user }: { user: JikoUser }) {
   const [adForm, setAdForm] = useState({ brand: '', title: '', subtitle: '', ctaLabel: '', region: '', type: '', weight: '1' });
   const [adBusy, setAdBusy] = useState(false);
   const [cashouts, setCashouts] = useState<any[]>([]);
+  const [disputes, setDisputes] = useState<any[]>([]);
 
   async function load() {
-    const [s, u, o, k, sp, ad, co] = await Promise.all([
+    const [s, u, o, k, sp, ad, co, dp] = await Promise.all([
       adminApi.stats().catch(() => null), adminApi.users().catch(() => ({ users: [] })),
       adminApi.orders().catch(() => ({ orders: [] })), adminApi.kycPending().catch(() => ({ pending: [] })),
       adminApi.suppliers().catch(() => ({ suppliers: [] })), adminApi.ads().catch(() => ({ ads: [] })),
-      adminApi.cashouts().catch(() => ({ requests: [] })),
+      adminApi.cashouts().catch(() => ({ requests: [] })), adminApi.disputes().catch(() => ({ disputes: [] })),
     ]);
     setStats(s); setUsers(u.users ?? []); setOrders(o.orders ?? []); setKyc(k.pending ?? []);
-    setSups(sp.suppliers ?? []); setAdList(ad.ads ?? []); setCashouts(co.requests ?? []);
+    setSups(sp.suppliers ?? []); setAdList(ad.ads ?? []); setCashouts(co.requests ?? []); setDisputes(dp.disputes ?? []);
   }
   useEffect(() => { load(); }, []);
+
+  async function resolveDispute(id: string, status: 'RESOLVED' | 'REJECTED') {
+    try { await adminApi.resolveDispute(id, status); toast.success(status === 'RESOLVED' ? t('Resolved', 'Imetatuliwa') : t('Rejected', 'Imekataliwa')); load(); }
+    catch (e: any) { toast.error(e?.message ?? t('Failed', 'Imeshindikana')); }
+  }
 
   async function payCashout(id: string) { try { await adminApi.payCashout(id); toast.success(t('Marked paid', 'Imelipwa')); load(); } catch (e: any) { toast.error(e?.message ?? t('Failed', 'Imeshindikana')); } }
   async function rejectCashout(id: string) { try { await adminApi.rejectCashout(id); toast(t('Refunded to wallet', 'Imerejeshwa')); load(); } catch (e: any) { toast.error(e?.message ?? t('Failed', 'Imeshindikana')); } }
@@ -207,6 +213,24 @@ export function AdminHome({ user }: { user: JikoUser }) {
                       </div>
                       <button onClick={() => rejectCashout(c.id)} className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-lg bg-black/5 text-danger"><X size={16} /></button>
                       <Button variant="leaf" onClick={() => payCashout(c.id)} className="flex-shrink-0 !px-3"><Check size={16} /> {t('Paid', 'Lipa')}</Button>
+                    </Card>
+                  ))}
+                </div>}
+            </div>
+
+            {/* Open disputes (Tier 2) */}
+            <div>
+              <h2 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-ink/70"><Flag size={15} /> {t('Open disputes', 'Malalamiko')} ({disputes.length})</h2>
+              {disputes.length === 0 ? <p className="py-3 text-center text-sm text-ink/50">{t('No open disputes.', 'Hakuna malalamiko.')}</p> :
+                <div className="space-y-2">
+                  {disputes.map((d) => (
+                    <Card key={d.id} className="!p-3">
+                      <div className="font-semibold">{d.reason}</div>
+                      <div className="truncate text-xs text-ink/50">{d.order?.orderNo} · {d.order?.household?.name ?? '—'}{d.detail ? ` · ${d.detail}` : ''}</div>
+                      <div className="mt-2 flex gap-2">
+                        <Button variant="ghost" className="flex-1 !text-xs" onClick={() => resolveDispute(d.id, 'REJECTED')}>{t('Reject', 'Kataa')}</Button>
+                        <Button variant="leaf" className="flex-1 !text-xs" onClick={() => resolveDispute(d.id, 'RESOLVED')}>{t('Resolve', 'Tatua')}</Button>
+                      </div>
                     </Card>
                   ))}
                 </div>}
