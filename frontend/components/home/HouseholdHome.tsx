@@ -152,7 +152,7 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
     <div className="min-h-screen pb-24">
       <AppHeader title="JIKO CONNECT" subtitle={`${t('Hi', 'Habari')}, ${user.name ?? t('customer', 'mteja')}`} />
 
-      <div className="mx-auto max-w-md space-y-4 px-5 pt-4">
+      <div className="mx-auto max-w-md space-y-3 px-5 pt-4">
         {/* saved delivery location */}
         <Card className="flex items-center gap-3 !p-3">
           <MapPin className="text-flame flex-shrink-0" size={20} />

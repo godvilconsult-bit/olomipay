@@ -104,7 +104,7 @@ export function SupplierHome({ user }: { user: JikoUser }) {
       <AppHeader title={p.businessName} subtitle={t('Supplier dashboard', 'Dashibodi ya muuzaji')}
         right={<button onClick={toggleOpen} className={cn('rounded-full px-3 py-1.5 text-xs font-bold', p.isOpen ? 'bg-leaf/15 text-leaf-dark' : 'bg-black/10 text-ink/50')}>{p.isOpen ? t('OPEN', 'WAZI') : t('CLOSED', 'IMEFUNGWA')}</button>} />
 
-      <div className="mx-auto max-w-md space-y-4 px-5 pt-4">
+      <div className="mx-auto max-w-md space-y-3 px-5 pt-4">
         {!user.supplierProfile?.isVerified && (user.kycStatus === 'SUBMITTED' ? (
           <Card className="flex items-center gap-3 border-warning/40 !bg-warning/5">
             <Clock className="text-warning flex-shrink-0" size={22} />
@@ -167,11 +167,7 @@ export function SupplierHome({ user }: { user: JikoUser }) {
               </Button>
             )}
           </div>
-          <div className="mt-2 border-t border-black/5 pt-2 text-xs text-ink/50">
-            {p.tier === 'FREE'
-              ? t('Pro lowers your commission + lifts you up the search. Premium adds a featured top slot.', 'Pro hupunguza kamisheni + kukupandisha juu. Premium huongeza nafasi ya kwanza.')
-              : t('Thanks for being a paid partner. Contact admin to change your plan.', 'Asante kwa kuwa mshirika. Wasiliana na admin kubadili mpango.')}
-          </div>
+          {p.tier === 'FREE' && <div className="mt-2 border-t border-black/5 pt-2 text-xs text-ink/50">{t('Pro lowers commission + lifts you up search. Premium = featured slot.', 'Pro hupunguza kamisheni + kukupandisha. Premium = nafasi ya juu.')}</div>}
         </Card>
 
         <Link href="/wallet"><Card className="flex items-center justify-between !p-3.5"><span className="flex items-center gap-2 font-semibold"><Wallet size={17} className="text-leaf-dark" /> {t('Wallet & cash-out', 'Pochi & toa pesa')}</span><ChevronRight size={18} className="text-ink/30" /></Card></Link>
@@ -207,28 +203,21 @@ export function SupplierHome({ user }: { user: JikoUser }) {
             <ListGroup>
               {queue.map((o) => {
                 const pay = payInfo(o);
-                const PayIcon = pay.icon;
                 return (
-                  <div key={o.id} className={cn('p-3.5', ['ALERTED', 'PLACED'].includes(o.status) && 'bg-flame/5')}>
-                    <div className="flex items-start justify-between">
-                      <div className="min-w-0"><div className="font-bold">{o.orderNo}</div><div className="truncate text-xs text-ink/50">{o.household?.name} · {localPhone(o.household?.phone)}</div></div>
-                      <Badge status={o.status} />
+                  <div key={o.id} className={cn('p-3', ['ALERTED', 'PLACED'].includes(o.status) && 'bg-flame/5')}>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate font-semibold">{o.orderNo}</span>
+                      <div className="flex flex-shrink-0 items-center gap-1.5"><Money value={o.total} className="text-xs text-ink/60" /><Badge status={o.status} /></div>
                     </div>
-                    <div className="mt-2 space-y-1 text-sm">
-                      {o.items?.map((it: any) => <div key={it.id} className="flex justify-between gap-2"><span className="min-w-0 truncate text-ink/70">{it.qty}× {it.brand} {it.productName}</span><Money value={it.lineTotal} className="flex-shrink-0 text-xs" /></div>)}
+                    <div className="mt-0.5 flex items-center gap-1.5 text-xs text-ink/50">
+                      <span className="truncate">{o.household?.name} · {o.items?.[0] ? `${o.items[0].qty}× ${o.items[0].brand} ${o.items[0].productName}` : ''}{o.items?.length > 1 ? ` +${o.items.length - 1}` : ''}</span>
+                      <span className={cn('ml-auto flex-shrink-0 font-medium', pay.ok ? 'text-leaf-dark' : 'text-warning')}>{pay.ok ? (o.payment?.provider === 'CASH' ? 'COD' : t('Paid', 'Imelipwa')) : t('Unpaid', 'Haijalipwa')}</span>
                     </div>
-                    <div className="mt-2 flex items-center gap-1 text-xs text-ink/50"><MapPin size={12} className="flex-shrink-0" /> {o.address?.label}{o.address?.ward ? ` · ${o.address.ward}` : ''}</div>
-                    <div className={cn('mt-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold', pay.ok ? 'bg-leaf/15 text-leaf-dark' : 'bg-warning/15 text-warning')}><PayIcon size={13} /> {pay.label}</div>
-
-                    {/* state-aware action */}
-                    <div className="mt-3 border-t border-black/5 pt-3">
+                    <div className="mt-2.5">
                       {['ALERTED', 'PLACED'].includes(o.status) ? (
-                        <div className="flex items-center justify-between">
-                          <div className="text-xs text-ink/50">{t('Total', 'Jumla')} <Money value={o.total} className="ml-1 text-ink" /></div>
-                          <div className="flex gap-2">
-                            <Button variant="ghost" onClick={() => reject(o.id)} loading={busy === o.id} className="!px-3"><X size={16} /></Button>
-                            <Button variant="primary" onClick={() => confirm(o.id)} loading={busy === o.id} disabled={!pay.ok}><Check size={16} /> {t('Confirm', 'Thibitisha')}</Button>
-                          </div>
+                        <div className="flex justify-end gap-2">
+                          <Button variant="ghost" onClick={() => reject(o.id)} loading={busy === o.id} className="!px-3"><X size={16} /></Button>
+                          <Button variant="primary" onClick={() => confirm(o.id)} loading={busy === o.id} disabled={!pay.ok}><Check size={16} /> {t('Confirm', 'Thibitisha')}</Button>
                         </div>
                       ) : o.status === 'ACCEPTED' ? (
                         <Button variant="primary" className="w-full" onClick={() => router.push(`/supplier/dispatch/${o.id}`)}><Bike size={16} /> {t('Find a rider', 'Tafuta dereva')}</Button>

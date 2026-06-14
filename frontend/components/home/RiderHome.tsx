@@ -110,7 +110,7 @@ export function RiderHome({ user }: { user: JikoUser }) {
       <AppHeader title={t('Rider', 'Dereva')} subtitle={user.name ?? undefined}
         right={<span className={cn('rounded-full px-2.5 py-1 text-xs font-bold', online ? 'bg-leaf/15 text-leaf-dark' : 'bg-black/10 text-ink/50')}>{online ? 'ONLINE' : 'OFFLINE'}</span>} />
 
-      <div className="mx-auto max-w-md space-y-4 px-5 pt-4">
+      <div className="mx-auto max-w-md space-y-3 px-5 pt-4">
         {/* profile / photo */}
         <Card className="flex items-center gap-3 !p-3">
           {photo ? <img src={photo} alt="" className="h-12 w-12 rounded-full object-cover" /> : <span className="grid h-12 w-12 place-items-center rounded-full bg-flame/15 font-bold text-flame">{(user.name ?? '?').slice(0, 2).toUpperCase()}</span>}

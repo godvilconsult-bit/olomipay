@@ -48,7 +48,7 @@ export function Card({ children, className, onClick }: { children: ReactNode; cl
     <div
       onClick={onClick}
       className={cn(
-        'rounded-ds-xl bg-white dark:bg-ink-2 border border-black/5 dark:border-white/5 shadow-ds-card p-3.5',
+        'rounded-ds-xl bg-white dark:bg-ink-2 border border-black/5 dark:border-white/5 shadow-ds-card p-3',
         onClick && 'cursor-pointer hover:shadow-lg transition',
         className,
       )}
