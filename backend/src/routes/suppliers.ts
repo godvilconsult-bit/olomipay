@@ -69,7 +69,16 @@ router.post('/inventory', requireRole('SUPPLIER'), async (req: AuthRequest, res)
     create: { supplierId: profile.id, productId, price, stock, isAvailable },
     include: { product: true },
   });
-  res.json({ inventory: inv });
+  // EWURA price-cap check: warn if priced above the regional cap (product-specific
+  // cap wins over a region-wide one).
+  const cap = await prisma.priceCap.findFirst({
+    where: { region: profile.region, OR: [{ productId }, { productId: null }] },
+    orderBy: { productId: 'desc' },
+  });
+  const capWarning = cap && price > cap.maxPrice
+    ? `Price exceeds the EWURA cap of TZS ${cap.maxPrice.toLocaleString()} for ${profile.region}.`
+    : null;
+  res.json({ inventory: inv, ...(capWarning && { capWarning }) });
 });
 
 router.delete('/inventory/:id', requireRole('SUPPLIER'), async (req: AuthRequest, res) => {

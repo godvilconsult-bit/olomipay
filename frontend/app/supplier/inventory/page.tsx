@@ -35,13 +35,13 @@ export default function InventoryPage() {
 
   async function save(row: any) {
     const e = edits[row.id]; setBusy(row.id);
-    try { await suppliers.setInventory({ productId: row.productId, price: Number(e.price), stock: Number(e.stock), isAvailable: e.isAvailable }); toast.success(t('Saved', 'Imehifadhiwa')); }
+    try { const r: any = await suppliers.setInventory({ productId: row.productId, price: Number(e.price), stock: Number(e.stock), isAvailable: e.isAvailable }); if (r?.capWarning) toast(r.capWarning, { icon: '⚠️', duration: 6000 }); else toast.success(t('Saved', 'Imehifadhiwa')); }
     catch { toast.error(t('Failed', 'Imeshindikana')); } finally { setBusy(null); }
   }
   async function add() {
     if (!adding.productId || !adding.price) return toast.error(t('Choose a product and price', 'Chagua bidhaa na bei'));
     setBusy('add');
-    try { await suppliers.setInventory({ productId: adding.productId, price: Number(adding.price), stock: Number(adding.stock || 0) }); setAdding({ productId: '', price: '', stock: '' }); await load(); toast.success(t('Product added', 'Bidhaa imeongezwa')); }
+    try { const r: any = await suppliers.setInventory({ productId: adding.productId, price: Number(adding.price), stock: Number(adding.stock || 0) }); setAdding({ productId: '', price: '', stock: '' }); await load(); if (r?.capWarning) toast(r.capWarning, { icon: '⚠️', duration: 6000 }); else toast.success(t('Product added', 'Bidhaa imeongezwa')); }
     catch { toast.error(t('Failed', 'Imeshindikana')); } finally { setBusy(null); }
   }
   async function sendRestock() {
