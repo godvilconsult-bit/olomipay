@@ -161,13 +161,22 @@ router.get('/active', requireRole('RIDER'), async (req: AuthRequest, res) => {
   res.json({ delivery });
 });
 
-// ── GET /api/jobs/earnings ───────────────────────────────────────────────────────
+// ── GET /api/jobs/earnings ─ totals + today / this-week breakdown ────────────────
 router.get('/earnings', requireRole('RIDER'), async (req: AuthRequest, res) => {
-  const [profile, history] = await Promise.all([
+  const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
+  const weekStart = new Date(Date.now() - 7 * 864e5);
+  const [profile, history, today, week] = await Promise.all([
     prisma.riderProfile.findUnique({ where: { userId: req.userId } }),
     prisma.delivery.findMany({ where: { riderId: req.userId, status: 'DELIVERED' }, include: { order: { select: { orderNo: true, deliveryFee: true, riderNet: true, deliveredAt: true } } }, orderBy: { deliveredAt: 'desc' }, take: 50 }),
+    prisma.delivery.aggregate({ _sum: { riderFee: true }, _count: true, where: { riderId: req.userId, status: 'DELIVERED', deliveredAt: { gte: dayStart } } }),
+    prisma.delivery.aggregate({ _sum: { riderFee: true }, _count: true, where: { riderId: req.userId, status: 'DELIVERED', deliveredAt: { gte: weekStart } } }),
   ]);
-  res.json({ totalDeliveries: profile?.totalDeliveries ?? 0, totalEarnings: profile?.totalEarnings ?? 0, rating: profile?.rating ?? 0, status: profile?.status ?? 'OFFLINE', history });
+  res.json({
+    totalDeliveries: profile?.totalDeliveries ?? 0, totalEarnings: profile?.totalEarnings ?? 0,
+    rating: profile?.rating ?? 0, status: profile?.status ?? 'OFFLINE', history,
+    today: { earnings: today._sum.riderFee ?? 0, trips: today._count },
+    week:  { earnings: week._sum.riderFee ?? 0,  trips: week._count },
+  });
 });
 
 export { router as jobsRouter };

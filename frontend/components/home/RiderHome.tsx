@@ -141,6 +141,13 @@ export function RiderHome({ user }: { user: JikoUser }) {
           <Stat label={t('Rating', 'Nyota')} value={<span className="inline-flex items-center gap-1"><Star size={16} className="fill-ember text-ember" />{earn.rating ? earn.rating.toFixed(1) : '—'}</span>} />
         </div>
 
+        {earn.today && (
+          <div className="grid grid-cols-2 gap-2.5">
+            <div className="rounded-ds-xl border border-black/5 bg-white p-3"><div className="text-xs text-ink/50">{t('Today', 'Leo')}</div><Money value={earn.today.earnings} className="text-base" /><div className="text-[10px] text-ink/40">{earn.today.trips} {t('trips', 'safari')}</div></div>
+            <div className="rounded-ds-xl border border-black/5 bg-white p-3"><div className="text-xs text-ink/50">{t('This week', 'Wiki hii')}</div><Money value={earn.week.earnings} className="text-base" /><div className="text-[10px] text-ink/40">{earn.week.trips} {t('trips', 'safari')}</div></div>
+          </div>
+        )}
+
         <Link href="/wallet"><Card className="flex items-center justify-between !p-3.5"><span className="flex items-center gap-2 font-semibold"><Wallet size={17} className="text-leaf-dark" /> {t('Wallet & cash-out', 'Pochi & toa pesa')}</span><ChevronRight size={18} className="text-ink/30" /></Card></Link>
 
         {/* ACTIVE JOB */}
