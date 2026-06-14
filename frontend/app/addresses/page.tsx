@@ -74,7 +74,7 @@ export default function AddressesPage() {
         <Card>
           <div className="mb-2 flex items-center gap-1.5 font-bold"><Plus size={16} className="text-flame" /> {t('Add address', 'Ongeza anwani')}</div>
           <div className="space-y-3">
-            <button onClick={gps} className={cn('flex w-full items-center justify-center gap-2 rounded-2xl py-3 text-sm font-semibold', form.lat != null ? 'bg-leaf/15 text-leaf-dark' : 'bg-grad-leaf text-white')}>
+            <button onClick={gps} className={cn('flex w-full items-center justify-center gap-2 rounded-2xl py-3 text-sm font-semibold', form.lat != null ? 'bg-leaf/15 text-leaf-dark' : 'border border-flame/40 bg-flame/5 text-flame')}>
               <Navigation size={16} /> {form.lat != null ? `${t('Location set', 'Eneo limewekwa')} ✓` : t('Use my live location (GPS)', 'Tumia eneo langu (GPS)')}
             </button>
             {form.lat != null && <Map markers={[{ lat: form.lat, lng: form.lng, kind: 'me', label: t('You', 'Wewe') }]} height={150} />}

@@ -260,7 +260,7 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
             </label>
           )}
         </div>
-        <Button variant="primary" className="w-full" loading={searching} onClick={search}><Search size={17} /> {t('Search vendors', 'Tafuta wauzaji')}</Button>
+        <Button variant="outline" className="w-full" loading={searching} onClick={search}><Search size={17} /> {t('Search vendors', 'Tafuta wauzaji')}</Button>
 
         {/* results loading skeleton (feels instant vs a blank wait) */}
         {searching && vlist === null && (

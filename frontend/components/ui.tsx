@@ -2,6 +2,7 @@
 
 import { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from 'react';
 import { Loader2 } from 'lucide-react';
+import { useT } from '../lib/i18n';
 
 export function cn(...parts: (string | false | null | undefined)[]): string {
   return parts.filter(Boolean).join(' ');
@@ -103,16 +104,33 @@ export function Pill({ children, active, onClick }: { children: ReactNode; activ
   );
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  PLACED: 'bg-amber-100 text-amber-700', ALERTED: 'bg-amber-100 text-amber-700',
-  ACCEPTED: 'bg-blue-100 text-blue-700', BROADCAST: 'bg-violet-100 text-violet-700',
-  CLAIMED: 'bg-blue-100 text-blue-700', PICKED: 'bg-indigo-100 text-indigo-700',
-  DELIVERED: 'bg-leaf/15 text-leaf-dark', COMPLETED: 'bg-leaf/15 text-leaf-dark',
-  CANCELLED: 'bg-red-100 text-red-700', PENDING: 'bg-amber-100 text-amber-700',
-  PAID: 'bg-leaf/15 text-leaf-dark', ONLINE: 'bg-leaf/15 text-leaf-dark', OFFLINE: 'bg-black/10 text-ink/60',
+// Human, bilingual status labels + consistent semantic colors. Used app-wide so
+// raw DB enums (RIDER_OFFERED…) never reach a user, and never line-wrap.
+const STATUS_META: Record<string, { en: string; sw: string; cls: string }> = {
+  PLACED:         { en: 'Sent to vendor', sw: 'Imetumwa kwa muuzaji', cls: 'bg-amber-100 text-amber-700' },
+  ALERTED:        { en: 'Sent to vendor', sw: 'Imetumwa kwa muuzaji', cls: 'bg-amber-100 text-amber-700' },
+  ACCEPTED:       { en: 'Confirmed',      sw: 'Imethibitishwa',       cls: 'bg-blue-100 text-blue-700' },
+  BROADCAST:      { en: 'Finding rider',  sw: 'Inatafuta dereva',     cls: 'bg-violet-100 text-violet-700' },
+  CLAIMED:        { en: 'Rider assigned', sw: 'Dereva amepangwa',     cls: 'bg-indigo-100 text-indigo-700' },
+  RIDER_OFFERED:  { en: 'Matching rider', sw: 'Inatafuta dereva',     cls: 'bg-violet-100 text-violet-700' },
+  RIDER_ACCEPTED: { en: 'Rider assigned', sw: 'Dereva amekubali',     cls: 'bg-indigo-100 text-indigo-700' },
+  FEE_CONFIRMED:  { en: 'Preparing',      sw: 'Inaandaliwa',          cls: 'bg-indigo-100 text-indigo-700' },
+  PICKED:         { en: 'On the way',     sw: 'Njiani',               cls: 'bg-indigo-100 text-indigo-700' },
+  DELIVERED:      { en: 'Delivered',      sw: 'Imefika',              cls: 'bg-leaf/15 text-leaf-dark' },
+  COMPLETED:      { en: 'Completed',      sw: 'Imekamilika',          cls: 'bg-leaf/15 text-leaf-dark' },
+  CANCELLED:      { en: 'Cancelled',      sw: 'Imeghairiwa',          cls: 'bg-red-100 text-red-700' },
+  PENDING:        { en: 'Pending',        sw: 'Inasubiri',            cls: 'bg-amber-100 text-amber-700' },
+  PAID:           { en: 'Paid',           sw: 'Imelipwa',             cls: 'bg-leaf/15 text-leaf-dark' },
+  FAILED:         { en: 'Failed',         sw: 'Imeshindwa',           cls: 'bg-red-100 text-red-700' },
+  REFUNDED:       { en: 'Refunded',       sw: 'Imerejeshwa',          cls: 'bg-blue-100 text-blue-700' },
+  ONLINE:         { en: 'Online',         sw: 'Mtandaoni',            cls: 'bg-leaf/15 text-leaf-dark' },
+  OFFLINE:        { en: 'Offline',        sw: 'Nje ya mtandao',       cls: 'bg-black/10 text-ink/60' },
+  ON_JOB:         { en: 'On a job',       sw: 'Kazini',               cls: 'bg-indigo-100 text-indigo-700' },
 };
 export function Badge({ status }: { status: string }) {
-  return <span className={cn('rounded-full px-2.5 py-1 text-xs font-semibold', STATUS_COLORS[status] ?? 'bg-black/10 text-ink/60')}>{status}</span>;
+  const { t } = useT();
+  const m = STATUS_META[status];
+  return <span className={cn('inline-block whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold', m?.cls ?? 'bg-black/10 text-ink/60')}>{m ? t(m.en, m.sw) : status}</span>;
 }
 
 export function Spinner() {
