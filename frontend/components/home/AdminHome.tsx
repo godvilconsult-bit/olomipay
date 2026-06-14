@@ -116,6 +116,31 @@ export function AdminHome({ user }: { user: JikoUser }) {
                 </div>
               </Card>
             )}
+            {stats.trend && (
+              <Card>
+                <div className="mb-2 flex items-center gap-1.5 text-xs font-bold text-ink/60"><Activity size={14} className="text-flame" /> {t('Orders — last 7 days', 'Oda — siku 7 zilizopita')}</div>
+                <div className="flex h-24 items-end justify-between gap-1.5">
+                  {stats.trend.map((d: any, i: number) => {
+                    const max = Math.max(...stats.trend.map((x: any) => x.count), 1);
+                    return (
+                      <div key={i} className="flex flex-1 flex-col items-center justify-end gap-1">
+                        <span className="text-[10px] font-bold tabular-nums">{d.count}</span>
+                        <div className="w-full rounded-t bg-grad-brand" style={{ height: `${Math.max(4, (d.count / max) * 70)}px` }} />
+                        <span className="text-[9px] text-ink/40">{d.label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Card>
+            )}
+            {stats.topVendors?.length > 0 && (
+              <Card className="!p-3">
+                <div className="mb-1.5 text-xs font-bold text-ink/60">{t('Top vendors', 'Wauzaji bora')}</div>
+                {stats.topVendors.map((v: any, i: number) => (
+                  <div key={i} className="flex items-center justify-between py-1 text-sm"><span className="min-w-0 truncate">{i + 1}. {v.name}</span><span className="flex-shrink-0 font-bold tabular-nums">{v.count}</span></div>
+                ))}
+              </Card>
+            )}
             <Card>
               <div className="mb-3 flex items-center gap-2 font-bold"><Users size={18} className="text-flame" /> {t('Users', 'Watumiaji')}</div>
               <div className="grid grid-cols-3 gap-2 text-center text-sm">

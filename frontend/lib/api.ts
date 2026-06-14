@@ -180,6 +180,7 @@ export const suppliers = {
   restock:   (body: { productId?: string; distributor?: string; qty: number; note?: string }) =>
     apiFetch('/api/suppliers/restock', { method: 'POST', body: JSON.stringify(body) }),
   payouts:   () => apiFetch('/api/suppliers/payouts'),
+  analytics: () => apiFetch<{ today: any; week: any; topProducts: any[]; walletBalance: number }>('/api/suppliers/analytics'),
   upgradeRequest: (tier: 'STANDARD' | 'PREMIUM') => apiFetch('/api/suppliers/upgrade-request', { method: 'POST', body: JSON.stringify({ tier }) }),
 };
 

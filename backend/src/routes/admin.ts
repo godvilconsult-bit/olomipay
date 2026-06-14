@@ -28,12 +28,28 @@ router.get('/stats', requireAdmin, async (_req: AuthRequest, res) => {
   // Delivery margin isn't a column; derive it from gross delivery fees.
   const deliveryMargin = Math.round((platform._sum.deliveryFee ?? 0) * Number(process.env.JIKO_DELIVERY_MARGIN_PCT ?? 0.15));
   const platformRevenue = platform._sum.platformAmount ?? (commission + service + deliveryMargin);
+
+  // 7-day order trend + top vendors.
+  const since = new Date(); since.setHours(0, 0, 0, 0); since.setDate(since.getDate() - 6);
+  const [recent, grouped] = await Promise.all([
+    prisma.order.findMany({ where: { placedAt: { gte: since } }, select: { placedAt: true } }),
+    prisma.order.groupBy({ by: ['supplierId'], _count: { _all: true }, where: { status: { in: ['DELIVERED', 'COMPLETED'] } }, orderBy: { _count: { supplierId: 'desc' } }, take: 5 }),
+  ]);
+  const trend = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - (6 - i));
+    const next = new Date(d); next.setDate(d.getDate() + 1);
+    return { label: d.toLocaleDateString('en', { weekday: 'short' }), count: recent.filter(o => o.placedAt >= d && o.placedAt < next).length };
+  });
+  const supNames = await prisma.supplierProfile.findMany({ where: { id: { in: grouped.map(g => g.supplierId) } }, select: { id: true, businessName: true } });
+  const topVendors = grouped.map(g => ({ name: supNames.find(s => s.id === g.supplierId)?.businessName ?? '—', count: g._count._all }));
+
   res.json({
     users: { households, suppliers, riders },
     orders: { total: orders, delivered },
     gmv: gmv._sum.total ?? 0,
     platformRevenue,
     revenueBreakdown: { commission, serviceFee: service, deliveryMargin },
+    trend, topVendors,
   });
 });
 

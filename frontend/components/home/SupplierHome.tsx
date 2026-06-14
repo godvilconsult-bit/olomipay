@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { Store, Bell, AlertTriangle, Check, X, MapPin, Bike, Smartphone, Banknote, Clock, ShieldAlert, Navigation, Wallet, ChevronRight } from 'lucide-react';
+import { Store, Bell, AlertTriangle, Check, X, MapPin, Bike, Smartphone, Banknote, Clock, ShieldAlert, Navigation, Wallet, ChevronRight, TrendingUp } from 'lucide-react';
 import { suppliers, getAccessToken, JikoUser } from '../../lib/api';
 import { useSocket } from '../../lib/useSocket';
 import { useT } from '../../lib/i18n';
@@ -23,6 +23,7 @@ export function SupplierHome({ user }: { user: JikoUser }) {
   const { on } = useSocket(getAccessToken());
   const [me, setMe]   = useState<any>(null);
   const [list, setList] = useState<any[]>([]);
+  const [analytics, setAnalytics] = useState<any>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [mismatchM, setMismatchM] = useState<number | null>(null);
   const [noLoc, setNoLoc] = useState(false);
@@ -36,8 +37,8 @@ export function SupplierHome({ user }: { user: JikoUser }) {
   }
 
   const refresh = useCallback(async () => {
-    const [m, o] = await Promise.all([suppliers.me().catch(() => null), suppliers.orders().catch(() => ({ orders: [] }))]);
-    setMe(m); setList(o.orders ?? []);
+    const [m, o, a] = await Promise.all([suppliers.me().catch(() => null), suppliers.orders().catch(() => ({ orders: [] })), suppliers.analytics().catch(() => null)]);
+    setMe(m); setList(o.orders ?? []); setAnalytics(a);
   }, []);
   useEffect(() => { refresh(); }, [refresh]);
 
@@ -138,6 +139,17 @@ export function SupplierHome({ user }: { user: JikoUser }) {
           <Stat label={t('Today', 'Leo')} value={me.stats.today} />
           <Stat label={t('Low stock', 'Stock ndogo')} value={me.stats.lowStock} />
         </div>
+
+        {analytics && (
+          <Card className="!p-3">
+            <div className="mb-2 flex items-center gap-1.5 text-xs font-bold text-ink/60"><TrendingUp size={14} className="text-leaf" /> {t('Sales', 'Mauzo')}</div>
+            <div className="grid grid-cols-2 gap-2 text-center">
+              <div><Money value={analytics.today.sales} className="text-sm" /><div className="text-[10px] text-ink/50">{t('Today', 'Leo')} · {analytics.today.orders} {t('orders', 'oda')}</div></div>
+              <div><Money value={analytics.week.sales} className="text-sm" /><div className="text-[10px] text-ink/50">{t('This week', 'Wiki hii')} · {analytics.week.orders} {t('orders', 'oda')}</div></div>
+            </div>
+            {analytics.topProducts?.length > 0 && <div className="mt-2 border-t border-black/5 pt-2 text-xs text-ink/50">{t('Top', 'Bora')}: {analytics.topProducts.slice(0, 3).map((p: any) => `${p.name} (${p.qty})`).join(', ')}</div>}
+          </Card>
+        )}
 
         {/* plan / featured slot (Phase 2 monetization) */}
         <Card>

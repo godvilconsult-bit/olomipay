@@ -198,6 +198,28 @@ router.get('/payouts', requireRole('SUPPLIER'), async (req: AuthRequest, res) =>
   res.json({ payouts, pending, paid });
 });
 
+// ── GET /api/suppliers/analytics ─ sales today/week + top products (Tier 4) ──────
+router.get('/analytics', requireRole('SUPPLIER'), async (req: AuthRequest, res) => {
+  const profile = await myProfile(req.userId!);
+  if (!profile) return res.status(404).json({ error: 'No supplier profile' });
+  const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
+  const weekStart = new Date(Date.now() - 7 * 864e5);
+  const settled = { in: ['DELIVERED', 'COMPLETED'] as any };
+  const [today, week, topProducts, wallet] = await Promise.all([
+    prisma.order.aggregate({ _sum: { itemsTotal: true, commissionAmount: true }, _count: true, where: { supplierId: profile.id, status: settled, deliveredAt: { gte: dayStart } } }),
+    prisma.order.aggregate({ _sum: { itemsTotal: true, commissionAmount: true }, _count: true, where: { supplierId: profile.id, status: settled, deliveredAt: { gte: weekStart } } }),
+    prisma.orderItem.groupBy({ by: ['productName'], _sum: { qty: true }, where: { order: { supplierId: profile.id } }, orderBy: { _sum: { qty: 'desc' } }, take: 5 }),
+    prisma.wallet.findUnique({ where: { userId: req.userId } }),
+  ]);
+  const net = (a: typeof today) => (a._sum.itemsTotal ?? 0) - (a._sum.commissionAmount ?? 0);
+  res.json({
+    today: { sales: today._sum.itemsTotal ?? 0, net: net(today), orders: today._count },
+    week:  { sales: week._sum.itemsTotal ?? 0,  net: net(week),  orders: week._count },
+    topProducts: topProducts.map(p => ({ name: p.productName, qty: p._sum.qty ?? 0 })),
+    walletBalance: wallet?.balance ?? 0,
+  });
+});
+
 // ── POST /api/suppliers/upgrade-request ─ ask to move to a paid plan (Phase 2) ────
 router.post('/upgrade-request', requireRole('SUPPLIER'), async (req: AuthRequest, res) => {
   const parse = z.object({ tier: z.enum(['STANDARD', 'PREMIUM']) }).safeParse(req.body);
