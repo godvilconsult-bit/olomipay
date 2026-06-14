@@ -5,26 +5,25 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import toast from 'react-hot-toast';
-import { MapPin, Star, BadgeCheck, Search, Navigation, Package, List, Map as MapIcon, HandCoins, Bike, Smartphone, Banknote, RotateCcw, Store, ChevronRight, RefreshCw, Gift, Wallet, Heart } from 'lucide-react';
-import { vendors, orders, addresses, ads, getAccessToken, JikoUser, type BrandAd } from '../../lib/api';
+import { MapPin, Star, BadgeCheck, Search, Navigation, Package, List, Map as MapIcon, HandCoins, Smartphone, Banknote, RotateCcw, Store, ChevronRight, RefreshCw, Gift, Wallet, Heart, Bell, Flame, Wrench, LogOut, Clock, Loader2 } from 'lucide-react';
+import { vendors, orders, addresses, ads, auth, getAccessToken, JikoUser, type BrandAd } from '../../lib/api';
 import { useSocket } from '../../lib/useSocket';
-import { useT } from '../../lib/i18n';
+import { useT, LangToggle } from '../../lib/i18n';
 import { getDeviceLocation, distanceM, prettyDistance } from '../../lib/location';
 import { reverseGeocode } from '../../lib/geocode';
-import { AppHeader } from '../AppHeader';
 import { RoleNav } from '../RoleNav';
-import { Card, Pill, Spinner, EmptyState, Money, Badge, Button, ListGroup, cn } from '../ui';
+import { Money, Badge, Button, EmptyState, cn } from '../ui';
 
 const Map = dynamic(() => import('../Map'), { ssr: false });
 const DAR = { lat: -6.7924, lng: 39.2083 };
-const MISMATCH_M = 300; // prompt when device is more than this far from the saved location
+const MISMATCH_M = 300;
 
 export function HouseholdHome({ user }: { user: JikoUser }) {
   const { t } = useT();
   const router = useRouter();
   const { on } = useSocket(getAccessToken());
 
-  const [savedAddr, setSavedAddr] = useState<any>(null);   // the single canonical delivery location
+  const [savedAddr, setSavedAddr] = useState<any>(null);
   const [mismatchM, setMismatchM] = useState<number | null>(null);
   const [locBusy, setLocBusy]   = useState(false);
   const [brands, setBrands]     = useState<string[]>([]);
@@ -35,30 +34,34 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
   const [searching, setSearching] = useState(false);
   const [view, setView]         = useState<'list' | 'map'>('list');
   const [busy, setBusy]         = useState(false);
-  const [ad, setAd]             = useState<BrandAd | null>(null); // sponsored brand (Phase 3)
+  const [ad, setAd]             = useState<BrandAd | null>(null);
+  const [menu, setMenu]         = useState(false);
+  const [reordering, setReordering] = useState<string | null>(null);
 
-  const TYPES = [
-    { v: 'REFILL', l: t('Refill', 'Refill') },
-    { v: 'CYLINDER', l: t('New cylinder', 'Mtungi mpya') },
-    { v: 'ACCESSORY', l: t('Accessories', 'Vifaa') },
+  const CATS = [
+    { v: 'REFILL',    l: t('Refill', 'Kujaza'),       icon: Flame },
+    { v: 'CYLINDER',  l: t('New cylinder', 'Mtungi'), icon: Package },
+    { v: 'ACCESSORY', l: t('Accessories', 'Vifaa'),   icon: Wrench },
   ];
   const center = savedAddr ? { lat: savedAddr.lat, lng: savedAddr.lng } : DAR;
+  const hour = new Date().getHours();
+  const greet = hour < 12 ? t('Good morning', 'Habari za asubuhi') : hour < 17 ? t('Good afternoon', 'Habari za mchana') : t('Good evening', 'Habari za jioni');
+  const firstName = (user.name ?? t('there', 'karibu')).split(' ')[0];
 
   const loadOrders = useCallback(() => { orders.list().then((r) => setRecent(r.orders ?? [])).catch(() => {}); }, []);
   const active = recent.find((o) => !['COMPLETED', 'CANCELLED'].includes(o.status));
+  const lastDone = recent.find((o) => o.status === 'COMPLETED');
 
-  // ── Load the saved delivery location; create it from GPS on first use ──────────
   const loadSaved = useCallback(async () => {
     const r = await addresses.list().catch(() => ({ addresses: [] }));
     let def = (r.addresses ?? []).find((a: any) => a.isDefault) ?? (r.addresses ?? [])[0];
     if (!def) {
-      // No saved location yet → capture the device's accurate position once.
       try {
         const d = await getDeviceLocation();
         const g = await reverseGeocode(d.lat, d.lng);
         const created = await addresses.current({ lat: d.lat, lng: d.lng, label: t('Home', 'Nyumbani'), region: g?.region, district: g?.district, ward: g?.ward });
         def = created.address;
-      } catch { /* leave unset — user can tap GPS */ }
+      } catch { /* leave unset */ }
     }
     setSavedAddr(def ?? null);
     return def ?? null;
@@ -71,8 +74,6 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
     loadSaved();
   }, [loadOrders, loadSaved, user.region]);
 
-  // Tap a sponsored brand → filter search to it (re-runs via the filter effect)
-  // and attribute the click for the advertiser's billing.
   function openAd() {
     if (!ad) return;
     ads.click(ad.id).catch(() => {});
@@ -80,7 +81,6 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
     toast.success(t(`Showing ${ad.brand} vendors`, `Inaonyesha wauzaji wa ${ad.brand}`));
   }
 
-  // ── Compare device position to the saved one → prompt if far apart ─────────────
   useEffect(() => {
     if (!savedAddr) return;
     let alive = true;
@@ -100,7 +100,6 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
     } catch { setVlist([]); } finally { setSearching(false); }
   }, [center.lat, center.lng, filter]);
 
-  // Show nearby available vendors automatically (and re-run when location/filters change).
   useEffect(() => { search(); }, [search]);
 
   useEffect(() => {
@@ -109,7 +108,6 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
     return () => offs.forEach((o) => o?.());
   }, [on, loadOrders]);
 
-  // ── Update the saved location to the device's current accurate position ────────
   async function useCurrentLocation() {
     setLocBusy(true);
     try {
@@ -121,24 +119,19 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
     } catch { toast.error(t("Couldn't get your location", 'Imeshindwa kupata eneo')); } finally { setLocBusy(false); }
   }
 
-  // 1-tap reorder: re-place a past order at the current vendor/stock + address.
-  const [reordering, setReordering] = useState<string | null>(null);
   async function reorder(o: any) {
     setReordering(o.id);
     try {
       const r = await orders.reorder(o.id);
-      toast.success(r.skipped?.length
-        ? t('Reordered — some items were unavailable', 'Imeagizwa tena — baadhi hayakupatikana')
-        : t('Reordered! Complete payment', 'Imeagizwa tena! Kamilisha malipo'));
+      toast.success(r.skipped?.length ? t('Reordered — some items were unavailable', 'Imeagizwa tena — baadhi hayakupatikana') : t('Reordered! Complete payment', 'Imeagizwa tena! Kamilisha malipo'));
       loadOrders();
       if (r.order?.id) router.push(`/order/${r.order.id}`);
-    } catch (e: any) {
-      toast.error(e?.message ?? t('Could not reorder', 'Imeshindwa kuagiza tena'));
-    } finally { setReordering(null); }
+    } catch (e: any) { toast.error(e?.message ?? t('Could not reorder', 'Imeshindwa kuagiza tena')); } finally { setReordering(null); }
   }
 
   async function confirmFee() { if (!active) return; setBusy(true); try { await orders.confirmFee(active.id); toast.success(t('Fee confirmed — rider is on the way', 'Ada imethibitishwa — dereva anakuja')); loadOrders(); } catch (e: any) { toast.error(e?.message ?? t('Failed', 'Imeshindikana')); } finally { setBusy(false); } }
   async function payNow(provider: string) { if (!active) return; setBusy(true); try { await orders.pay(active.id, { provider }); toast.success(provider === 'CASH' ? t("You'll pay cash", 'Utalipa cash') : t('Check your phone to pay', 'Angalia simu kulipa')); setTimeout(loadOrders, 2000); } catch (e: any) { toast.error(e?.message); } finally { setBusy(false); } }
+  async function logout() { try { await auth.logout(); } catch {} router.replace('/auth/login'); }
 
   async function toggleFav(supplierId: string, e: React.MouseEvent) {
     e.preventDefault(); e.stopPropagation();
@@ -148,157 +141,171 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
   const markers = (vlist ?? []).filter((v) => v.lat != null).map((v) => ({ lat: v.lat, lng: v.lng, kind: 'vendor' as const, label: v.businessName, id: v.supplierId, shop: v.businessName }))
     .concat([{ lat: center.lat, lng: center.lng, kind: 'me' as const, label: savedAddr?.label ?? t('You', 'Wewe'), id: '', shop: '' }]);
 
+  const unpaid = active && active.payment?.status !== 'PAID' && active.payment?.provider !== 'CASH';
+  function heroLine(): string {
+    if (!active) return '';
+    if (unpaid) return t('Awaiting your payment', 'Inasubiri malipo yako');
+    if (active.status === 'RIDER_ACCEPTED') return t('Confirm the rider fee', 'Thibitisha ada ya dereva');
+    if (active.status === 'FEE_CONFIRMED') return t('Rider heading to pickup', 'Dereva anaenda kuchukua');
+    if (active.status === 'PICKED') return t('On the way · arriving soon', 'Njiani · inakaribia');
+    if (active.status === 'DELIVERED') return t('Delivered — please confirm', 'Imefika — tafadhali thibitisha');
+    if (['ACCEPTED', 'RIDER_OFFERED'].includes(active.status)) return t('Matching a rider · 3–5 min', 'Inatafuta dereva · dakika 3–5');
+    return t('Sent to vendor', 'Imetumwa kwa muuzaji');
+  }
+
   return (
-    <div className="min-h-screen pb-24">
-      <AppHeader title="JIKO CONNECT" subtitle={`${t('Hi', 'Habari')}, ${user.name ?? t('customer', 'mteja')}`} />
-
-      <div className="mx-auto max-w-md space-y-3 px-5 pt-4">
-        {/* saved delivery location */}
-        <Card className="flex items-center gap-3 !p-3">
-          <MapPin className="text-flame flex-shrink-0" size={20} />
-          <div className="min-w-0 flex-1">
-            <div className="text-xs text-ink/50">{t('Deliver to (saved)', 'Inaletwa (iliyohifadhiwa)')}</div>
-            <div className="truncate text-sm font-semibold">{savedAddr ? [savedAddr.label, savedAddr.ward, savedAddr.district].filter(Boolean).join(' · ') : t('Tap GPS to set your location', 'Bonyeza GPS kuweka eneo')}</div>
+    <div className="min-h-screen pb-28">
+      {/* ── Greeting header ───────────────────────────────────────────────── */}
+      <header className="sticky top-0 z-30 border-b border-black/5 bg-sand/85 backdrop-blur dark:border-white/5">
+        <div className="mx-auto flex max-w-md items-center justify-between px-5 py-3">
+          <div className="min-w-0">
+            <div className="truncate text-lg font-extrabold leading-tight">{greet}, {firstName}</div>
+            <div className="truncate text-xs text-ink/50">{t('Delivering gas to your location', 'Tunaleta gesi kwenye eneo lako')}</div>
           </div>
-          <button onClick={useCurrentLocation} disabled={locBusy} className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-xl bg-flame/10 text-flame disabled:opacity-50"><Navigation size={17} className={locBusy ? 'animate-pulse' : ''} /></button>
-        </Card>
+          <div className="flex flex-shrink-0 items-center gap-2">
+            <Link href="/notifications" className="grid h-10 w-10 place-items-center rounded-full bg-white text-ink/60 shadow-ds-card"><Bell size={18} /></Link>
+            <button onClick={() => setMenu((m) => !m)} className="grid h-10 w-10 place-items-center rounded-full bg-grad-brand text-sm font-bold text-white" aria-label={t('Account', 'Akaunti')}>{firstName.slice(0, 1).toUpperCase()}</button>
+          </div>
+        </div>
+        {menu && (
+          <>
+            <div className="fixed inset-0 z-30" onClick={() => setMenu(false)} />
+            <div className="absolute right-5 top-[58px] z-40 w-56 rounded-2xl border border-black/5 bg-white p-3 shadow-ds-card">
+              <div className="mb-2 flex items-center justify-between"><span className="text-xs font-semibold text-ink/50">{t('Language', 'Lugha')}</span><LangToggle /></div>
+              <Link href="/addresses" onClick={() => setMenu(false)} className="flex items-center gap-2 rounded-xl px-2 py-2 text-sm font-medium hover:bg-black/5"><MapPin size={16} className="text-flame" /> {t('My addresses', 'Anwani zangu')}</Link>
+              <Link href="/wallet" onClick={() => setMenu(false)} className="flex items-center gap-2 rounded-xl px-2 py-2 text-sm font-medium hover:bg-black/5"><Wallet size={16} className="text-leaf-dark" /> {t('Wallet', 'Pochi')}</Link>
+              <button onClick={logout} className="flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left text-sm font-medium text-danger hover:bg-danger/5"><LogOut size={16} /> {t('Sign out', 'Toka')}</button>
+            </div>
+          </>
+        )}
+      </header>
 
-        {/* sponsored brand (Phase 3 monetization) */}
+      <div className="mx-auto max-w-md space-y-4 px-5 pt-4">
+        {/* ── Active order HERO ───────────────────────────────────────────── */}
+        {active && (
+          <div className="rounded-ds-xl border-2 border-flame/30 bg-white p-4 shadow-ds-card">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="text-[11px] font-bold uppercase tracking-wide text-ink/40">{t('Your order', 'Oda yako')}</div>
+                <div className="truncate text-2xl font-extrabold tracking-tight">{active.orderNo}</div>
+                <div className="truncate text-sm text-ink/60">{active.supplier?.businessName}</div>
+              </div>
+              <Badge status={active.status} />
+            </div>
+            <div className="mt-2.5 flex items-center gap-2 text-sm font-semibold text-flame">
+              <span className="relative flex h-2.5 w-2.5"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-flame opacity-60" /><span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-flame" /></span>
+              {heroLine()}
+            </div>
+
+            <div className="mt-3.5">
+              {unpaid ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <Button variant="primary" loading={busy} onClick={() => payNow('MPESA')}><Smartphone size={15} /> {t('Pay now', 'Lipa sasa')}</Button>
+                  <Button variant="ghost" loading={busy} onClick={() => payNow('CASH')}><Banknote size={15} /> {t('Cash', 'Cash')}</Button>
+                </div>
+              ) : active.status === 'RIDER_ACCEPTED' ? (
+                <div className="rounded-xl bg-flame/5 p-3">
+                  <div className="flex items-center justify-between"><span className="inline-flex items-center gap-1.5 text-sm font-bold text-flame"><HandCoins size={16} /> {t('Rider fee', 'Ada ya dereva')}</span><Money value={active.deliveryFee} className="text-lg" /></div>
+                  <Button variant="primary" loading={busy} onClick={confirmFee} className="mt-2 w-full">{t('Confirm & start', 'Thibitisha & anza')}</Button>
+                </div>
+              ) : active.status === 'DELIVERED' ? (
+                <Link href={`/order/${active.id}`}><Button variant="leaf" className="w-full">{t('Confirm & rate', 'Thibitisha & toa nyota')}</Button></Link>
+              ) : (
+                <Link href={`/order/${active.id}`}><Button variant="primary" className="w-full"><Navigation size={16} /> {t('Track order', 'Fuatilia oda')}</Button></Link>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Location ────────────────────────────────────────────────────── */}
+        <button onClick={useCurrentLocation} disabled={locBusy} className="flex w-full items-center gap-3 rounded-2xl bg-white p-3 text-left shadow-ds-card">
+          <span className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-full bg-flame/10 text-flame"><MapPin size={18} /></span>
+          <div className="min-w-0 flex-1">
+            <div className="text-[11px] text-ink/40">{t('Deliver to', 'Inaletwa')}</div>
+            <div className="truncate text-sm font-semibold">{savedAddr ? [savedAddr.label, savedAddr.ward, savedAddr.district].filter(Boolean).join(' · ') : t('Tap to set your location', 'Bonyeza kuweka eneo')}</div>
+          </div>
+          <Navigation size={16} className={cn('flex-shrink-0 text-flame', locBusy && 'animate-pulse')} />
+        </button>
+
+        {/* mismatch prompt */}
+        {mismatchM != null && savedAddr && (
+          <div className="rounded-2xl border border-flame/40 bg-flame/5 p-3">
+            <div className="text-sm"><span className="font-semibold">{t("You're about", 'Uko takriban')} {prettyDistance(mismatchM)} {t('from', 'kutoka')} {savedAddr.label}.</span> {t('Deliver here instead?', 'Uletewe hapa badala yake?')}</div>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <Button variant="primary" loading={locBusy} onClick={useCurrentLocation}><Navigation size={15} /> {t('Deliver here', 'Lete hapa')}</Button>
+              <Button variant="ghost" onClick={() => setMismatchM(null)}>{t('Keep saved', 'Baki na hii')}</Button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Search (immediately below location) ─────────────────────────── */}
+        <button onClick={search} className="flex w-full items-center gap-2.5 rounded-2xl bg-white px-4 py-3.5 text-left shadow-ds-card active:scale-[.99]">
+          <Search size={18} className="flex-shrink-0 text-flame" />
+          <span className="flex-1 text-sm text-ink/45">{t('Search gas vendors near you', 'Tafuta wauzaji wa gesi karibu')}</span>
+          {searching ? <Loader2 size={16} className="animate-spin text-flame" /> : <span className="text-xs font-bold text-flame">{t('Search', 'Tafuta')}</span>}
+        </button>
+
+        {/* ── Quick actions ───────────────────────────────────────────────── */}
+        <div className="grid grid-cols-3 gap-2.5">
+          {[
+            { href: '/subscriptions', icon: RefreshCw, label: t('Auto-refill', 'Rejesha'), bg: 'bg-leaf/15', fg: 'text-leaf-dark' },
+            { href: '/invite',        icon: Gift,      label: t('Invite', 'Alika'),         bg: 'bg-flame/15', fg: 'text-flame' },
+            { href: '/wallet',        icon: Wallet,    label: t('Wallet', 'Pochi'),         bg: 'bg-ember/15', fg: 'text-ember' },
+          ].map((a) => {
+            const Icon = a.icon;
+            return (
+              <Link key={a.href} href={a.href} className="flex flex-col items-center gap-1.5 rounded-2xl bg-white py-3.5 shadow-ds-card active:scale-[.97]">
+                <span className={cn('grid h-10 w-10 place-items-center rounded-full', a.bg, a.fg)}><Icon size={20} /></span>
+                <span className="text-xs font-semibold">{a.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+
+        {/* ── Categories (icon chips) ─────────────────────────────────────── */}
+        <div className="flex gap-2 overflow-x-auto pb-0.5">
+          <button onClick={() => setFilter((f) => ({ ...f, type: '' }))} className={cn('flex-shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition', !filter.type ? 'bg-grad-brand text-white shadow-ds-btn' : 'bg-white text-ink/60 shadow-ds-card')}>{t('All', 'Zote')}</button>
+          {CATS.map((c) => {
+            const Icon = c.icon; const on = filter.type === c.v;
+            return (
+              <button key={c.v} onClick={() => setFilter((f) => ({ ...f, type: f.type === c.v ? '' : c.v }))} className={cn('flex flex-shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold transition', on ? 'bg-grad-brand text-white shadow-ds-btn' : 'bg-white text-ink/60 shadow-ds-card')}><Icon size={15} /> {c.l}</button>
+            );
+          })}
+        </div>
+
+        {/* brand / size — compact, only when a brand/size choice is useful */}
+        <div className={cn('grid gap-2', filter.type === 'ACCESSORY' ? 'grid-cols-1' : 'grid-cols-2')}>
+          <select value={filter.brand} onChange={(e) => setFilter((f) => ({ ...f, brand: e.target.value }))} className="w-full rounded-xl border border-black/10 bg-white px-3 py-2.5 text-sm font-medium text-ink outline-none focus:border-flame">
+            <option value="">{t('All brands', 'Brand zote')}</option>
+            {brands.map((b) => <option key={b} value={b}>{b}</option>)}
+          </select>
+          {filter.type !== 'ACCESSORY' && (
+            <select value={filter.sizeKg} onChange={(e) => setFilter((f) => ({ ...f, sizeKg: e.target.value }))} className="w-full rounded-xl border border-black/10 bg-white px-3 py-2.5 text-sm font-medium text-ink outline-none focus:border-flame">
+              <option value="">{t('All sizes', 'Saizi zote')}</option>
+              {sizes.map((s) => <option key={s} value={s}>{s} kg</option>)}
+            </select>
+          )}
+        </div>
+
+        {/* sponsored brand */}
         {ad && (
           <button onClick={openAd} className="block w-full text-left">
-            <div className="relative overflow-hidden rounded-2xl bg-grad-brand p-4 text-white shadow-ds-card">
+            <div className="relative overflow-hidden rounded-2xl bg-grad-brand p-3.5 text-white shadow-ds-card">
               <span className="absolute right-2 top-2 rounded-full bg-white/20 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide">{t('Sponsored', 'Tangazo')}</span>
               <div className="flex items-center gap-3">
-                {ad.imageUrl
-                  ? <img src={ad.imageUrl} alt={ad.brand} className="h-12 w-12 flex-shrink-0 rounded-xl bg-white/10 object-cover" />
-                  : <span className="grid h-12 w-12 flex-shrink-0 place-items-center rounded-xl bg-white/15 text-lg font-extrabold">{ad.brand.slice(0, 2).toUpperCase()}</span>}
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-extrabold">{ad.title}</div>
-                  {ad.subtitle && <div className="truncate text-xs text-white/80">{ad.subtitle}</div>}
-                </div>
+                {ad.imageUrl ? <img src={ad.imageUrl} alt={ad.brand} className="h-11 w-11 flex-shrink-0 rounded-xl bg-white/10 object-cover" /> : <span className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-xl bg-white/15 font-extrabold">{ad.brand.slice(0, 2).toUpperCase()}</span>}
+                <div className="min-w-0 flex-1"><div className="truncate text-sm font-extrabold">{ad.title}</div>{ad.subtitle && <div className="truncate text-xs text-white/80">{ad.subtitle}</div>}</div>
                 <span className="flex-shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-bold text-flame">{ad.ctaLabel || t('Shop', 'Nunua')}</span>
               </div>
             </div>
           </button>
         )}
 
-        {/* mismatch prompt — device is somewhere else */}
-        {mismatchM != null && savedAddr && (
-          <Card className="border-flame/40 !bg-flame/5">
-            <div className="text-sm"><span className="font-semibold">{t("You're about", 'Uko takriban')} {prettyDistance(mismatchM)} {t('from', 'kutoka')} {savedAddr.label}.</span> {t('Deliver to where you are now, or keep your saved location?', 'Uletewe ulipo sasa, au ubaki na eneo lililohifadhiwa?')}</div>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              <Button variant="primary" loading={locBusy} onClick={useCurrentLocation}><Navigation size={15} /> {t('Deliver here', 'Lete hapa')}</Button>
-              <Button variant="ghost" onClick={() => setMismatchM(null)}>{t('Keep saved', 'Baki na hii')}</Button>
-            </div>
-          </Card>
-        )}
-
-        {/* active order */}
-        {active && (
-          <Card className="border-flame/40">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0"><div className="font-bold">{active.orderNo}</div><div className="truncate text-xs text-ink/50">{active.supplier?.businessName}</div></div>
-              <Badge status={active.status} />
-            </div>
-            {active.payment?.status !== 'PAID' && active.payment?.provider !== 'CASH' ? (
-              <div className="mt-3">
-                <div className="mb-1.5 text-xs font-medium text-ink/60">{t('Complete payment for your gas', 'Kamilisha malipo ya gesi')}</div>
-                <div className="grid grid-cols-2 gap-2">
-                  <Button variant="primary" loading={busy} onClick={() => payNow('MPESA')}><Smartphone size={15} /> {t('Mobile money', 'Pesa za simu')}</Button>
-                  <Button variant="ghost" loading={busy} onClick={() => payNow('CASH')}><Banknote size={15} /> {t('Cash', 'Cash')}</Button>
-                </div>
-              </div>
-            ) : active.status === 'RIDER_ACCEPTED' ? (
-              <div className="mt-3 rounded-xl bg-flame/5 p-3">
-                <div className="flex items-center gap-2 text-sm font-bold text-flame"><HandCoins size={16} /> {t('Confirm the rider fee', 'Thibitisha ada ya dereva')}</div>
-                <div className="my-1 text-center"><Money value={active.deliveryFee} className="text-2xl" /></div>
-                <Button variant="primary" loading={busy} onClick={confirmFee} className="w-full">{t('Confirm & start', 'Thibitisha & anza')}</Button>
-              </div>
-            ) : ['FEE_CONFIRMED', 'PICKED'].includes(active.status) ? (
-              <div className="mt-3 flex items-center justify-between">
-                <span className="inline-flex items-center gap-1.5 text-sm font-medium text-leaf-dark"><Bike size={15} /> {active.status === 'PICKED' ? t('Rider on the way', 'Dereva njiani') : t('Rider heading to pickup', 'Dereva anaenda kuchukua')}</span>
-                <Link href={`/order/${active.id}`} className="text-xs font-semibold text-flame">{t('Track live', 'Fuatilia')}</Link>
-              </div>
-            ) : active.status === 'DELIVERED' ? (
-              <Link href={`/order/${active.id}`}><Button variant="leaf" className="mt-3 w-full">{t('Confirm & rate', 'Thibitisha & toa nyota')}</Button></Link>
-            ) : (
-              <div className="mt-3 flex items-center justify-between">
-                <span className="text-sm text-ink/60">{['ACCEPTED', 'RIDER_OFFERED'].includes(active.status) ? t('Finding a rider…', 'Inatafuta dereva…') : t('Waiting for vendor…', 'Inasubiri muuzaji…')}</span>
-                <Link href={`/order/${active.id}`} className="text-xs font-semibold text-flame">{t('View', 'Angalia')}</Link>
-              </div>
-            )}
-          </Card>
-        )}
-
-        {/* quick links */}
-        <div className="grid grid-cols-3 gap-2">
-          <Link href="/subscriptions" className="flex flex-col items-center gap-1 rounded-2xl bg-white p-3 text-center shadow-ds-card"><RefreshCw size={18} className="text-leaf-dark" /><span className="text-[11px] font-semibold">{t('Auto-refill', 'Rejesha')}</span></Link>
-          <Link href="/invite" className="flex flex-col items-center gap-1 rounded-2xl bg-white p-3 text-center shadow-ds-card"><Gift size={18} className="text-flame" /><span className="text-[11px] font-semibold">{t('Invite', 'Alika')}</span></Link>
-          <Link href="/wallet" className="flex flex-col items-center gap-1 rounded-2xl bg-white p-3 text-center shadow-ds-card"><Wallet size={18} className="text-ink" /><span className="text-[11px] font-semibold">{t('Wallet', 'Pochi')}</span></Link>
-        </div>
-
-        {/* filters */}
-        <div className="flex gap-2">
-          <Pill active={!filter.type} onClick={() => setFilter((f) => ({ ...f, type: '' }))}>{t('All', 'Zote')}</Pill>
-          {TYPES.map((ty) => <Pill key={ty.v} active={filter.type === ty.v} onClick={() => setFilter((f) => ({ ...f, type: f.type === ty.v ? '' : ty.v }))}>{ty.l}</Pill>)}
-        </div>
-        <div className={cn('grid gap-2', filter.type === 'ACCESSORY' ? 'grid-cols-1' : 'grid-cols-2')}>
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium text-ink/50">{t('Brand', 'Brand')}</span>
-            <select value={filter.brand} onChange={(e) => setFilter((f) => ({ ...f, brand: e.target.value }))} className="w-full rounded-xl border border-black/15 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-flame">
-              <option value="">{t('All brands', 'Brand zote')}</option>
-              {brands.map((b) => <option key={b} value={b}>{b}</option>)}
-            </select>
-          </label>
-          {filter.type !== 'ACCESSORY' && (
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium text-ink/50">{t('Size', 'Saizi')}</span>
-              <select value={filter.sizeKg} onChange={(e) => setFilter((f) => ({ ...f, sizeKg: e.target.value }))} className="w-full rounded-xl border border-black/15 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-flame">
-                <option value="">{t('All sizes', 'Saizi zote')}</option>
-                {sizes.map((s) => <option key={s} value={s}>{s} kg</option>)}
-              </select>
-            </label>
-          )}
-        </div>
-        <Button variant="outline" className="w-full" loading={searching} onClick={search}><Search size={17} /> {t('Search vendors', 'Tafuta wauzaji')}</Button>
-
-        {/* results loading skeleton (feels instant vs a blank wait) */}
-        {searching && vlist === null && (
-          <div className="space-y-3">
-            {[0, 1, 2].map((i) => (
-              <Card key={i}><div className="h-14 animate-pulse rounded-xl bg-black/5 dark:bg-white/5" /></Card>
-            ))}
-          </div>
-        )}
-
-        {/* recent orders */}
-        {vlist === null && !searching && recent.filter((o) => o.id !== active?.id).length > 0 && (
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-sm font-bold text-ink/70">{t('Your recent orders', 'Oda zako za hivi karibuni')}</h2>
-              <Link href="/orders" className="text-xs font-semibold text-flame">{t('All', 'Zote')}</Link>
-            </div>
-            <ListGroup>
-              {recent.filter((o) => o.id !== active?.id).slice(0, 3).map((o) => (
-                <div key={o.id} className="flex items-center justify-between gap-3 px-3 py-2.5">
-                  <Link href={`/order/${o.id}`} className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-semibold">{o.supplier?.businessName}</div>
-                    <div className="mt-0.5 flex items-center gap-1.5 text-xs text-ink/50"><Money value={o.total} className="text-xs" /> · <Badge status={o.status} /></div>
-                  </Link>
-                  <Button variant="primary" loading={reordering === o.id} onClick={() => reorder(o)} className="flex-shrink-0 !px-3">
-                    <RotateCcw size={15} /> {t('Reorder', 'Agiza tena')}
-                  </Button>
-                </div>
-              ))}
-            </ListGroup>
-          </div>
-        )}
-
-        {/* results */}
+        {/* ── Vendors ─────────────────────────────────────────────────────── */}
         {vlist !== null && (
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-sm font-bold text-ink/70">{vlist.length} {t('vendors near your location', 'wauzaji karibu na eneo lako')}</h2>
+              <h2 className="text-sm font-bold">{vlist.length} {t('vendors nearby', 'wauzaji karibu')}</h2>
               <div className="flex items-center rounded-full bg-black/5 p-0.5 text-xs font-bold">
                 <button onClick={() => setView('list')} className={cn('flex items-center gap-1 rounded-full px-2.5 py-1', view === 'list' ? 'bg-flame text-white' : 'text-ink/50')}><List size={13} /> {t('List', 'Orodha')}</button>
                 <button onClick={() => setView('map')} className={cn('flex items-center gap-1 rounded-full px-2.5 py-1', view === 'map' ? 'bg-flame text-white' : 'text-ink/50')}><MapIcon size={13} /> {t('Map', 'Ramani')}</button>
@@ -306,27 +313,31 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
             </div>
             {vlist.length === 0 ? <EmptyState icon={<Package size={36} />} title={t('No vendor with stock nearby', 'Hakuna muuzaji mwenye stock karibu')} sub={t('Try another brand or size.', 'Jaribu brand au saizi nyingine.')} /> :
               view === 'map' ? (
-                <Card className="!p-1.5"><Map markers={markers} height={340} onMarkerClick={(id) => id && router.push(`/vendor/${id}`)} /></Card>
+                <div className="overflow-hidden rounded-ds-xl bg-white p-1.5 shadow-ds-card"><Map markers={markers} height={340} onMarkerClick={(id) => id && router.push(`/vendor/${id}`)} /></div>
               ) : (
-                /* Compact zero-boundary list: vendor name + distance. Tap a row
-                   to open the full vendor card (details + payment). */
-                <div className="divide-y divide-black/5 overflow-hidden rounded-ds-xl bg-white dark:bg-ink-2">
+                <div className="space-y-2.5">
                   {vlist.map((v) => (
-                    <Link key={v.supplierId} href={`/vendor/${v.supplierId}`} className="flex items-center gap-3 px-3 py-2.5 active:bg-black/[.03]">
-                      <span className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-full bg-flame/10 text-flame"><Store size={16} /></span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5">
-                          <span className="truncate font-semibold">{v.businessName}</span>
-                          {v.isVerified && <BadgeCheck size={14} className="flex-shrink-0 text-leaf" />}
-                          {v.featured && <Star size={12} className="flex-shrink-0 fill-ember text-ember" />}
+                    <Link key={v.supplierId} href={`/vendor/${v.supplierId}`} className="block rounded-ds-xl bg-white p-3 shadow-ds-card transition active:scale-[.99]">
+                      <div className="flex items-center gap-3">
+                        <span className="grid h-11 w-11 flex-shrink-0 place-items-center overflow-hidden rounded-xl bg-flame/10 text-flame">{v.logoUrl ? <img src={v.logoUrl} alt="" className="h-full w-full object-cover" /> : <Store size={20} />}</span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="truncate font-bold">{v.businessName}</span>
+                            {v.isVerified && <BadgeCheck size={15} className="flex-shrink-0 text-leaf" />}
+                            {v.featured && <span className="flex-shrink-0 rounded-full bg-ember/15 px-1.5 text-[9px] font-bold uppercase text-ember">{t('Top', 'Bora')}</span>}
+                          </div>
+                          <div className="mt-0.5 flex items-center gap-2 text-xs text-ink/50">
+                            <span className="inline-flex items-center gap-0.5 font-semibold text-ink/70"><Star size={12} className="fill-ember text-ember" /> {v.rating ? v.rating.toFixed(1) : t('New', 'Mpya')}</span>
+                            <span className="inline-flex items-center gap-0.5"><MapPin size={11} /> {v.distanceKm < 1 ? `${Math.round(v.distanceKm * 1000)} m` : `${v.distanceKm} km`}</span>
+                            <span className="inline-flex items-center gap-0.5"><Clock size={11} /> {v.etaMin} {t('min', 'dak')}</span>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2 text-xs text-ink/50">
-                          <span className="inline-flex items-center gap-0.5 font-medium text-ink/70"><MapPin size={11} /> {v.distanceKm < 1 ? `${Math.round(v.distanceKm * 1000)} m` : `${v.distanceKm} km`}</span>
-                          {v.fromPrice != null && <><span>·</span><span>{t('from', 'kuanzia')} <Money value={v.fromPrice} className="text-xs" /></span></>}
-                        </div>
+                        <button onClick={(e) => toggleFav(v.supplierId, e)} className="grid h-8 w-8 flex-shrink-0 place-items-center" aria-label={t('Favourite', 'Pendwa')}><Heart size={17} className={v.favorited ? 'fill-flame text-flame' : 'text-ink/25'} /></button>
                       </div>
-                      <button onClick={(e) => toggleFav(v.supplierId, e)} className="grid h-8 w-8 flex-shrink-0 place-items-center"><Heart size={16} className={v.favorited ? 'fill-flame text-flame' : 'text-ink/25'} /></button>
-                      <ChevronRight size={18} className="flex-shrink-0 text-ink/30" />
+                      <div className="mt-2.5 flex items-center justify-between border-t border-black/5 pt-2.5">
+                        <span className="text-sm">{v.fromPrice != null ? <><span className="text-xs text-ink/45">{t('From', 'Kuanzia')} </span><Money value={v.fromPrice} className="text-flame" /></> : <span className="text-xs text-ink/45">{t('Tap to view', 'Bonyeza kuona')}</span>}</span>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-flame/10 px-3.5 py-1.5 text-xs font-bold text-flame">{t('Order', 'Agiza')} <ChevronRight size={13} /></span>
+                      </div>
                     </Link>
                   ))}
                 </div>
@@ -334,6 +345,14 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
           </div>
         )}
       </div>
+
+      {/* ── Sticky "Refill now" FAB (fast reorder of your usual) ──────────── */}
+      {!active && lastDone && (
+        <button onClick={() => reorder(lastDone)} disabled={reordering === lastDone.id} className="fixed bottom-[5.25rem] left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full bg-grad-brand px-6 py-3.5 text-sm font-bold text-white shadow-ds-btn active:scale-[.97]">
+          {reordering === lastDone.id ? <Loader2 size={18} className="animate-spin" /> : <RotateCcw size={18} />} {t('Refill now', 'Jaza sasa')}
+        </button>
+      )}
+
       <RoleNav role="HOUSEHOLD" />
     </div>
   );

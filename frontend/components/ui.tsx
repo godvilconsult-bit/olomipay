@@ -110,12 +110,12 @@ const STATUS_META: Record<string, { en: string; sw: string; cls: string }> = {
   PLACED:         { en: 'Sent to vendor', sw: 'Imetumwa kwa muuzaji', cls: 'bg-amber-100 text-amber-700' },
   ALERTED:        { en: 'Sent to vendor', sw: 'Imetumwa kwa muuzaji', cls: 'bg-amber-100 text-amber-700' },
   ACCEPTED:       { en: 'Confirmed',      sw: 'Imethibitishwa',       cls: 'bg-blue-100 text-blue-700' },
-  BROADCAST:      { en: 'Finding rider',  sw: 'Inatafuta dereva',     cls: 'bg-violet-100 text-violet-700' },
-  CLAIMED:        { en: 'Rider assigned', sw: 'Dereva amepangwa',     cls: 'bg-indigo-100 text-indigo-700' },
-  RIDER_OFFERED:  { en: 'Matching rider', sw: 'Inatafuta dereva',     cls: 'bg-violet-100 text-violet-700' },
-  RIDER_ACCEPTED: { en: 'Rider assigned', sw: 'Dereva amekubali',     cls: 'bg-indigo-100 text-indigo-700' },
-  FEE_CONFIRMED:  { en: 'Preparing',      sw: 'Inaandaliwa',          cls: 'bg-indigo-100 text-indigo-700' },
-  PICKED:         { en: 'On the way',     sw: 'Njiani',               cls: 'bg-indigo-100 text-indigo-700' },
+  BROADCAST:      { en: 'Finding rider',  sw: 'Inatafuta dereva',     cls: 'bg-amber-100 text-amber-700' },
+  CLAIMED:        { en: 'Rider assigned', sw: 'Dereva amepangwa',     cls: 'bg-blue-100 text-blue-700' },
+  RIDER_OFFERED:  { en: 'Matching rider', sw: 'Inatafuta dereva',     cls: 'bg-amber-100 text-amber-700' },
+  RIDER_ACCEPTED: { en: 'Rider assigned', sw: 'Dereva amekubali',     cls: 'bg-blue-100 text-blue-700' },
+  FEE_CONFIRMED:  { en: 'Preparing',      sw: 'Inaandaliwa',          cls: 'bg-blue-100 text-blue-700' },
+  PICKED:         { en: 'On the way',     sw: 'Njiani',               cls: 'bg-blue-100 text-blue-700' },
   DELIVERED:      { en: 'Delivered',      sw: 'Imefika',              cls: 'bg-leaf/15 text-leaf-dark' },
   COMPLETED:      { en: 'Completed',      sw: 'Imekamilika',          cls: 'bg-leaf/15 text-leaf-dark' },
   CANCELLED:      { en: 'Cancelled',      sw: 'Imeghairiwa',          cls: 'bg-red-100 text-red-700' },
@@ -125,7 +125,7 @@ const STATUS_META: Record<string, { en: string; sw: string; cls: string }> = {
   REFUNDED:       { en: 'Refunded',       sw: 'Imerejeshwa',          cls: 'bg-blue-100 text-blue-700' },
   ONLINE:         { en: 'Online',         sw: 'Mtandaoni',            cls: 'bg-leaf/15 text-leaf-dark' },
   OFFLINE:        { en: 'Offline',        sw: 'Nje ya mtandao',       cls: 'bg-black/10 text-ink/60' },
-  ON_JOB:         { en: 'On a job',       sw: 'Kazini',               cls: 'bg-indigo-100 text-indigo-700' },
+  ON_JOB:         { en: 'On a job',       sw: 'Kazini',               cls: 'bg-blue-100 text-blue-700' },
 };
 export function Badge({ status }: { status: string }) {
   const { t } = useT();
