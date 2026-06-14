@@ -1,0 +1,45 @@
+name: CI
+
+# Type-checks + money-math tests on the backend, and a production build of the
+# frontend, on every push and PR. Keeps the fee/settlement logic honest.
+on:
+  push:
+    branches: [main, jiko-connect]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install
+        run: npm install --no-audit --no-fund
+      - name: Generate Prisma client (types)
+        run: npx prisma generate
+      - name: Type-check
+        run: npx tsc --noEmit --skipLibCheck
+      - name: Test (money math)
+        run: npm test
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install
+        run: npm install --no-audit --no-fund
+      - name: Build
+        run: npx next build
+        env:
+          NEXT_PUBLIC_API_URL: https://olomipay-production.up.railway.app
