@@ -140,56 +140,6 @@ export function SupplierHome({ user }: { user: JikoUser }) {
           <Stat label={t('Low stock', 'Stock ndogo')} value={me.stats.lowStock} />
         </div>
 
-        {analytics && (
-          <Card className="!p-3">
-            <div className="mb-2 flex items-center gap-1.5 text-xs font-bold text-ink/60"><TrendingUp size={14} className="text-leaf" /> {t('Sales', 'Mauzo')}</div>
-            <div className="grid grid-cols-2 gap-2 text-center">
-              <div><Money value={analytics.today.sales} className="text-sm" /><div className="text-[10px] text-ink/50">{t('Today', 'Leo')} · {analytics.today.orders} {t('orders', 'oda')}</div></div>
-              <div><Money value={analytics.week.sales} className="text-sm" /><div className="text-[10px] text-ink/50">{t('This week', 'Wiki hii')} · {analytics.week.orders} {t('orders', 'oda')}</div></div>
-            </div>
-            {analytics.topProducts?.length > 0 && <div className="mt-2 border-t border-black/5 pt-2 text-xs text-ink/50">{t('Top', 'Bora')}: {analytics.topProducts.slice(0, 3).map((p: any) => `${p.name} (${p.qty})`).join(', ')}</div>}
-          </Card>
-        )}
-
-        {/* plan / featured slot (Phase 2 monetization) */}
-        <Card>
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-xs text-ink/50">{t('Your plan', 'Mpango wako')}</div>
-              <div className="flex items-center gap-2 font-bold">
-                {p.tier === 'PREMIUM' ? '⭐ Premium' : p.tier === 'STANDARD' ? 'Pro' : t('Free', 'Bure')}
-                {p.featured && <span className="rounded-full bg-ember/15 px-2 py-0.5 text-[10px] font-bold text-ember">{t('FEATURED', 'FEATURED')}</span>}
-              </div>
-            </div>
-            {p.tier !== 'PREMIUM' && (
-              <Button variant="primary" loading={upBusy} onClick={() => upgrade(p.tier === 'FREE' ? 'STANDARD' : 'PREMIUM')} className="flex-shrink-0 !px-3.5">
-                {p.tier === 'FREE' ? t('Go Pro', 'Pata Pro') : t('Go Premium', 'Pata Premium')}
-              </Button>
-            )}
-          </div>
-          {p.tier === 'FREE' && <div className="mt-2 border-t border-black/5 pt-2 text-xs text-ink/50">{t('Pro lowers commission + lifts you up search. Premium = featured slot.', 'Pro hupunguza kamisheni + kukupandisha. Premium = nafasi ya juu.')}</div>}
-        </Card>
-
-        <Link href="/wallet"><Card className="flex items-center justify-between !p-3.5"><span className="flex items-center gap-2 font-semibold"><Wallet size={17} className="text-leaf-dark" /> {t('Wallet & cash-out', 'Pochi & toa pesa')}</span><ChevronRight size={18} className="text-ink/30" /></Card></Link>
-
-        {/* operating hours — auto open/close (Tier 4) */}
-        <Card className="!p-3">
-          <div className="flex items-center justify-between gap-2">
-            <span className="flex items-center gap-2 text-sm font-semibold"><Clock size={15} className="text-flame" /> {t('Open hours', 'Saa za kazi')}</span>
-            <div className="flex items-center gap-1.5 text-sm">
-              <select value={p.openHour ?? ''} onChange={(e) => setHours(e.target.value === '' ? null : Number(e.target.value), p.closeHour ?? null)} className="rounded-lg border border-black/15 bg-white px-2 py-1 text-ink outline-none focus:border-flame">
-                <option value="">{t('Always', 'Saa zote')}</option>
-                {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>)}
-              </select>
-              <span className="text-ink/40">–</span>
-              <select value={p.closeHour ?? ''} onChange={(e) => setHours(p.openHour ?? null, e.target.value === '' ? null : Number(e.target.value))} className="rounded-lg border border-black/15 bg-white px-2 py-1 text-ink outline-none focus:border-flame">
-                <option value="">{t('Always', 'Saa zote')}</option>
-                {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>)}
-              </select>
-            </div>
-          </div>
-        </Card>
-
         {me.stats.lowStock > 0 && (
           <Card className="flex items-center gap-3 border-warning/30 !bg-warning/5">
             <AlertTriangle className="text-warning flex-shrink-0" size={20} />
@@ -198,7 +148,7 @@ export function SupplierHome({ user }: { user: JikoUser }) {
         )}
 
         <div>
-          <h2 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-ink/70"><Bell size={15} /> {t('Orders needing action', 'Oda zinazohitaji hatua')}</h2>
+          <h2 className="mb-2 flex items-center gap-1.5 text-sm font-bold"><Bell size={15} className="text-flame" /> {t('Orders needing action', 'Oda zinazohitaji hatua')}{queue.length > 0 && <span className="grid h-5 min-w-5 place-items-center rounded-full bg-flame px-1 text-[11px] font-bold text-white">{queue.length}</span>}</h2>
           {queue.length === 0 ? <EmptyState icon={<Store size={36} />} title={t('No orders right now', 'Hakuna oda kwa sasa')} sub={t('New orders appear here the instant they arrive.', 'Oda mpya zitaonekana papo hapo.')} /> :
             <ListGroup>
               {queue.map((o) => {
@@ -238,6 +188,57 @@ export function SupplierHome({ user }: { user: JikoUser }) {
             </ListGroup>
           }
         </div>
+
+        {/* ── Business (secondary — below the primary order queue) ───────────── */}
+        <h2 className="pt-1 text-sm font-bold text-ink/70">{t('Business', 'Biashara')}</h2>
+
+        {analytics && (
+          <Card className="!p-3">
+            <div className="mb-2 flex items-center gap-1.5 text-xs font-bold text-ink/60"><TrendingUp size={14} className="text-leaf" /> {t('Sales', 'Mauzo')}</div>
+            <div className="grid grid-cols-2 gap-2 text-center">
+              <div><Money value={analytics.today.sales} className="text-sm" /><div className="text-[10px] text-ink/50">{t('Today', 'Leo')} · {analytics.today.orders} {t('orders', 'oda')}</div></div>
+              <div><Money value={analytics.week.sales} className="text-sm" /><div className="text-[10px] text-ink/50">{t('This week', 'Wiki hii')} · {analytics.week.orders} {t('orders', 'oda')}</div></div>
+            </div>
+            {analytics.topProducts?.length > 0 && <div className="mt-2 border-t border-black/5 pt-2 text-xs text-ink/50">{t('Top', 'Bora')}: {analytics.topProducts.slice(0, 3).map((p: any) => `${p.name} (${p.qty})`).join(', ')}</div>}
+          </Card>
+        )}
+
+        <Card>
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-xs text-ink/50">{t('Your plan', 'Mpango wako')}</div>
+              <div className="flex items-center gap-2 font-bold">
+                {p.tier === 'PREMIUM' ? '⭐ Premium' : p.tier === 'STANDARD' ? 'Pro' : t('Free', 'Bure')}
+                {p.featured && <span className="rounded-full bg-ember/15 px-2 py-0.5 text-[10px] font-bold text-ember">{t('FEATURED', 'FEATURED')}</span>}
+              </div>
+            </div>
+            {p.tier !== 'PREMIUM' && (
+              <Button variant="primary" loading={upBusy} onClick={() => upgrade(p.tier === 'FREE' ? 'STANDARD' : 'PREMIUM')} className="flex-shrink-0 !px-3.5">
+                {p.tier === 'FREE' ? t('Go Pro', 'Pata Pro') : t('Go Premium', 'Pata Premium')}
+              </Button>
+            )}
+          </div>
+          {p.tier === 'FREE' && <div className="mt-2 border-t border-black/5 pt-2 text-xs text-ink/50">{t('Pro lowers commission + lifts you up search. Premium = featured slot.', 'Pro hupunguza kamisheni + kukupandisha. Premium = nafasi ya juu.')}</div>}
+        </Card>
+
+        <Link href="/wallet"><Card className="flex items-center justify-between !p-3.5"><span className="flex items-center gap-2 font-semibold"><Wallet size={17} className="text-leaf-dark" /> {t('Wallet & cash-out', 'Pochi & toa pesa')}</span><ChevronRight size={18} className="text-ink/30" /></Card></Link>
+
+        <Card className="!p-3">
+          <div className="flex items-center justify-between gap-2">
+            <span className="flex items-center gap-2 text-sm font-semibold"><Clock size={15} className="text-flame" /> {t('Open hours', 'Saa za kazi')}</span>
+            <div className="flex items-center gap-1.5 text-sm">
+              <select value={p.openHour ?? ''} onChange={(e) => setHours(e.target.value === '' ? null : Number(e.target.value), p.closeHour ?? null)} className="rounded-lg border border-black/15 bg-white px-2 py-1 text-ink outline-none focus:border-flame">
+                <option value="">{t('Always', 'Saa zote')}</option>
+                {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>)}
+              </select>
+              <span className="text-ink/40">–</span>
+              <select value={p.closeHour ?? ''} onChange={(e) => setHours(p.openHour ?? null, e.target.value === '' ? null : Number(e.target.value))} className="rounded-lg border border-black/15 bg-white px-2 py-1 text-ink outline-none focus:border-flame">
+                <option value="">{t('Always', 'Saa zote')}</option>
+                {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>)}
+              </select>
+            </div>
+          </div>
+        </Card>
       </div>
       <RoleNav role="SUPPLIER" />
     </div>
