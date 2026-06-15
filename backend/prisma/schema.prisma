@@ -269,6 +269,7 @@ model SupplierProfile {
   restockRequests RestockRequest[]
 
   @@index([region, isOpen])
+  @@index([isOpen, lat, lng])   // geo bounding-box vendor search
 }
 
 // ── Rider / Logistics ────────────────────────────────────────────────────────────

@@ -20,6 +20,14 @@ let _io: Server | null = null;
 // Deliveries we've already sent an "arrived" alert for (reset on restart).
 const arrivedNotified = new Set<string>();
 
+// Live-location scale guards: relay every ping in-memory, but cache the
+// delivery→order metadata and throttle DB writes so thousands of riders pinging
+// every few seconds don't hammer Postgres.
+const deliveryMeta = new Map<string, { householdId: string; supplierUserId?: string; dropLat: number | null; dropLng: number | null; orderId: string; orderNo: string; status: string }>();
+const lastRiderWrite = new Map<string, number>();
+const lastDeliveryWrite = new Map<string, number>();
+const LOC_WRITE_MS = 12_000;
+
 export function getIo(): Server | null { return _io; }
 
 /** Push an event to a single user's personal room. */
@@ -95,32 +103,49 @@ export function initSocket(httpServer: HttpServer): Server {
     // ── Rider location ping (every few seconds while moving) ──────────────────────
     socket.on('rider:location', async ({ lat, lng, deliveryId }: { lat: number; lng: number; deliveryId?: string }) => {
       if (role !== 'RIDER' || typeof lat !== 'number' || typeof lng !== 'number') return;
-      await prisma.riderProfile.update({
-        where: { userId },
-        data:  { currentLat: lat, currentLng: lng },
-      }).catch(() => {});
+      const now = Date.now();
 
-      if (deliveryId) {
-        const d = await prisma.delivery.update({
-          where: { id: deliveryId },
-          data:  { riderLat: lat, riderLng: lng, lastLocationAt: new Date() },
+      // Ambient position (powers "nearby riders") — throttled write, not every ping.
+      if (now - (lastRiderWrite.get(userId) ?? 0) > LOC_WRITE_MS) {
+        lastRiderWrite.set(userId, now);
+        prisma.riderProfile.update({ where: { userId }, data: { currentLat: lat, currentLng: lng } }).catch(() => {});
+      }
+
+      if (!deliveryId) return;
+
+      // Cache delivery → order metadata so we never read the DB per ping.
+      let meta = deliveryMeta.get(deliveryId);
+      if (!meta) {
+        const d = await prisma.delivery.findUnique({
+          where:  { id: deliveryId },
           select: { dropLat: true, dropLng: true, order: { select: { id: true, orderNo: true, status: true, householdId: true, supplier: { select: { userId: true } } } } },
         }).catch(() => null);
-        if (d?.order) {
-          // Both the household AND the supplier watch the rider live.
-          emitToUser(d.order.householdId, 'delivery:location', { deliveryId, lat, lng });
-          if (d.order.supplier?.userId) emitToUser(d.order.supplier.userId, 'delivery:location', { deliveryId, lat, lng });
+        if (!d?.order) return;
+        meta = { householdId: d.order.householdId, supplierUserId: d.order.supplier?.userId ?? undefined, dropLat: d.dropLat, dropLng: d.dropLng, orderId: d.order.id, orderNo: d.order.orderNo, status: d.order.status };
+        deliveryMeta.set(deliveryId, meta);
+      }
 
-          // Geofence: rider within ~150 m of the destination while carrying the gas → "arrived".
-          if (d.order.status === 'PICKED' && d.dropLat != null && d.dropLng != null && !arrivedNotified.has(deliveryId)) {
-            const km = haversineKm(lat, lng, d.dropLat, d.dropLng);
-            if (km <= 0.15) {
-              arrivedNotified.add(deliveryId);
-              emitToUser(d.order.householdId, 'order:arriving', { orderId: d.order.id });
-              await notify(d.order.householdId, { title: 'Your rider has arrived 🏍️', body: `${d.order.orderNo}: the rider is at your location. Have your code ready.`, type: 'order', data: { orderId: d.order.id } });
-            }
-          }
-        }
+      // Always relay live (in-memory, cheap) so the map stays real-time.
+      emitToUser(meta.householdId, 'delivery:location', { deliveryId, lat, lng });
+      if (meta.supplierUserId) emitToUser(meta.supplierUserId, 'delivery:location', { deliveryId, lat, lng });
+
+      // Geofence arrival — one alert per delivery.
+      if (meta.status === 'PICKED' && meta.dropLat != null && meta.dropLng != null && !arrivedNotified.has(deliveryId) && haversineKm(lat, lng, meta.dropLat, meta.dropLng) <= 0.15) {
+        arrivedNotified.add(deliveryId);
+        emitToUser(meta.householdId, 'order:arriving', { orderId: meta.orderId });
+        await notify(meta.householdId, { title: 'Your rider has arrived 🏍️', body: `${meta.orderNo}: the rider is at your location. Have your code ready.`, type: 'order', data: { orderId: meta.orderId } });
+      }
+
+      // Persist last-known position + refresh status (so the geofence fires after
+      // pickup) — throttled to once per LOC_WRITE_MS per delivery.
+      if (now - (lastDeliveryWrite.get(deliveryId) ?? 0) > LOC_WRITE_MS) {
+        lastDeliveryWrite.set(deliveryId, now);
+        const upd = await prisma.delivery.update({
+          where:  { id: deliveryId },
+          data:   { riderLat: lat, riderLng: lng, lastLocationAt: new Date() },
+          select: { order: { select: { status: true } } },
+        }).catch(() => null);
+        if (upd?.order) meta!.status = upd.order.status;
       }
     });
 

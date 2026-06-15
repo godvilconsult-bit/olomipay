@@ -4,12 +4,14 @@ import 'express-async-errors';
 import { createServer } from 'http';
 import cors from 'cors';
 import helmet from 'helmet';
+import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 
 const app  = express();
 const PORT = process.env.PORT ?? 3001;
 
 app.set('trust proxy', 1);
+app.use(compression()); // gzip every response — big win on mobile networks
 app.use(helmet({ crossOriginResourcePolicy: false }));
 app.use(cors({
   origin: (origin, cb) => cb(null, true), // open during build-out; lock down per-env later

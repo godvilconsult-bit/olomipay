@@ -17,11 +17,16 @@ function openNow(s: { isOpen: boolean; openHour: number | null; closeHour: numbe
 }
 
 // ── GET /api/vendors/products ─ catalog for search filters (brands/sizes) ────────
+// Cached in-memory (5 min): the catalog is near-static but hit on every load.
+let catalogCache: { at: number; data: any } | null = null;
 router.get('/products', async (_req, res) => {
+  if (catalogCache && Date.now() - catalogCache.at < 300_000) return res.json(catalogCache.data);
   const products = await prisma.product.findMany({ orderBy: [{ type: 'asc' }, { brand: 'asc' }, { sizeKg: 'asc' }] });
   const brands = [...new Set(products.map(p => p.brand))];
   const sizes  = [...new Set(products.filter(p => p.sizeKg).map(p => p.sizeKg!))].sort((a, b) => a - b);
-  res.json({ products, brands, sizes });
+  const data = { products, brands, sizes };
+  catalogCache = { at: Date.now(), data };
+  res.json(data);
 });
 
 // ── GET /api/vendors/search ─ nearby vendors that HAVE stock, with price + ETA ───
@@ -38,6 +43,12 @@ router.get('/search', requireAuth, async (req: AuthRequest, res) => {
 
   const { lat, lng, brand, type, sizeKg, radiusKm } = parse.data;
 
+  // Bounding-box prefilter: lets Postgres use the (isOpen,lat,lng) index instead
+  // of scanning every open vendor. The haversine pass below refines to the exact
+  // circle, and the box is a superset of the circle so nothing is missed.
+  const dLat = radiusKm / 111;
+  const dLng = radiusKm / ((111 * Math.cos((lat * Math.PI) / 180)) || 1);
+
   const productWhere: any = {};
   if (brand)  productWhere.brand  = brand;
   if (type)   productWhere.type   = type;
@@ -46,8 +57,8 @@ router.get('/search', requireAuth, async (req: AuthRequest, res) => {
   const suppliers = await prisma.supplierProfile.findMany({
     where: {
       isOpen: true,
-      lat: { not: null },
-      lng: { not: null },
+      lat: { gte: lat - dLat, lte: lat + dLat },
+      lng: { gte: lng - dLng, lte: lng + dLng },
       // Show any open vendor with stock + a location. KYC adds a verified badge
       // (returned below) but does not hide the vendor from search.
       inventory: { some: { isAvailable: true, stock: { gt: 0 }, ...(Object.keys(productWhere).length ? { product: productWhere } : {}) } },

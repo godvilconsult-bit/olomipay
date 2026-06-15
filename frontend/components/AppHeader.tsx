@@ -13,7 +13,7 @@ function NotificationBell() {
     let alive = true;
     const load = () => notifications.list().then((r) => { if (alive) setUnread(r.unread ?? 0); }).catch(() => {});
     load();
-    const id = setInterval(load, 30_000);
+    const id = setInterval(load, 60_000); // socket 'notification' covers live updates; this is just a fallback
     return () => { alive = false; clearInterval(id); };
   }, []);
   return (
