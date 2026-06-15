@@ -73,7 +73,7 @@ export default function OrderPage() {
   if (order.address) markers.push({ lat: order.address.lat, lng: order.address.lng, kind: 'dest', label: t('Your location', 'Eneo lako'), name: t('Your location', 'Eneo lako') });
   if (order.supplier?.lat != null) markers.push({ lat: order.supplier.lat, lng: order.supplier.lng, kind: 'vendor', label: order.supplier.businessName, name: order.supplier.businessName, shop: order.supplier.businessName, phone: order.supplier.phone });
   const rp = riderPos ?? (order.delivery?.riderLat != null ? { lat: order.delivery.riderLat, lng: order.delivery.riderLng } : null);
-  if (rp) markers.push({ lat: rp.lat, lng: rp.lng, kind: 'rider', label: rd?.name, name: rd?.name, phone: rd?.phone, photo: rd?.profilePicUrl, plate: rd?.riderProfile?.plateNo });
+  if (rp) markers.push({ lat: rp.lat, lng: rp.lng, kind: 'rider', label: rd?.name, name: rd?.name, phone: rd?.phone, photo: rd?.profilePicUrl, plate: rd?.riderProfile?.plateNo, vehicle: rd?.riderProfile?.vehicleType });
 
   return (
     <div className="min-h-screen bg-sand pb-10">
@@ -151,8 +151,16 @@ export default function OrderPage() {
           </Card>
         )}
 
-        {/* LIVE MAP */}
-        {tracking && markers.length > 0 && <Card className="!p-1.5"><Map markers={markers} height={240} /></Card>}
+        {/* LIVE MAP — watch the rider move in real time */}
+        {tracking && markers.length > 0 && (
+          <div>
+            <div className="mb-1.5 flex items-center gap-1.5 text-sm font-bold">
+              <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-flame opacity-60" /><span className="relative inline-flex h-2 w-2 rounded-full bg-flame" /></span>
+              {t('Live tracking', 'Ufuatiliaji wa moja kwa moja')}
+            </div>
+            <Card className="!p-1.5"><Map markers={markers} height={300} /></Card>
+          </div>
+        )}
 
         {/* receipt */}
         <Card>

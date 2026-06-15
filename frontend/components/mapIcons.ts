@@ -16,9 +16,18 @@ const MOTORBIKE = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="36
   <circle cx="59" cy="15" r="2.6" fill="#FFB100"/>
 </svg>`;
 
-/** SVG string for a marker. Riders are drawn as a small motorbike, everyone else as a pin. */
-export function markerSvg(kind: MapMarker['kind']): string {
-  if (kind === 'rider') return MOTORBIKE;
+const CAR = `<svg xmlns="http://www.w3.org/2000/svg" width="52" height="34" viewBox="0 0 82 50">
+  <circle cx="24" cy="41" r="8.5" fill="#1A130E"/><circle cx="24" cy="41" r="3.5" fill="#fff"/>
+  <circle cx="60" cy="41" r="8.5" fill="#1A130E"/><circle cx="60" cy="41" r="3.5" fill="#fff"/>
+  <path d="M8 38 Q8 27 19 26 L27 16 Q31 12 41 12 L53 12 Q62 12 66 21 L73 25 Q76 26 76 31 L76 36 Q76 39 73 39 L10 39 Q8 39 8 38 Z" fill="#F15A24" stroke="#C73E12" stroke-width="1.5"/>
+  <path d="M29 17 L40 17 L40 25 L23 25 Z" fill="#CFE8FF"/>
+  <path d="M43 17 L53 17 Q58 17 61 24 L43 24 Z" fill="#CFE8FF"/>
+  <circle cx="71" cy="30" r="2" fill="#FFE08A"/>
+</svg>`;
+
+/** SVG for a marker. Riders are drawn as their vehicle (motorbike / car); others as a pin. */
+export function markerSvg(kind: MapMarker['kind'], vehicle?: string): string {
+  if (kind === 'rider') return (vehicle === 'CAR' || vehicle === 'TRUCK') ? CAR : MOTORBIKE;
   const p = PIN[kind] ?? PIN.me;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="38" height="47" viewBox="0 0 40 50"><path d="M20 0C9 0 0 9 0 20c0 13 20 30 20 30s20-17 20-30C40 9 31 0 20 0z" fill="${p.color}"/><circle cx="20" cy="19" r="13" fill="#fff"/><text x="20" y="25" font-size="16" text-anchor="middle">${p.glyph}</text></svg>`;
 }

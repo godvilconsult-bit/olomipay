@@ -20,6 +20,7 @@ export interface MapMarker {
   photo?: string;
   plate?: string;
   shop?: string;
+  vehicle?: string; // rider vehicle type → motorbike vs car icon
 }
 
 export interface MapProps {
