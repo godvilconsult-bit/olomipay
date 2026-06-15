@@ -24,6 +24,7 @@ export default function LeafletMap({ markers, height = 200, onMarkerClick }: { m
   const layerRef = useRef<L.LayerGroup | null>(null);   // static markers (dest/vendor/me)
   const riderRef = useRef<L.Marker | null>(null);       // persistent, smoothly animated
   const routeRef = useRef<L.Polyline | null>(null);
+  const routeAnchorRef = useRef<{ lat: number; lng: number } | null>(null);
   const animRef  = useRef<number | null>(null);
   const followRef = useRef(true);                        // camera follows the rider (Uber-style)
   const fittedRef = useRef(false);
@@ -44,6 +45,16 @@ export default function LeafletMap({ markers, height = 200, onMarkerClick }: { m
 
   // fullscreen → the container resized, tell Leaflet to recompute.
   useEffect(() => { const m = mapRef.current; if (m) setTimeout(() => m.invalidateSize(), 180); }, [full]);
+
+  // Road-snapped route via OSRM (free, no key). Falls back to the straight line.
+  async function fetchRoute(from: { lat: number; lng: number }, to: { lat: number; lng: number }) {
+    try {
+      const r = await fetch(`https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`);
+      const j = await r.json();
+      const c = j?.routes?.[0]?.geometry?.coordinates;
+      if (Array.isArray(c) && c.length && routeRef.current) routeRef.current.setLatLngs(c.map((p: number[]) => [p[1], p[0]] as [number, number]));
+    } catch { /* keep the straight line */ }
+  }
 
   function animateRider(target: L.LatLng) {
     const marker = riderRef.current; if (!marker) return;
@@ -87,11 +98,16 @@ export default function LeafletMap({ markers, height = 200, onMarkerClick }: { m
         riderRef.current.setIcon(makeIcon(rider));
         animateRider(target);
       }
-      // Route line rider → destination.
-      const line: [number, number][] = dest ? [[rider.lat, rider.lng], [dest.lat, dest.lng]] : [];
-      if (line.length) {
-        if (!routeRef.current) routeRef.current = L.polyline(line, { color: '#F15A24', weight: 4, opacity: 0.65, dashArray: '1 9', lineCap: 'round' }).addTo(map);
-        else routeRef.current.setLatLngs(line);
+      // Route rider → destination: instant straight line, then road-snapped via
+      // OSRM (re-fetched only when the rider has moved ~150m, to spare the API).
+      if (dest) {
+        const straight: [number, number][] = [[rider.lat, rider.lng], [dest.lat, dest.lng]];
+        if (!routeRef.current) routeRef.current = L.polyline(straight, { color: '#F15A24', weight: 5, opacity: 0.85, lineCap: 'round', lineJoin: 'round' }).addTo(map);
+        const a = routeAnchorRef.current;
+        if (!a || map.distance([a.lat, a.lng], [rider.lat, rider.lng]) > 150) {
+          routeAnchorRef.current = { lat: rider.lat, lng: rider.lng };
+          fetchRoute({ lat: rider.lat, lng: rider.lng }, { lat: dest.lat, lng: dest.lng });
+        }
       }
       // Follow-camera: frame rider + dest once, then track the rider.
       if (followRef.current) {

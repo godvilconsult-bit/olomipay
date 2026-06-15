@@ -91,7 +91,8 @@ export function SupplierHome({ user }: { user: JikoUser }) {
 
   if (!me) return <Spinner />;
   const p = me.profile;
-  const queue = list.filter((o) => ACTIVE.includes(o.status));
+  const liveOrder = list.find((o) => ['FEE_CONFIRMED', 'PICKED'].includes(o.status));
+  const queue = list.filter((o) => ACTIVE.includes(o.status) && o.id !== liveOrder?.id);
 
   function payInfo(o: any) {
     if (o.payment?.status === 'PAID') return { ok: true, label: `${t('Paid', 'Imelipwa')} ✓`, icon: Smartphone };
@@ -133,6 +134,25 @@ export function SupplierHome({ user }: { user: JikoUser }) {
             </div>
           </Card>
         ) : null}
+
+        {/* active delivery hero — watch the one in motion */}
+        {liveOrder && (
+          <div className="rounded-ds-xl border-2 border-flame/30 bg-white p-4 shadow-ds-card">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="text-[11px] font-bold uppercase tracking-wide text-ink/40">{t('Out for delivery', 'Inapelekwa')}</div>
+                <div className="truncate text-2xl font-extrabold tracking-tight">{liveOrder.orderNo}</div>
+                <div className="truncate text-sm text-ink/60">{liveOrder.household?.name}{liveOrder.delivery?.rider?.name ? ` · ${liveOrder.delivery.rider.name}` : ''}</div>
+              </div>
+              <Badge status={liveOrder.status} />
+            </div>
+            <div className="mt-2.5 flex items-center gap-2 text-sm font-semibold text-flame">
+              <span className="relative flex h-2.5 w-2.5"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-flame opacity-60" /><span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-flame" /></span>
+              {liveOrder.status === 'PICKED' ? t('Rider on the way to the customer', 'Dereva njiani kwa mteja') : t('Rider collecting the order', 'Dereva anachukua oda')}
+            </div>
+            <Button variant="primary" className="mt-3 w-full" onClick={() => router.push(`/supplier/dispatch/${liveOrder.id}`)}><MapPin size={16} /> {t('Track delivery', 'Fuatilia usafirishaji')}</Button>
+          </div>
+        )}
 
         <div className="grid grid-cols-3 gap-2.5">
           <Stat label={t('Pending', 'Zinasubiri')} value={me.stats.pending} accent />
