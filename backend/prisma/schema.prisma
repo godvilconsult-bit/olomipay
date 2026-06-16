@@ -632,6 +632,9 @@ model BrandAd {
   subtitle  String?
   imageUrl  String?  @db.Text            // logo / banner art (data URL or hosted)
   ctaLabel  String?                       // e.g. "Order Oryx 15kg"
+  linkUrl   String?  @db.Text             // optional external CTA link; else taps filter by brand
+  bgColor   String?                       // optional brand hex bg (e.g. #0A7C3A); else brand gradient
+  animation String   @default("none")     // banner motion: none|pulse|shine|slide|float|zoom
   region    String?                       // null = nationwide
   type      ProductType?                  // optional: deep-link the search type
   weight    Int      @default(1)          // higher = shown more often

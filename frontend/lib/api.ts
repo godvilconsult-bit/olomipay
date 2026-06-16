@@ -216,12 +216,14 @@ export const wallet = {
   settle:  () => apiFetch<{ ok: boolean; balance: number; settled: number }>('/api/wallet/settle', { method: 'POST' }),
 };
 
-// Brand ads (Phase 3) — sponsored placements on the household home.
+// Brand ads — region-targeted sponsored placements (revenue model).
 export const ads = {
-  active: (region?: string) => apiFetch<{ ad: BrandAd | null }>(`/api/ads/active${region ? `?region=${encodeURIComponent(region)}` : ''}`),
-  click:  (id: string) => apiFetch(`/api/ads/${id}/click`, { method: 'POST' }),
+  active:     (region?: string) => apiFetch<{ ad: BrandAd | null; ads: BrandAd[] }>(`/api/ads/active${region ? `?region=${encodeURIComponent(region)}` : ''}`),
+  impression: (id: string) => apiFetch(`/api/ads/${id}/impression`, { method: 'POST' }),
+  click:      (id: string) => apiFetch(`/api/ads/${id}/click`, { method: 'POST' }),
 };
-export interface BrandAd { id: string; brand: string; title: string; subtitle?: string | null; imageUrl?: string | null; ctaLabel?: string | null; type?: string | null }
+export interface BrandAd { id: string; brand: string; title: string; subtitle?: string | null; imageUrl?: string | null; ctaLabel?: string | null; linkUrl?: string | null; bgColor?: string | null; animation?: string | null; type?: string | null }
+export interface AdInput { brand: string; title: string; subtitle?: string; imageUrl?: string; ctaLabel?: string; linkUrl?: string; bgColor?: string; animation?: string; region?: string; type?: string; weight?: number; isActive?: boolean }
 
 export const adminApi = {
   stats:      () => apiFetch('/api/admin/stats'),
@@ -233,11 +235,14 @@ export const adminApi = {
   // Phase 2 — supplier plans + featured slots
   suppliers:  () => apiFetch<{ suppliers: any[] }>('/api/admin/suppliers'),
   setTier:    (id: string, body: { tier?: 'FREE' | 'STANDARD' | 'PREMIUM'; featured?: boolean }) => apiFetch(`/api/admin/suppliers/${id}/tier`, { method: 'POST', body: JSON.stringify(body) }),
-  // Phase 3 — brand ads
+  // Brand ads (revenue)
   ads:        () => apiFetch<{ ads: any[] }>('/api/admin/ads'),
-  createAd:   (body: { brand: string; title: string; subtitle?: string; imageUrl?: string; ctaLabel?: string; region?: string; type?: string; weight?: number }) => apiFetch('/api/admin/ads', { method: 'POST', body: JSON.stringify(body) }),
-  patchAd:    (id: string, body: { isActive?: boolean; weight?: number }) => apiFetch(`/api/admin/ads/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  createAd:   (body: AdInput) => apiFetch('/api/admin/ads', { method: 'POST', body: JSON.stringify(body) }),
+  patchAd:    (id: string, body: Partial<AdInput>) => apiFetch(`/api/admin/ads/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   deleteAd:   (id: string) => apiFetch(`/api/admin/ads/${id}`, { method: 'DELETE' }),
+  // Security — account safety
+  security:   () => apiFetch<{ locked: any[]; sos: any[]; openDisputes: number }>('/api/admin/security'),
+  unlockUser: (id: string) => apiFetch(`/api/admin/users/${id}/unlock`, { method: 'POST' }),
   // T1 — cash-out disbursements
   cashouts:     () => apiFetch<{ requests: any[] }>('/api/admin/cashouts'),
   payCashout:   (id: string, ref?: string) => apiFetch(`/api/admin/cashouts/${id}/paid`, { method: 'POST', body: JSON.stringify({ ref }) }),

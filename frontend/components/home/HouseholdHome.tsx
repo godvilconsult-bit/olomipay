@@ -1,17 +1,19 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import toast from 'react-hot-toast';
 import { MapPin, Star, BadgeCheck, Search, Navigation, Package, List, Map as MapIcon, HandCoins, Smartphone, Banknote, RotateCcw, Store, ChevronRight, RefreshCw, Gift, Wallet, Heart, Bell, Flame, Wrench, LogOut, Clock, Loader2 } from 'lucide-react';
-import { vendors, orders, addresses, ads, auth, getAccessToken, JikoUser, type BrandAd } from '../../lib/api';
+import { vendors, orders, addresses, auth, getAccessToken, JikoUser } from '../../lib/api';
 import { useSocket } from '../../lib/useSocket';
 import { useT, LangToggle } from '../../lib/i18n';
 import { getDeviceLocation, distanceM, prettyDistance } from '../../lib/location';
 import { reverseGeocode } from '../../lib/geocode';
+import { TZ_REGIONS } from '../../lib/tanzania';
 import { RoleNav } from '../RoleNav';
+import { SponsoredAds } from '../SponsoredAds';
 import { Money, Badge, Button, EmptyState, cn } from '../ui';
 
 const Map = dynamic(() => import('../Map'), { ssr: false });
@@ -34,7 +36,8 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
   const [searching, setSearching] = useState(false);
   const [view, setView]         = useState<'list' | 'map'>('list');
   const [busy, setBusy]         = useState(false);
-  const [ad, setAd]             = useState<BrandAd | null>(null);
+  const [adRegion, setAdRegion] = useState(user.region ?? 'Dar es Salaam');
+  const regionTouched           = useRef(false);
   const [menu, setMenu]         = useState(false);
   const [reordering, setReordering] = useState<string | null>(null);
 
@@ -64,22 +67,16 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
       } catch { /* leave unset */ }
     }
     setSavedAddr(def ?? null);
+    // Default the offers region to the household's saved area, unless they picked one.
+    if (def?.region && !regionTouched.current) setAdRegion(def.region);
     return def ?? null;
   }, [t]);
 
   useEffect(() => {
     vendors.products().then((r) => { setBrands(r.brands ?? []); setSizes(r.sizes ?? []); }).catch(() => {});
-    ads.active(user.region ?? undefined).then((r) => setAd(r.ad)).catch(() => {});
     loadOrders();
     loadSaved();
-  }, [loadOrders, loadSaved, user.region]);
-
-  function openAd() {
-    if (!ad) return;
-    ads.click(ad.id).catch(() => {});
-    setFilter((f) => ({ ...f, brand: ad.brand, type: (ad.type as string) || f.type }));
-    toast.success(t(`Showing ${ad.brand} vendors`, `Inaonyesha wauzaji wa ${ad.brand}`));
-  }
+  }, [loadOrders, loadSaved]);
 
   useEffect(() => {
     if (!savedAddr) return;
@@ -287,19 +284,19 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
           )}
         </div>
 
-        {/* sponsored brand */}
-        {ad && (
-          <button onClick={openAd} className="block w-full text-left">
-            <div className="relative overflow-hidden rounded-2xl bg-grad-brand p-3.5 text-white shadow-ds-card">
-              <span className="absolute right-2 top-2 rounded-full bg-white/20 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide">{t('Sponsored', 'Tangazo')}</span>
-              <div className="flex items-center gap-3">
-                {ad.imageUrl ? <img src={ad.imageUrl} alt={ad.brand} className="h-11 w-11 flex-shrink-0 rounded-xl bg-white/10 object-cover" /> : <span className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-xl bg-white/15 font-extrabold">{ad.brand.slice(0, 2).toUpperCase()}</span>}
-                <div className="min-w-0 flex-1"><div className="truncate text-sm font-extrabold">{ad.title}</div>{ad.subtitle && <div className="truncate text-xs text-white/80">{ad.subtitle}</div>}</div>
-                <span className="flex-shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-bold text-flame">{ad.ctaLabel || t('Shop', 'Nunua')}</span>
-              </div>
+        {/* ── Sponsored offers, targeted to the selected region (revenue) ──── */}
+        <div>
+          <div className="mb-1.5 flex items-center justify-between gap-2">
+            <h2 className="flex-shrink-0 text-sm font-bold text-ink/70">{t('Offers near you', 'Ofa karibu nawe')}</h2>
+            <div className="flex min-w-0 items-center gap-1 rounded-full bg-white px-2.5 py-1 shadow-ds-card">
+              <MapPin size={12} className="flex-shrink-0 text-flame" />
+              <select value={adRegion} onChange={(e) => { regionTouched.current = true; setAdRegion(e.target.value); }} className="max-w-[9rem] truncate bg-transparent text-xs font-semibold text-ink outline-none" aria-label={t('Region', 'Mkoa')}>
+                {TZ_REGIONS.map((r) => <option key={r} value={r}>{r}</option>)}
+              </select>
             </div>
-          </button>
-        )}
+          </div>
+          <SponsoredAds region={adRegion} onBrand={(brand, type) => setFilter((f) => ({ ...f, brand, type: type || f.type }))} />
+        </div>
 
         {/* ── Vendors ─────────────────────────────────────────────────────── */}
         {vlist !== null && (

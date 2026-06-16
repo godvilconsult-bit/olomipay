@@ -210,30 +210,46 @@ router.get('/ads', requireAdmin, async (_req: AuthRequest, res) => {
   res.json({ ads });
 });
 
+const ANIMATIONS = ['none', 'pulse', 'shine', 'slide', 'float', 'zoom'] as const;
+const adBody = z.object({
+  brand:     z.string().min(1).max(60),
+  title:     z.string().min(1).max(120),
+  subtitle:  z.string().max(200).optional(),
+  imageUrl:  z.string().max(3_000_000).optional(),
+  ctaLabel:  z.string().max(40).optional(),
+  linkUrl:   z.string().max(2000).optional(),
+  bgColor:   z.string().max(20).optional(),
+  animation: z.enum(ANIMATIONS).default('none'),
+  region:    z.string().max(60).optional(),
+  type:      z.enum(['REFILL', 'CYLINDER', 'ACCESSORY']).optional(),
+  weight:    z.number().int().min(1).max(100).default(1),
+  isActive:  z.boolean().default(true),
+});
+
 router.post('/ads', requireAdmin, async (req: AuthRequest, res) => {
-  const parse = z.object({
-    brand:    z.string().min(1).max(60),
-    title:    z.string().min(1).max(120),
-    subtitle: z.string().max(160).optional(),
-    imageUrl: z.string().max(3_000_000).optional(),
-    ctaLabel: z.string().max(40).optional(),
-    region:   z.string().max(60).optional(),
-    type:     z.enum(['REFILL', 'CYLINDER', 'ACCESSORY']).optional(),
-    weight:   z.number().int().min(1).max(100).default(1),
-    isActive: z.boolean().default(true),
-  }).safeParse(req.body);
+  const parse = adBody.safeParse(req.body);
   if (!parse.success) return res.status(400).json({ error: parse.error.errors[0].message });
   const d = parse.data;
+  // Empty strings → null so optional columns stay clean.
   const ad = await prisma.brandAd.create({
-    data: { brand: d.brand, title: d.title, subtitle: d.subtitle, imageUrl: d.imageUrl, ctaLabel: d.ctaLabel, region: d.region, type: d.type, weight: d.weight, isActive: d.isActive },
+    data: {
+      brand: d.brand, title: d.title, subtitle: d.subtitle || null, imageUrl: d.imageUrl || null,
+      ctaLabel: d.ctaLabel || null, linkUrl: d.linkUrl || null, bgColor: d.bgColor || null,
+      animation: d.animation, region: d.region || null, type: d.type, weight: d.weight, isActive: d.isActive,
+    },
   });
   res.status(201).json({ ad });
 });
 
 router.patch('/ads/:id', requireAdmin, async (req: AuthRequest, res) => {
-  const parse = z.object({ isActive: z.boolean().optional(), weight: z.number().int().min(1).max(100).optional() }).safeParse(req.body);
+  // Full editor: any subset of fields.
+  const parse = adBody.partial().safeParse(req.body);
   if (!parse.success) return res.status(400).json({ error: parse.error.errors[0].message });
-  const ad = await prisma.brandAd.update({ where: { id: req.params.id }, data: parse.data }).catch(() => null);
+  const d = parse.data;
+  const data: any = {};
+  for (const k of ['brand', 'title', 'animation', 'weight', 'isActive', 'type'] as const) if (d[k] !== undefined) data[k] = d[k];
+  for (const k of ['subtitle', 'imageUrl', 'ctaLabel', 'linkUrl', 'bgColor', 'region'] as const) if (d[k] !== undefined) data[k] = (d[k] as string) || null;
+  const ad = await prisma.brandAd.update({ where: { id: req.params.id }, data }).catch(() => null);
   if (!ad) return res.status(404).json({ error: 'Ad not found' });
   res.json({ ad });
 });
@@ -343,6 +359,32 @@ router.post('/seed-demo', requireAdmin, async (_req: AuthRequest, res) => {
   });
 
   res.json({ ok: true, logins: { supplier: '0788000001', rider: '0788000002', household: '0788000003', pin: '1234' } });
+});
+
+// ── GET /api/admin/security ─ account safety: lockouts, failed logins, SOS ────────
+router.get('/security', requireAdmin, async (_req: AuthRequest, res) => {
+  const now = new Date();
+  const [risky, sos, openDisputes] = await Promise.all([
+    // Locked or repeatedly-failing accounts.
+    prisma.user.findMany({
+      where:   { OR: [{ lockedUntil: { not: null } }, { failedLoginCount: { gt: 0 } }] },
+      select:  { id: true, name: true, phone: true, role: true, region: true, failedLoginCount: true, lockedUntil: true, lastSeenAt: true },
+      orderBy: { failedLoginCount: 'desc' },
+      take:    100,
+    }),
+    // Recent SOS alerts (stored as type:'sos' notifications to admins).
+    prisma.notification.findMany({ where: { type: 'sos' }, orderBy: { createdAt: 'desc' }, take: 25, select: { id: true, body: true, data: true, createdAt: true } }),
+    prisma.dispute.count({ where: { status: 'OPEN' } }),
+  ]);
+  const locked = risky.map(u => ({ ...u, isLocked: !!(u.lockedUntil && u.lockedUntil > now) }));
+  res.json({ locked, sos, openDisputes });
+});
+
+// ── POST /api/admin/users/:id/unlock ─ clear lock + failed-attempt counter ────────
+router.post('/users/:id/unlock', requireAdmin, async (req: AuthRequest, res) => {
+  const u = await prisma.user.update({ where: { id: req.params.id }, data: { lockedUntil: null, failedLoginCount: 0 } }).catch(() => null);
+  if (!u) return res.status(404).json({ error: 'User not found' });
+  res.json({ ok: true });
 });
 
 export { router as adminRouter };

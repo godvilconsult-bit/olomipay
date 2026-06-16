@@ -1,7 +1,7 @@
 /**
- * Brand advertising surface (Phase 3 monetization). LPG brands pay for a
- * "Sponsored" slot on the household home. Public read + click tracking; all
- * authoring is admin-only (see routes/admin.ts).
+ * Brand advertising surface (revenue model). LPG brands & local businesses pay
+ * for sponsored slots on the household home, targeted by region. Public read +
+ * impression/click tracking; all authoring is admin-only (see routes/admin.ts).
  */
 import { Router } from 'express';
 import { prisma } from '../lib/prisma';
@@ -9,14 +9,21 @@ import { requireAuth, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
-// ── GET /api/ads/active ─ a weighted pick of live ads for this user's region ──────
+const adPublic = (a: any) => ({
+  id: a.id, brand: a.brand, title: a.title, subtitle: a.subtitle,
+  imageUrl: a.imageUrl, ctaLabel: a.ctaLabel, linkUrl: a.linkUrl,
+  bgColor: a.bgColor, animation: a.animation, type: a.type,
+});
+
+// ── GET /api/ads/active ─ live ads for this user's region, weighted ──────────────
+// Returns a LIST (so the home can rotate through them) plus `ad` (the top weighted
+// pick) for back-compat. Region match = nationwide (null) OR the selected region.
 router.get('/active', requireAuth, async (req: AuthRequest, res) => {
   const region = (req.query.region as string | undefined)?.trim();
   const now = new Date();
   const ads = await prisma.brandAd.findMany({
     where: {
       isActive: true,
-      // nationwide ads (region null) OR ads targeting this region
       ...(region ? { OR: [{ region: null }, { region }] } : {}),
       AND: [
         { OR: [{ startsAt: null }, { startsAt: { lte: now } }] },
@@ -28,20 +35,16 @@ router.get('/active', requireAuth, async (req: AuthRequest, res) => {
   });
   if (ads.length === 0) return res.json({ ad: null, ads: [] });
 
-  // Weighted random pick so higher-paying brands surface more often. No Math
-  // bias issues: build a cumulative table over the integer weights.
-  const total = ads.reduce((s, a) => s + Math.max(1, a.weight), 0);
-  let r = Math.floor(Math.random() * total);
-  let chosen = ads[0];
-  for (const a of ads) { r -= Math.max(1, a.weight); if (r < 0) { chosen = a; break; } }
+  // Weighted shuffle: higher weight → earlier in the rotation, more often.
+  const ranked = [...ads].sort((a, b) => (Math.random() * Math.max(1, b.weight)) - (Math.random() * Math.max(1, a.weight)));
 
-  // Count the impression (fire-and-forget).
-  prisma.brandAd.update({ where: { id: chosen.id }, data: { impressions: { increment: 1 } } }).catch(() => {});
+  res.json({ ad: adPublic(ranked[0]), ads: ranked.map(adPublic) });
+});
 
-  res.json({
-    ad: { id: chosen.id, brand: chosen.brand, title: chosen.title, subtitle: chosen.subtitle, imageUrl: chosen.imageUrl, ctaLabel: chosen.ctaLabel, type: chosen.type },
-    ads: ads.map(a => ({ id: a.id, brand: a.brand, title: a.title })),
-  });
+// ── POST /api/ads/:id/impression ─ count a view (carousel reports each shown ad) ──
+router.post('/:id/impression', requireAuth, async (req: AuthRequest, res) => {
+  await prisma.brandAd.updateMany({ where: { id: req.params.id }, data: { impressions: { increment: 1 } } });
+  res.json({ ok: true });
 });
 
 // ── POST /api/ads/:id/click ─ attribute a tap (for the brand's billing) ───────────
