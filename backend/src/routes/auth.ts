@@ -46,6 +46,7 @@ async function publicUser(userId: string) {
       kycStatus: true, profilePicUrl: true, isAdmin: true, createdAt: true,
       supplierProfile: { select: { id: true, businessName: true, isOpen: true, isVerified: true, tier: true } },
       riderProfile:    { select: { id: true, vehicleType: true, plateNo: true, status: true, isVerified: true, rating: true, totalDeliveries: true } },
+      distributorProfile: { select: { id: true, businessName: true, region: true, isVerified: true, isActive: true } },
     },
   });
 }
@@ -55,7 +56,7 @@ router.post('/register', authLimiter, async (req, res) => {
   const parse = z.object({
     phone:        z.string().min(7).max(20).transform(normalizePhone),
     pin:          z.string().regex(/^\d{4,6}$/, 'PIN must be 4–6 digits'),
-    role:         z.enum(['HOUSEHOLD', 'SUPPLIER', 'RIDER']).default('HOUSEHOLD'),
+    role:         z.enum(['HOUSEHOLD', 'SUPPLIER', 'RIDER', 'DISTRIBUTOR']).default('HOUSEHOLD'),
     name:         z.string().min(1).max(100).optional(),
     region:       z.string().max(60).optional(),
     businessName: z.string().max(120).optional(),
@@ -88,6 +89,9 @@ router.post('/register', authLimiter, async (req, res) => {
       }),
       ...(role === 'RIDER' && {
         riderProfile: { create: { region: region ?? 'Dar es Salaam', vehicleType: (vehicleType ?? 'MOTORBIKE') as any, ...(hasLoc && { currentLat: lat!, currentLng: lng! }) } },
+      }),
+      ...(role === 'DISTRIBUTOR' && {
+        distributorProfile: { create: { businessName: businessName ?? (name ?? 'My Depot'), phone, region: region ?? 'Dar es Salaam', ...(hasLoc && { lat: lat!, lng: lng! }) } },
       }),
     },
   });

@@ -5,7 +5,7 @@
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
-export type Role = 'HOUSEHOLD' | 'SUPPLIER' | 'RIDER' | 'ADMIN';
+export type Role = 'HOUSEHOLD' | 'SUPPLIER' | 'RIDER' | 'ADMIN' | 'DISTRIBUTOR';
 
 export interface JikoUser {
   id: string;
@@ -16,6 +16,7 @@ export interface JikoUser {
   kycStatus: string;
   supplierProfile?: { id: string; businessName: string; isOpen: boolean; isVerified: boolean; tier: string } | null;
   riderProfile?: { id: string; vehicleType: string; status: string; isVerified: boolean; rating: number; totalDeliveries: number } | null;
+  distributorProfile?: { id: string; businessName: string; region?: string | null; isVerified: boolean; isActive: boolean } | null;
 }
 
 let accessToken:  string | null = null;
@@ -225,6 +226,25 @@ export const ads = {
 };
 export interface BrandAd { id: string; brand: string; title: string; subtitle?: string | null; imageUrl?: string | null; ctaLabel?: string | null; linkUrl?: string | null; bgColor?: string | null; animation?: string | null; type?: string | null }
 export interface AdInput { brand: string; title: string; subtitle?: string; imageUrl?: string; ctaLabel?: string; linkUrl?: string; bgColor?: string; animation?: string; region?: string; type?: string; weight?: number; isActive?: boolean; status?: 'PENDING' | 'APPROVED' | 'REJECTED' }
+
+// Distributors (B2B upstream) — shops restock wholesale; distributors fulfil.
+export const distributors = {
+  // discovery (shop side)
+  search:  (region?: string) => apiFetch<{ distributors: any[] }>(`/api/distributors${region ? `?region=${encodeURIComponent(region)}` : ''}`),
+  get:     (id: string) => apiFetch<{ distributor: any; stock: any[] }>(`/api/distributors/${id}`),
+  restock: (body: { distributorId: string; items: { productId: string; qty: number }[]; payMethod?: string; note?: string }) => apiFetch('/api/distributors/restock', { method: 'POST', body: JSON.stringify(body) }),
+  myOrders:(  ) => apiFetch<{ orders: any[] }>('/api/distributors/restock/mine'),
+  received:(id: string) => apiFetch(`/api/distributors/restock/${id}/received`, { method: 'POST' }),
+  // distributor side
+  me:      () => apiFetch<{ profile: any; stock: any[] }>('/api/distributors/me'),
+  updateMe:(body: any) => apiFetch('/api/distributors/me', { method: 'PUT', body: JSON.stringify(body) }),
+  setStock:(body: { productId: string; price: number; stock: number; isAvailable?: boolean }) => apiFetch('/api/distributors/me/stock', { method: 'POST', body: JSON.stringify(body) }),
+  delStock:(productId: string) => apiFetch(`/api/distributors/me/stock/${productId}`, { method: 'DELETE' }),
+  orders:  () => apiFetch<{ orders: any[] }>('/api/distributors/me/orders'),
+  accept:  (id: string) => apiFetch(`/api/distributors/orders/${id}/accept`, { method: 'POST' }),
+  dispatch:(id: string) => apiFetch(`/api/distributors/orders/${id}/dispatch`, { method: 'POST' }),
+  cancel:  (id: string) => apiFetch(`/api/distributors/orders/${id}/cancel`, { method: 'POST' }),
+};
 
 export const adminApi = {
   stats:      () => apiFetch('/api/admin/stats'),

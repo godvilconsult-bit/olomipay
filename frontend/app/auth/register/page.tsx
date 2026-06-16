@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import toast from 'react-hot-toast';
-import { Flame, Home, Store, Bike, Navigation } from 'lucide-react';
+import { Flame, Home, Store, Bike, Navigation, Warehouse } from 'lucide-react';
 import { auth, setTokens, ApiError, Role } from '../../../lib/api';
 import { useT, LangToggle } from '../../../lib/i18n';
 import { Button, Field, cn } from '../../../components/ui';
@@ -48,13 +48,15 @@ export default function RegisterPage() {
     );
   }
   const locLabel = role === 'SUPPLIER' ? t('Pin your shop location', 'Weka eneo la duka')
+    : role === 'DISTRIBUTOR' ? t('Pin your depot location', 'Weka eneo la ghala')
     : role === 'RIDER' ? t('Share your current location', 'Shiriki eneo lako sasa')
     : t('Pin your delivery location', 'Weka eneo la kupokelea');
 
   const ROLES: { value: Role; label: string; sub: string; icon: any }[] = [
-    { value: 'HOUSEHOLD', label: t('Household', 'Kaya'),    sub: t('Order gas', 'Agiza gesi'),     icon: Home },
-    { value: 'SUPPLIER',  label: t('Supplier', 'Muuzaji'),  sub: t('Receive orders', 'Pokea oda'), icon: Store },
-    { value: 'RIDER',     label: t('Rider', 'Dereva'),      sub: t('Deliver gas', 'Sambaza'),      icon: Bike },
+    { value: 'HOUSEHOLD',   label: t('Household', 'Kaya'),       sub: t('Order gas', 'Agiza gesi'),        icon: Home },
+    { value: 'SUPPLIER',    label: t('Gas shop', 'Duka'),        sub: t('Sell to homes', 'Uza kwa kaya'),  icon: Store },
+    { value: 'RIDER',       label: t('Rider', 'Dereva'),         sub: t('Deliver gas', 'Sambaza'),         icon: Bike },
+    { value: 'DISTRIBUTOR', label: t('Distributor', 'Msambazaji'), sub: t('Supply shops', 'Sambazia maduka'), icon: Warehouse },
   ];
 
   async function submit(e: React.FormEvent) {
@@ -65,7 +67,7 @@ export default function RegisterPage() {
     try {
       const res = await auth.register({
         phone: form.phone, pin: form.pin, role, name: form.name, region: form.region,
-        ...(role === 'SUPPLIER' && { businessName: form.businessName || form.name }),
+        ...((role === 'SUPPLIER' || role === 'DISTRIBUTOR') && { businessName: form.businessName || form.name }),
         ...(role === 'RIDER' && { vehicleType: form.vehicleType }),
         ...(coords && { lat: coords.lat, lng: coords.lng }),
         ...(form.referralCode && { referralCode: form.referralCode }),
@@ -92,7 +94,7 @@ export default function RegisterPage() {
         <h1 className="mt-6 text-2xl font-extrabold">{t('Create account', 'Fungua akaunti')}</h1>
         <p className="mt-1 text-sm text-ink/60">{t('Who are you on the network?', 'Wewe ni nani kwenye mtandao?')}</p>
 
-        <div className="mt-4 grid grid-cols-3 gap-2.5">
+        <div className="mt-4 grid grid-cols-2 gap-2.5">
           {ROLES.map((r) => {
             const Icon = r.icon; const active = role === r.value;
             return (
@@ -116,7 +118,7 @@ export default function RegisterPage() {
             </select>
           </label>
 
-          {role === 'SUPPLIER' && <Field label={t('Business name', 'Jina la biashara')} placeholder={t('e.g. Mwenge Gas Centre', 'mfano: Mwenge Gas Centre')} value={form.businessName} onChange={set('businessName')} />}
+          {(role === 'SUPPLIER' || role === 'DISTRIBUTOR') && <Field label={t('Business name', 'Jina la biashara')} placeholder={role === 'DISTRIBUTOR' ? t('e.g. Oryx Depot Mwanza', 'mfano: Oryx Depot Mwanza') : t('e.g. Mwenge Gas Centre', 'mfano: Mwenge Gas Centre')} value={form.businessName} onChange={set('businessName')} />}
           {role === 'RIDER' && (
             <label className="block">
               <span className="mb-1.5 block text-sm font-medium text-ink/70">{t('Vehicle', 'Chombo')}</span>

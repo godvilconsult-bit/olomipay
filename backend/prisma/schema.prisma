@@ -19,6 +19,7 @@ enum Role {
   SUPPLIER
   RIDER
   ADMIN
+  DISTRIBUTOR
 }
 
 enum KycStatus {
@@ -175,6 +176,7 @@ model User {
   pushSubscriptions PushSubscription[]
   addresses         Address[]
   supplierProfile   SupplierProfile?
+  distributorProfile DistributorProfile?
   riderProfile      RiderProfile?
   orders            Order[]            @relation("HouseholdOrders")
   deliveries        Delivery[]         @relation("RiderDeliveries")
@@ -267,6 +269,7 @@ model SupplierProfile {
   inventory       Inventory[]
   orders          Order[]
   restockRequests RestockRequest[]
+  restockOrders   RestockOrder[]
 
   @@index([region, isOpen])
   @@index([isOpen, lat, lng])   // geo bounding-box vendor search
@@ -308,6 +311,8 @@ model Product {
 
   inventory  Inventory[]
   orderItems OrderItem[]
+  distributorStock DistributorStock[]
+  restockItems     RestockItem[]
 
   @@index([brand, type])
 }
@@ -575,6 +580,82 @@ model RestockRequest {
   supplier SupplierProfile @relation(fields: [supplierId], references: [id], onDelete: Cascade)
 
   @@index([supplierId, status])
+}
+
+// ── Distributors (B2B upstream: depots/dealers that supply gas shops) ────────────
+model DistributorProfile {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  businessName String
+  phone        String?
+  region       String?
+  district     String?
+  lat          Float?
+  lng          Float?
+  brands       String?                  // comma-separated brands carried (display)
+  isVerified   Boolean  @default(false)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stock         DistributorStock[]
+  restockOrders RestockOrder[]
+
+  @@index([region, isActive])
+}
+
+model DistributorStock {
+  id            String   @id @default(cuid())
+  distributorId String
+  productId     String
+  price         Int                      // wholesale price (TZS)
+  stock         Int      @default(0)
+  isAvailable   Boolean  @default(true)
+
+  distributor DistributorProfile @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+  product     Product            @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([distributorId, productId])
+  @@index([distributorId])
+}
+
+// A gas shop restocking wholesale from a distributor. RECEIVED tops up the shop's
+// retail Inventory automatically, closing the upstream supply gap.
+model RestockOrder {
+  id            String   @id @default(cuid())
+  orderNo       String   @unique
+  supplierId    String                    // the gas shop (SupplierProfile)
+  distributorId String
+  status        String   @default("PLACED")  // PLACED ACCEPTED DISPATCHED RECEIVED CANCELLED
+  total         Int      @default(0)
+  payMethod     String   @default("CREDIT")  // CREDIT CASH MOBILE
+  note          String?
+  createdAt     DateTime @default(now())
+  acceptedAt    DateTime?
+  dispatchedAt  DateTime?
+  receivedAt    DateTime?
+
+  supplier    SupplierProfile    @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  distributor DistributorProfile @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+  items       RestockItem[]
+
+  @@index([distributorId, status])
+  @@index([supplierId, status])
+}
+
+model RestockItem {
+  id        String @id @default(cuid())
+  orderId   String
+  productId String
+  brand     String
+  name      String
+  qty       Int
+  unitPrice Int
+
+  order   RestockOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product      @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
 }
 
 // ── Reviews ──────────────────────────────────────────────────────────────────────

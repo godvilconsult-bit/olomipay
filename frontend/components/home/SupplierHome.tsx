@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { Store, Bell, AlertTriangle, Check, X, MapPin, Bike, Smartphone, Banknote, Clock, ShieldAlert, Navigation, Wallet, ChevronRight, TrendingUp } from 'lucide-react';
+import { Store, Bell, AlertTriangle, Check, X, MapPin, Bike, Smartphone, Banknote, Clock, ShieldAlert, Navigation, Wallet, ChevronRight, TrendingUp, Truck } from 'lucide-react';
 import { suppliers, getAccessToken, JikoUser } from '../../lib/api';
 import { useSocket } from '../../lib/useSocket';
 import { useT } from '../../lib/i18n';
@@ -240,6 +240,8 @@ export function SupplierHome({ user }: { user: JikoUser }) {
           </div>
           {p.tier === 'FREE' && <div className="mt-2 border-t border-black/5 pt-2 text-xs text-ink/50">{t('Pro lowers commission + lifts you up search. Premium = featured slot.', 'Pro hupunguza kamisheni + kukupandisha. Premium = nafasi ya juu.')}</div>}
         </Card>
+
+        <Link href="/supplier/restock"><Card className="flex items-center justify-between !p-3.5"><span className="flex items-center gap-2 font-semibold"><Truck size={17} className="text-flame" /> {t('Restock from a distributor', 'Jaza bidhaa kutoka msambazaji')}</span><ChevronRight size={18} className="text-ink/30" /></Card></Link>
 
         <Link href="/wallet"><Card className="flex items-center justify-between !p-3.5"><span className="flex items-center gap-2 font-semibold"><Wallet size={17} className="text-leaf-dark" /> {t('Wallet & cash-out', 'Pochi & toa pesa')}</span><ChevronRight size={18} className="text-ink/30" /></Card></Link>
 
