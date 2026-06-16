@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Package, MapPin, Bell, Store, Boxes, Bike, Wallet, ShieldCheck, Truck } from 'lucide-react';
+import { Home, Package, MapPin, Bell, Store, Boxes, Bike, Wallet, ShieldCheck, Truck, Megaphone } from 'lucide-react';
 import { Role } from '../lib/api';
 import { useT } from '../lib/i18n';
 import { cn } from './ui';
@@ -36,6 +36,10 @@ export function RoleNav({ role }: { role: Role }) {
       { href: '/dashboard',          label: t('Orders', 'Oda'),     icon: Truck },
       { href: '/distributor/stock',  label: t('Stock', 'Bidhaa'),   icon: Boxes },
       { href: '/notifications',      label: t('Alerts', 'Arifa'),   icon: Bell },
+    ],
+    BRAND: [
+      { href: '/dashboard',     label: t('Campaigns', 'Matangazo'), icon: Megaphone },
+      { href: '/notifications', label: t('Alerts', 'Arifa'),        icon: Bell },
     ],
   };
 

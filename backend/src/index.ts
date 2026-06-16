@@ -51,6 +51,7 @@ async function loadRoutes() {
     ['/api/notifications', () => import('./routes/notifications'), 'notificationsRouter'],
     ['/api/kyc',       () => import('./routes/kyc'),       'kycRouter'],
     ['/api/ads',       () => import('./routes/ads'),       'adsRouter'],
+    ['/api/brand',     () => import('./routes/brand'),     'brandRouter'],
     ['/api/wallet',    () => import('./routes/wallet'),    'walletRouter'],
     ['/api/subscriptions', () => import('./routes/subscriptions'), 'subscriptionsRouter'],
     ['/api/referrals', () => import('./routes/referrals'), 'referralsRouter'],

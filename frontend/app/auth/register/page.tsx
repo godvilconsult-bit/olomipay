@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import toast from 'react-hot-toast';
-import { Flame, Home, Store, Bike, Navigation, Warehouse } from 'lucide-react';
+import { Flame, Home, Store, Bike, Navigation, Warehouse, Megaphone } from 'lucide-react';
 import { auth, setTokens, ApiError, Role } from '../../../lib/api';
 import { useT, LangToggle } from '../../../lib/i18n';
 import { Button, Field, cn } from '../../../components/ui';
@@ -57,6 +57,7 @@ export default function RegisterPage() {
     { value: 'SUPPLIER',    label: t('Gas shop', 'Duka'),        sub: t('Sell to homes', 'Uza kwa kaya'),  icon: Store },
     { value: 'RIDER',       label: t('Rider', 'Dereva'),         sub: t('Deliver gas', 'Sambaza'),         icon: Bike },
     { value: 'DISTRIBUTOR', label: t('Distributor', 'Msambazaji'), sub: t('Supply shops', 'Sambazia maduka'), icon: Warehouse },
+    { value: 'BRAND',       label: t('Brand', 'Kampuni'),          sub: t('Advertise & leads', 'Tangaza'),    icon: Megaphone },
   ];
 
   async function submit(e: React.FormEvent) {
@@ -67,7 +68,7 @@ export default function RegisterPage() {
     try {
       const res = await auth.register({
         phone: form.phone, pin: form.pin, role, name: form.name, region: form.region,
-        ...((role === 'SUPPLIER' || role === 'DISTRIBUTOR') && { businessName: form.businessName || form.name }),
+        ...((role === 'SUPPLIER' || role === 'DISTRIBUTOR' || role === 'BRAND') && { businessName: form.businessName || form.name }),
         ...(role === 'RIDER' && { vehicleType: form.vehicleType }),
         ...(coords && { lat: coords.lat, lng: coords.lng }),
         ...(form.referralCode && { referralCode: form.referralCode }),
@@ -118,7 +119,7 @@ export default function RegisterPage() {
             </select>
           </label>
 
-          {(role === 'SUPPLIER' || role === 'DISTRIBUTOR') && <Field label={t('Business name', 'Jina la biashara')} placeholder={role === 'DISTRIBUTOR' ? t('e.g. Oryx Depot Mwanza', 'mfano: Oryx Depot Mwanza') : t('e.g. Mwenge Gas Centre', 'mfano: Mwenge Gas Centre')} value={form.businessName} onChange={set('businessName')} />}
+          {(role === 'SUPPLIER' || role === 'DISTRIBUTOR' || role === 'BRAND') && <Field label={role === 'BRAND' ? t('Brand name', 'Jina la kampuni') : t('Business name', 'Jina la biashara')} placeholder={role === 'BRAND' ? t('e.g. Oryx Gas', 'mfano: Oryx Gas') : role === 'DISTRIBUTOR' ? t('e.g. Oryx Depot Mwanza', 'mfano: Oryx Depot Mwanza') : t('e.g. Mwenge Gas Centre', 'mfano: Mwenge Gas Centre')} value={form.businessName} onChange={set('businessName')} />}
           {role === 'RIDER' && (
             <label className="block">
               <span className="mb-1.5 block text-sm font-medium text-ink/70">{t('Vehicle', 'Chombo')}</span>
@@ -132,6 +133,7 @@ export default function RegisterPage() {
             </label>
           )}
 
+          {role !== 'BRAND' && (
           <div>
             <span className="mb-1.5 block text-sm font-medium text-ink/70">{locLabel}</span>
             <button type="button" onClick={getLocation} className={cn('flex w-full items-center justify-center gap-2 rounded-2xl py-3 text-sm font-semibold', coords ? 'bg-leaf/15 text-leaf-dark' : 'bg-flame/10 text-flame')}>
@@ -140,6 +142,7 @@ export default function RegisterPage() {
             {detected && <p className="mt-1.5 text-xs text-leaf-dark">📍 {detected}</p>}
             {coords && <div className="mt-2"><Map markers={[{ lat: coords.lat, lng: coords.lng, kind: 'me', label: t('You', 'Wewe') }]} height={170} /></div>}
           </div>
+          )}
 
           <Field label={t('Create a 4-digit PIN', 'Weka PIN ya tarakimu 4')} type="password" inputMode="numeric" maxLength={4} placeholder="••••" value={form.pin} onChange={(e) => setForm((f) => ({ ...f, pin: e.target.value.replace(/\D/g, '') }))} required />
           <Field label={t('Invite code (optional)', 'Namba ya mwaliko (hiari)')} placeholder="JKXXXXX" value={form.referralCode} onChange={(e) => setForm((f) => ({ ...f, referralCode: e.target.value.toUpperCase() }))} />

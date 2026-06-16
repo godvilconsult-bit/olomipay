@@ -9,6 +9,7 @@ import { RiderHome } from '../../components/home/RiderHome';
 import { SupplierHome } from '../../components/home/SupplierHome';
 import { AdminHome } from '../../components/home/AdminHome';
 import { DistributorHome } from '../../components/home/DistributorHome';
+import { BrandHome } from '../../components/home/BrandHome';
 import { LocationGate } from '../../components/LocationGate';
 import { NotificationListener } from '../../components/NotificationListener';
 
@@ -27,11 +28,12 @@ export default function Dashboard() {
     : user.role === 'SUPPLIER' ? <SupplierHome user={user} />
     : user.role === 'ADMIN' ? <AdminHome user={user} />
     : user.role === 'DISTRIBUTOR' ? <DistributorHome user={user} />
+    : user.role === 'BRAND' ? <BrandHome user={user} />
     : <HouseholdHome user={user} />;
 
-  // Admin + distributor work without GPS; everyone else needs location for maps +
+  // Admin/distributor/brand work without GPS; everyone else needs location for maps +
   // live tracking, so the gate takes over the screen until permission is granted.
-  const noGate = user.role === 'ADMIN' || user.role === 'DISTRIBUTOR';
+  const noGate = user.role === 'ADMIN' || user.role === 'DISTRIBUTOR' || user.role === 'BRAND';
   return <>
     {noGate ? home : <LocationGate>{home}</LocationGate>}
     <NotificationListener />

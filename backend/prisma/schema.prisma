@@ -20,6 +20,7 @@ enum Role {
   RIDER
   ADMIN
   DISTRIBUTOR
+  BRAND
 }
 
 enum KycStatus {
@@ -177,6 +178,7 @@ model User {
   addresses         Address[]
   supplierProfile   SupplierProfile?
   distributorProfile DistributorProfile?
+  brandProfile      BrandProfile?
   riderProfile      RiderProfile?
   orders            Order[]            @relation("HouseholdOrders")
   deliveries        Delivery[]         @relation("RiderDeliveries")
@@ -712,6 +714,7 @@ model BrandAd {
   title     String                       // headline shown on the banner
   subtitle  String?
   imageUrl  String?  @db.Text            // logo / banner art (data URL or hosted)
+  ownerId   String?                       // BRAND user who authored it (null = admin-created)
   ctaLabel  String?                       // e.g. "Order Oryx 15kg"
   linkUrl   String?  @db.Text             // optional external CTA link; else taps filter by brand
   bgColor   String?                       // optional brand hex bg (e.g. #0A7C3A); else brand gradient
@@ -730,6 +733,21 @@ model BrandAd {
   adLeads   AdLead[]
 
   @@index([isActive, region])
+  @@index([ownerId])
+}
+
+// A marketer/gas company (Oryx, Taifa…) self-serving ads + leads + demand data.
+model BrandProfile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  brandName   String
+  contactName String?
+  phone       String?
+  logoUrl     String?  @db.Text
+  isVerified  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 // A "Shop now" enquiry from a household — the advertiser/distributor follows up.

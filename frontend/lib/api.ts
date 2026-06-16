@@ -5,7 +5,7 @@
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
-export type Role = 'HOUSEHOLD' | 'SUPPLIER' | 'RIDER' | 'ADMIN' | 'DISTRIBUTOR';
+export type Role = 'HOUSEHOLD' | 'SUPPLIER' | 'RIDER' | 'ADMIN' | 'DISTRIBUTOR' | 'BRAND';
 
 export interface JikoUser {
   id: string;
@@ -17,6 +17,7 @@ export interface JikoUser {
   supplierProfile?: { id: string; businessName: string; isOpen: boolean; isVerified: boolean; tier: string } | null;
   riderProfile?: { id: string; vehicleType: string; status: string; isVerified: boolean; rating: number; totalDeliveries: number } | null;
   distributorProfile?: { id: string; businessName: string; region?: string | null; isVerified: boolean; isActive: boolean } | null;
+  brandProfile?: { id: string; brandName: string; isVerified: boolean } | null;
 }
 
 let accessToken:  string | null = null;
@@ -244,6 +245,17 @@ export const distributors = {
   accept:  (id: string) => apiFetch(`/api/distributors/orders/${id}/accept`, { method: 'POST' }),
   dispatch:(id: string) => apiFetch(`/api/distributors/orders/${id}/dispatch`, { method: 'POST' }),
   cancel:  (id: string) => apiFetch(`/api/distributors/orders/${id}/cancel`, { method: 'POST' }),
+};
+
+// Brand self-serve portal (marketers run their own approved ads + see leads/demand).
+export const brand = {
+  me:       () => apiFetch<{ profile: any; totals: { ads: number; impressions: number; clicks: number; leads: number } }>('/api/brand/me'),
+  ads:      () => apiFetch<{ ads: any[] }>('/api/brand/ads'),
+  createAd: (body: Partial<AdInput>) => apiFetch('/api/brand/ads', { method: 'POST', body: JSON.stringify(body) }),
+  patchAd:  (id: string, body: Partial<AdInput>) => apiFetch(`/api/brand/ads/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deleteAd: (id: string) => apiFetch(`/api/brand/ads/${id}`, { method: 'DELETE' }),
+  leads:    () => apiFetch<{ leads: any[] }>('/api/brand/leads'),
+  demand:   () => apiFetch<{ brand: string; periodDays: number; orders: number; totalUnits: number; regions: { region: string; units: number }[] }>('/api/brand/demand'),
 };
 
 export const adminApi = {
