@@ -15,7 +15,7 @@ import { getDeviceLocation } from '../../lib/location';
 import { useRiderTracking } from '../../lib/useRiderTracking';
 import { AppHeader } from '../AppHeader';
 import { RoleNav } from '../RoleNav';
-import { Card, Button, Spinner, EmptyState, Money, Stat, cn } from '../ui';
+import { Card, Button, Spinner, EmptyState, Money, cn } from '../ui';
 import type { MapMarker } from '../Map';
 
 const Map = dynamic(() => import('../Map'), { ssr: false });
@@ -27,7 +27,7 @@ export function RiderHome({ user }: { user: JikoUser }) {
   const token = getAccessToken();
   const { emit, on } = useSocket(token);
   const [online, setOnline] = useState(user.riderProfile?.status === 'ONLINE' || user.riderProfile?.status === 'ON_JOB');
-  const [earn, setEarn]     = useState<any>(null);
+  const [ready, setReady]   = useState(false);
   const [active, setActive] = useState<any>(null);
   const [offers, setOffers] = useState<any[]>([]);
   const [photo, setPhoto]   = useState<string | null>(user.profilePicUrl ?? null);
@@ -40,8 +40,10 @@ export function RiderHome({ user }: { user: JikoUser }) {
   useEffect(() => { activeRef.current = active; }, [active]);
 
   const refresh = useCallback(async () => {
-    const [e, a, o] = await Promise.all([jobs.earnings().catch(() => null), jobs.active().catch(() => ({ delivery: null })), jobs.offers().catch(() => ({ offers: [] }))]);
-    setEarn(e); setActive(a?.delivery ?? null); setOffers(o.offers ?? []);
+    // Earnings/trips/rating live on the Earnings tab now — the home only needs the
+    // live job state, so we don't fetch the earnings summary here.
+    const [a, o] = await Promise.all([jobs.active().catch(() => ({ delivery: null })), jobs.offers().catch(() => ({ offers: [] }))]);
+    setActive(a?.delivery ?? null); setOffers(o.offers ?? []); setReady(true);
   }, []);
   useEffect(() => { refresh(); }, [refresh]);
 
@@ -99,7 +101,7 @@ export function RiderHome({ user }: { user: JikoUser }) {
     reader.readAsDataURL(f);
   }
 
-  if (!earn) return <Spinner />;
+  if (!ready) return <Spinner />;
   const o = active?.order;
   const status = o?.status;
   const destUrl = active?.order?.address ? `https://www.google.com/maps/dir/?api=1&destination=${active.order.address.lat},${active.order.address.lng}` : '#';
@@ -135,33 +137,10 @@ export function RiderHome({ user }: { user: JikoUser }) {
           <Power size={20} /> {online ? t('Go offline', 'Maliza') : t('Go online', 'Anza kazi')}
         </button>
 
-        <div className="grid grid-cols-3 gap-2.5">
-          <Stat label={t('Earnings', 'Mapato')} value={<Money value={earn.totalEarnings} className="text-base" />} accent />
-          <Stat label={t('Trips', 'Safari')} value={earn.totalDeliveries} />
-          <Stat label={t('Rating', 'Nyota')} value={<span className="inline-flex items-center gap-1"><Star size={16} className="fill-ember text-ember" />{earn.rating ? earn.rating.toFixed(1) : '—'}</span>} />
+        <div className="grid grid-cols-2 gap-2.5">
+          <Link href="/rider/earnings"><Card className="flex items-center justify-between !p-3.5"><span className="flex items-center gap-2 font-semibold"><Star size={17} className="text-ember" /> {t('Earnings', 'Mapato')}</span><ChevronRight size={18} className="text-ink/30" /></Card></Link>
+          <Link href="/wallet"><Card className="flex items-center justify-between !p-3.5"><span className="flex items-center gap-2 font-semibold"><Wallet size={17} className="text-leaf-dark" /> {t('Wallet', 'Pochi')}</span><ChevronRight size={18} className="text-ink/30" /></Card></Link>
         </div>
-
-        {earn.today && (
-          <div className="grid grid-cols-2 gap-2.5">
-            <div className="rounded-ds-xl border border-black/5 bg-white p-3"><div className="text-xs text-ink/50">{t('Today', 'Leo')}</div><Money value={earn.today.earnings} className="text-base" /><div className="text-[10px] text-ink/40">{earn.today.trips} {t('trips', 'safari')}</div></div>
-            <div className="rounded-ds-xl border border-black/5 bg-white p-3"><div className="text-xs text-ink/50">{t('This week', 'Wiki hii')}</div><Money value={earn.week.earnings} className="text-base" /><div className="text-[10px] text-ink/40">{earn.week.trips} {t('trips', 'safari')}</div></div>
-          </div>
-        )}
-
-        {earn.incentive && (
-          <Card className="!p-3">
-            <div className="mb-1.5 flex items-center justify-between text-xs">
-              <span className="font-semibold text-ink/70">🎯 {t('Weekly goal', 'Lengo la wiki')}</span>
-              <span className="text-ink/50">{Math.min(earn.incentive.trips, earn.incentive.target)}/{earn.incentive.target} · <Money value={earn.incentive.bonus} className="text-xs" /> {t('bonus', 'bonasi')}</span>
-            </div>
-            <div className="h-2 overflow-hidden rounded-full bg-black/5">
-              <div className="h-full rounded-full bg-grad-leaf transition-all" style={{ width: `${Math.min(100, (earn.incentive.trips / earn.incentive.target) * 100)}%` }} />
-            </div>
-            {earn.incentive.trips >= earn.incentive.target && <div className="mt-1 text-[10px] font-semibold text-leaf-dark">{t('Bonus earned this week! 🎉', 'Umepata bonasi wiki hii! 🎉')}</div>}
-          </Card>
-        )}
-
-        <Link href="/wallet"><Card className="flex items-center justify-between !p-3.5"><span className="flex items-center gap-2 font-semibold"><Wallet size={17} className="text-leaf-dark" /> {t('Wallet & cash-out', 'Pochi & toa pesa')}</span><ChevronRight size={18} className="text-ink/30" /></Card></Link>
 
         {/* ACTIVE JOB */}
         {o ? (
