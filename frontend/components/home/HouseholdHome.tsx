@@ -295,7 +295,7 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
               </select>
             </div>
           </div>
-          <SponsoredAds region={adRegion} onBrand={(brand, type) => setFilter((f) => ({ ...f, brand, type: type || f.type }))} />
+          <SponsoredAds region={adRegion} userName={user.name} userPhone={user.phone} />
         </div>
 
         {/* ── Vendors ─────────────────────────────────────────────────────── */}

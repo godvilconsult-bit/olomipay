@@ -221,6 +221,7 @@ export const ads = {
   active:     (region?: string) => apiFetch<{ ad: BrandAd | null; ads: BrandAd[] }>(`/api/ads/active${region ? `?region=${encodeURIComponent(region)}` : ''}`),
   impression: (id: string) => apiFetch(`/api/ads/${id}/impression`, { method: 'POST' }),
   click:      (id: string) => apiFetch(`/api/ads/${id}/click`, { method: 'POST' }),
+  lead:       (id: string, body: { name: string; phone: string; note?: string }) => apiFetch(`/api/ads/${id}/lead`, { method: 'POST', body: JSON.stringify(body) }),
 };
 export interface BrandAd { id: string; brand: string; title: string; subtitle?: string | null; imageUrl?: string | null; ctaLabel?: string | null; linkUrl?: string | null; bgColor?: string | null; animation?: string | null; type?: string | null }
 export interface AdInput { brand: string; title: string; subtitle?: string; imageUrl?: string; ctaLabel?: string; linkUrl?: string; bgColor?: string; animation?: string; region?: string; type?: string; weight?: number; isActive?: boolean }
@@ -243,6 +244,9 @@ export const adminApi = {
   // Security — account safety
   security:   () => apiFetch<{ locked: any[]; sos: any[]; openDisputes: number }>('/api/admin/security'),
   unlockUser: (id: string) => apiFetch(`/api/admin/users/${id}/unlock`, { method: 'POST' }),
+  // Ad leads — "Shop now" enquiries
+  adLeads:      () => apiFetch<{ leads: any[] }>('/api/admin/ad-leads'),
+  setLeadStatus:(id: string, status: 'NEW' | 'CONTACTED' | 'CLOSED') => apiFetch(`/api/admin/ad-leads/${id}/status`, { method: 'POST', body: JSON.stringify({ status }) }),
   // T1 — cash-out disbursements
   cashouts:     () => apiFetch<{ requests: any[] }>('/api/admin/cashouts'),
   payCashout:   (id: string, ref?: string) => apiFetch(`/api/admin/cashouts/${id}/paid`, { method: 'POST', body: JSON.stringify({ ref }) }),

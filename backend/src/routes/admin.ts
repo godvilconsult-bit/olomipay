@@ -387,4 +387,23 @@ router.post('/users/:id/unlock', requireAdmin, async (req: AuthRequest, res) => 
   res.json({ ok: true });
 });
 
+// ── GET /api/admin/ad-leads ─ "Shop now" enquiries for advertisers to follow up ───
+router.get('/ad-leads', requireAdmin, async (_req: AuthRequest, res) => {
+  const leads = await prisma.adLead.findMany({
+    orderBy: { createdAt: 'desc' },
+    take:    200,
+    include: { ad: { select: { brand: true, title: true } } },
+  });
+  res.json({ leads });
+});
+
+// ── POST /api/admin/ad-leads/:id/status ─ mark a lead contacted / closed ──────────
+router.post('/ad-leads/:id/status', requireAdmin, async (req: AuthRequest, res) => {
+  const parse = z.object({ status: z.enum(['NEW', 'CONTACTED', 'CLOSED']) }).safeParse(req.body);
+  if (!parse.success) return res.status(400).json({ error: 'status must be NEW, CONTACTED or CLOSED' });
+  const l = await prisma.adLead.update({ where: { id: req.params.id }, data: { status: parse.data.status } }).catch(() => null);
+  if (!l) return res.status(404).json({ error: 'Lead not found' });
+  res.json({ ok: true });
+});
+
 export { router as adminRouter };

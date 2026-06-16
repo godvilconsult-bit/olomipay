@@ -641,11 +641,30 @@ model BrandAd {
   isActive  Boolean  @default(true)
   impressions Int    @default(0)
   clicks    Int      @default(0)
+  leads     Int      @default(0)          // "Shop now" details submitted
   startsAt  DateTime?
   endsAt    DateTime?
   createdAt DateTime @default(now())
+  adLeads   AdLead[]
 
   @@index([isActive, region])
+}
+
+// A "Shop now" enquiry from a household — the advertiser/distributor follows up.
+model AdLead {
+  id        String   @id @default(cuid())
+  adId      String
+  ad        BrandAd  @relation(fields: [adId], references: [id], onDelete: Cascade)
+  userId    String?
+  name      String
+  phone     String
+  note      String?
+  region    String?
+  status    String   @default("NEW")      // NEW | CONTACTED | CLOSED
+  createdAt DateTime @default(now())
+
+  @@index([adId])
+  @@index([status, createdAt])
 }
 
 // ── Notifications ────────────────────────────────────────────────────────────────

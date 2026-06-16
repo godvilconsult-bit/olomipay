@@ -4,8 +4,10 @@
  * impression/click tracking; all authoring is admin-only (see routes/admin.ts).
  */
 import { Router } from 'express';
+import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { requireAuth, AuthRequest } from '../middleware/auth';
+import { notify } from '../services/notify';
 
 const router = Router();
 
@@ -31,7 +33,7 @@ router.get('/active', requireAuth, async (req: AuthRequest, res) => {
       ],
     },
     orderBy: { createdAt: 'desc' },
-    take: 12,
+    take: 50, // admin can run as many ads as they like; the home rotates through them
   });
   if (ads.length === 0) return res.json({ ad: null, ads: [] });
 
@@ -51,6 +53,36 @@ router.post('/:id/impression', requireAuth, async (req: AuthRequest, res) => {
 router.post('/:id/click', requireAuth, async (req: AuthRequest, res) => {
   await prisma.brandAd.updateMany({ where: { id: req.params.id }, data: { clicks: { increment: 1 } } });
   res.json({ ok: true });
+});
+
+// ── POST /api/ads/:id/lead ─ "Shop now" enquiry; advertiser follows up later ──────
+router.post('/:id/lead', requireAuth, async (req: AuthRequest, res) => {
+  const parse = z.object({
+    name:  z.string().min(1).max(80),
+    phone: z.string().min(7).max(20),
+    note:  z.string().max(400).optional(),
+  }).safeParse(req.body);
+  if (!parse.success) return res.status(400).json({ error: parse.error.errors[0].message });
+
+  const ad = await prisma.brandAd.findUnique({ where: { id: req.params.id }, select: { id: true, brand: true } });
+  if (!ad) return res.status(404).json({ error: 'Ad not found' });
+
+  const me = await prisma.user.findUnique({ where: { id: req.userId }, select: { region: true } });
+  const lead = await prisma.adLead.create({
+    data: { adId: ad.id, userId: req.userId ?? null, name: parse.data.name.trim(), phone: parse.data.phone.trim(), note: parse.data.note?.trim() || null, region: me?.region ?? null },
+  });
+  await prisma.brandAd.updateMany({ where: { id: ad.id }, data: { leads: { increment: 1 }, clicks: { increment: 1 } } });
+
+  // Alert admins so the brand/distributor can be connected to follow up.
+  const admins = await prisma.user.findMany({ where: { role: 'ADMIN' }, select: { id: true } });
+  await Promise.all(admins.map((a) => notify(a.id, {
+    title: `🛒 New ${ad.brand} enquiry`,
+    body:  `${parse.data.name} (${parse.data.phone})${me?.region ? ` · ${me.region}` : ''}${parse.data.note ? ` — “${parse.data.note}”` : ''}`,
+    type:  'lead',
+    data:  { adId: ad.id, leadId: lead.id },
+  }).catch(() => {})));
+
+  res.status(201).json({ ok: true });
 });
 
 export { router as adsRouter };

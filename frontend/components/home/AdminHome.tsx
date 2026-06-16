@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Users, ShieldCheck, Activity, Phone, Home, Store, Bike, Trash2, Star, Megaphone, Plus, TrendingUp, Banknote, Check, X, Flag, Lock, Unlock, Siren, Image as ImageIcon, Pencil } from 'lucide-react';
+import { Users, ShieldCheck, Activity, Phone, Home, Store, Bike, Trash2, Star, Megaphone, Plus, TrendingUp, Banknote, Check, X, Flag, Lock, Unlock, Siren, Image as ImageIcon, Pencil, Inbox } from 'lucide-react';
 import { adminApi, JikoUser } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 import { TZ_REGIONS } from '../../lib/tanzania';
@@ -31,21 +31,28 @@ export function AdminHome({ user }: { user: JikoUser }) {
   const [cashouts, setCashouts] = useState<any[]>([]);
   const [disputes, setDisputes] = useState<any[]>([]);
   const [sec, setSec] = useState<{ locked: any[]; sos: any[]; openDisputes: number }>({ locked: [], sos: [], openDisputes: 0 });
+  const [leads, setLeads] = useState<any[]>([]);
   const editing = !!adForm.id;
 
   async function load() {
-    const [s, u, o, k, sp, ad, co, dp, se] = await Promise.all([
+    const [s, u, o, k, sp, ad, co, dp, se, ld] = await Promise.all([
       adminApi.stats().catch(() => null), adminApi.users().catch(() => ({ users: [] })),
       adminApi.orders().catch(() => ({ orders: [] })), adminApi.kycPending().catch(() => ({ pending: [] })),
       adminApi.suppliers().catch(() => ({ suppliers: [] })), adminApi.ads().catch(() => ({ ads: [] })),
       adminApi.cashouts().catch(() => ({ requests: [] })), adminApi.disputes().catch(() => ({ disputes: [] })),
       adminApi.security().catch(() => ({ locked: [], sos: [], openDisputes: 0 })),
+      adminApi.adLeads().catch(() => ({ leads: [] })),
     ]);
     setStats(s); setUsers(u.users ?? []); setOrders(o.orders ?? []); setKyc(k.pending ?? []);
     setSups(sp.suppliers ?? []); setAdList(ad.ads ?? []); setCashouts(co.requests ?? []); setDisputes(dp.disputes ?? []);
-    setSec(se as any);
+    setSec(se as any); setLeads(ld.leads ?? []);
   }
   useEffect(() => { load(); }, []);
+
+  async function setLeadStatus(id: string, status: 'NEW' | 'CONTACTED' | 'CLOSED') {
+    setLeads((arr) => arr.map((l) => l.id === id ? { ...l, status } : l));
+    try { await adminApi.setLeadStatus(id, status); } catch { toast.error(t('Failed', 'Imeshindikana')); load(); }
+  }
 
   async function resolveDispute(id: string, status: 'RESOLVED' | 'REJECTED') {
     try { await adminApi.resolveDispute(id, status); toast.success(status === 'RESOLVED' ? t('Resolved', 'Imetatuliwa') : t('Rejected', 'Imekataliwa')); load(); }
@@ -114,7 +121,7 @@ export function AdminHome({ user }: { user: JikoUser }) {
     { id: 'users',    label: t('Users', 'Watumiaji'), badge: kycList.length },
     { id: 'security', label: t('Security', 'Usalama'), badge: sec.locked.length + sec.openDisputes },
     { id: 'money',    label: t('Transactions', 'Miamala'), badge: cashouts.length },
-    { id: 'ads',      label: t('Ads', 'Matangazo') },
+    { id: 'ads',      label: t('Ads', 'Matangazo'), badge: leads.filter((l) => l.status === 'NEW').length },
   ];
   const inputCls = 'w-full rounded-xl border border-black/15 bg-white px-3 py-2 text-sm text-ink outline-none focus:border-flame';
   const animClass = adForm.animation === 'pulse' ? 'ad-anim-pulse' : adForm.animation === 'float' ? 'ad-anim-float' : adForm.animation === 'zoom' ? 'ad-anim-zoom' : '';
@@ -365,6 +372,32 @@ export function AdminHome({ user }: { user: JikoUser }) {
         {/* ── ADS (revenue) ──────────────────────────────────────────────── */}
         {tab === 'ads' && (
           <div className="space-y-4">
+            {/* Shop-now enquiries (leads) */}
+            {leads.length > 0 && (
+              <div>
+                <h2 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-ink/70"><Inbox size={15} className="text-flame" /> {t('Shop-now enquiries', 'Maombi ya wateja')} ({leads.length})</h2>
+                <div className="space-y-2">
+                  {leads.map((l) => (
+                    <Card key={l.id} className="!p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate font-semibold">{l.name} <span className="text-xs font-normal text-ink/50">· {l.ad?.brand}</span></div>
+                          {l.note && <div className="mt-0.5 text-xs text-ink/60">“{l.note}”</div>}
+                          <div className="mt-0.5 text-[10px] text-ink/40">{l.region ? `${l.region} · ` : ''}{timeAgo(l.createdAt)}</div>
+                        </div>
+                        <span className={cn('flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold', l.status === 'NEW' ? 'bg-flame/15 text-flame' : l.status === 'CONTACTED' ? 'bg-leaf/15 text-leaf-dark' : 'bg-black/10 text-ink/40')}>{l.status}</span>
+                      </div>
+                      <div className="mt-2 flex gap-2">
+                        <a href={`tel:${l.phone}`} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-flame/10 py-2 text-xs font-bold text-flame"><Phone size={13} /> {localPhone(l.phone)}</a>
+                        {l.status !== 'CONTACTED' && <button onClick={() => setLeadStatus(l.id, 'CONTACTED')} className="flex-1 rounded-xl bg-leaf/15 py-2 text-xs font-bold text-leaf-dark">{t('Contacted', 'Nimewasiliana')}</button>}
+                        {l.status !== 'CLOSED' && <button onClick={() => setLeadStatus(l.id, 'CLOSED')} className="flex-shrink-0 rounded-xl bg-black/5 px-3 py-2 text-xs font-bold text-ink/50">{t('Close', 'Funga')}</button>}
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div>
               <h2 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-ink/70"><Megaphone size={15} /> {editing ? t('Edit ad', 'Hariri tangazo') : t('Create a sponsored ad', 'Tengeneza tangazo')}</h2>
 
