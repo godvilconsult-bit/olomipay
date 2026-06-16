@@ -104,6 +104,7 @@ enum CylinderStatus {
   WITH_SUPPLIER
   WITH_HOUSEHOLD
   IN_TRANSIT
+  RETURN_REQUESTED
   RETURNED
   RETIRED
 }
@@ -680,15 +681,19 @@ model Review {
 // ── Cylinder registry (plain DB, no chain) ──────────────────────────────────────
 
 model Cylinder {
-  id        String         @id @default(cuid())
-  serial    String         @unique
-  brand     String
-  sizeKg    Float
-  ownerId   String?        // current holder (household / supplier user id)
-  status    CylinderStatus @default(WITH_SUPPLIER)
-  createdAt DateTime       @default(now())
+  id         String         @id @default(cuid())
+  serial     String?        @unique  // physical serial if known (optional for self-registered)
+  brand      String
+  sizeKg     Float
+  ownerId    String?        // current holder (household / supplier user id)
+  status     CylinderStatus @default(WITH_SUPPLIER)
+  deposit    Int            @default(0)  // refundable deposit paid for the cylinder shell
+  region     String?
+  createdAt  DateTime       @default(now())
+  returnedAt DateTime?
 
   @@index([ownerId])
+  @@index([status])
 }
 
 // ── EWURA price regulation ───────────────────────────────────────────────────────

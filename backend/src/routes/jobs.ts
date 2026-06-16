@@ -110,6 +110,31 @@ router.post('/:orderId/pick', requireRole('RIDER'), async (req: AuthRequest, res
   res.json({ ok: true });
 });
 
+// ── POST /api/jobs/:orderId/arrived ─ rider taps "I've arrived" (either leg) ──────
+// Guarantees the arrival alert even if the GPS geofence didn't fire. At pickup it
+// alerts the supplier; at the customer it alerts the household.
+router.post('/:orderId/arrived', requireRole('RIDER'), async (req: AuthRequest, res) => {
+  const delivery = await prisma.delivery.findUnique({
+    where:   { orderId: req.params.orderId },
+    include: { order: { include: { supplier: { select: { userId: true } } } } },
+  });
+  if (!delivery || delivery.riderId !== req.userId) return res.status(404).json({ error: 'Job not found' });
+  const order = delivery.order;
+
+  if (order.status === 'PICKED') {
+    emitToUser(order.householdId, 'order:arriving', { orderId: order.id });
+    await notify(order.householdId, { title: 'Your rider has arrived 🏍️', body: `${order.orderNo}: the rider is at your location. Have your confirmation code ready.`, type: 'order', data: { orderId: order.id } });
+  } else if (order.status === 'FEE_CONFIRMED') {
+    if (order.supplier?.userId) {
+      emitToUser(order.supplier.userId, 'order:arriving', { orderId: order.id });
+      await notify(order.supplier.userId, { title: 'Rider is here to collect 🏍️', body: `${order.orderNo}: the rider has arrived to pick up the order.`, type: 'order', data: { orderId: order.id } });
+    }
+  } else {
+    return res.status(409).json({ error: 'Not an active delivery leg' });
+  }
+  res.json({ ok: true });
+});
+
 // ── POST /api/jobs/:orderId/deliver ─ OTP + proof, then settle ────────────────────
 router.post('/:orderId/deliver', requireRole('RIDER'), async (req: AuthRequest, res) => {
   const parse = z.object({ otp: z.string().min(3).max(6), proofPhotoUrl: z.string().url().optional() }).safeParse(req.body);

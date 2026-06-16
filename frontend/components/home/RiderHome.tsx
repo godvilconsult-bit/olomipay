@@ -84,6 +84,7 @@ export function RiderHome({ user }: { user: JikoUser }) {
   async function accept(orderId: string) { setBusy(true); try { await jobs.acceptOffer(orderId); toast.success(t('Accepted — fee sent to household', 'Umekubali — ada imetumwa kwa kaya')); await refresh(); } catch (e: any) { toast.error(e?.message ?? t('Failed', 'Imeshindikana')); } finally { setBusy(false); } }
   async function decline(orderId: string) { setBusy(true); try { await jobs.declineOffer(orderId); await refresh(); } finally { setBusy(false); } }
   async function pick() { setBusy(true); try { await jobs.pick(active.orderId); await refresh(); } catch (e: any) { toast.error(e?.message ?? t('Failed', 'Imeshindikana')); } finally { setBusy(false); } }
+  async function arrived() { try { await jobs.arrived(active.orderId); toast.success(t('Arrival sent ✓', 'Taarifa imetumwa ✓')); } catch (e: any) { toast.error(e?.message ?? t('Failed', 'Imeshindikana')); } }
   async function deliver() {
     if (otp.length < 3) return toast.error(t('Enter the confirmation code', 'Weka namba ya uthibitisho'));
     setBusy(true);
@@ -166,10 +167,16 @@ export function RiderHome({ user }: { user: JikoUser }) {
                 </div>
                 <button onClick={sos} className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-2xl border border-danger/40 py-2.5 text-sm font-bold text-danger active:bg-danger/5"><Siren size={16} /> {t('Emergency SOS', 'Dharura SOS')}</button>
                 <div className="mt-2 flex items-center justify-between border-t border-black/5 pt-2 text-sm"><span className="text-ink/50">{t('Your fee', 'Ada yako')}</span><Money value={o.deliveryFee} className="text-leaf-dark" /></div>
-                <div className="mt-3">
-                  {status === 'FEE_CONFIRMED' && <Button variant="primary" loading={busy} onClick={pick} className="w-full">{t('Picked up the gas ✓', 'Nimechukua gesi ✓')}</Button>}
+                <div className="mt-3 space-y-2">
+                  {status === 'FEE_CONFIRMED' && (
+                    <>
+                      <button onClick={arrived} className="flex w-full items-center justify-center gap-1.5 rounded-2xl border border-flame/40 py-2.5 text-sm font-bold text-flame active:bg-flame/5"><MapPin size={16} /> {t("I've arrived at pickup", 'Nimefika kuchukua')}</button>
+                      <Button variant="primary" loading={busy} onClick={pick} className="w-full">{t('Picked up the gas ✓', 'Nimechukua gesi ✓')}</Button>
+                    </>
+                  )}
                   {status === 'PICKED' && (
                     <div className="space-y-2">
+                      <button onClick={arrived} className="flex w-full items-center justify-center gap-1.5 rounded-2xl border border-flame/40 py-2.5 text-sm font-bold text-flame active:bg-flame/5"><MapPin size={16} /> {t("I've arrived — notify customer", 'Nimefika — mjulishe mteja')}</button>
                       <input value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))} inputMode="numeric" maxLength={4} placeholder={t('Confirmation code from household', 'Namba kutoka kwa kaya')} className="w-full min-h-touch rounded-2xl border border-black/15 bg-white px-4 text-center text-lg tracking-[.4em] text-ink outline-none focus:border-flame" />
                       <Button variant="leaf" loading={busy} onClick={deliver} className="w-full"><CheckCircle2 size={18} /> {t('Confirm delivered', 'Thibitisha umefikisha')}</Button>
                     </div>

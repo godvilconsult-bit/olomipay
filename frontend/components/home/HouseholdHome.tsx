@@ -186,6 +186,7 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
               <div className="mb-2 flex items-center justify-between"><span className="text-xs font-semibold text-ink/50">{t('Language', 'Lugha')}</span><LangToggle /></div>
               <Link href="/addresses" onClick={() => setMenu(false)} className="flex items-center gap-2 rounded-xl px-2 py-2 text-sm font-medium hover:bg-black/5"><MapPin size={16} className="text-flame" /> {t('My addresses', 'Anwani zangu')}</Link>
               <Link href="/wallet" onClick={() => setMenu(false)} className="flex items-center gap-2 rounded-xl px-2 py-2 text-sm font-medium hover:bg-black/5"><Wallet size={16} className="text-leaf-dark" /> {t('Wallet', 'Pochi')}</Link>
+              <Link href="/cylinders" onClick={() => setMenu(false)} className="flex items-center gap-2 rounded-xl px-2 py-2 text-sm font-medium hover:bg-black/5"><Flame size={16} className="text-flame" /> {t('My gas cylinders', 'Mitungi yangu')}</Link>
               <button onClick={logout} className="flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left text-sm font-medium text-danger hover:bg-danger/5"><LogOut size={16} /> {t('Sign out', 'Toka')}</button>
             </div>
           </>

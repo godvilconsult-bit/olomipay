@@ -161,6 +161,7 @@ export const jobs = {
   acceptOffer: (orderId: string) => apiFetch(`/api/jobs/${orderId}/accept-offer`, { method: 'POST' }),
   declineOffer:(orderId: string) => apiFetch(`/api/jobs/${orderId}/decline-offer`, { method: 'POST' }),
   pick:        (orderId: string) => apiFetch(`/api/jobs/${orderId}/pick`, { method: 'POST' }),
+  arrived:     (orderId: string) => apiFetch(`/api/jobs/${orderId}/arrived`, { method: 'POST' }),
   deliver:     (orderId: string, otp: string) => apiFetch(`/api/jobs/${orderId}/deliver`, { method: 'POST', body: JSON.stringify({ otp }) }),
   active:      () => apiFetch('/api/jobs/active'),
   earnings:    () => apiFetch('/api/jobs/earnings'),
@@ -247,6 +248,14 @@ export const distributors = {
   cancel:  (id: string) => apiFetch(`/api/distributors/orders/${id}/cancel`, { method: 'POST' }),
 };
 
+// Cylinder registry + deposit/return (household).
+export const cylinders = {
+  mine:     () => apiFetch<{ cylinders: any[] }>('/api/cylinders/mine'),
+  register: (body: { brand: string; sizeKg: number; deposit?: number; serial?: string }) => apiFetch('/api/cylinders', { method: 'POST', body: JSON.stringify(body) }),
+  remove:   (id: string) => apiFetch(`/api/cylinders/${id}`, { method: 'DELETE' }),
+  return:   (id: string) => apiFetch(`/api/cylinders/${id}/return`, { method: 'POST' }),
+};
+
 // Brand self-serve portal (marketers run their own approved ads + see leads/demand).
 export const brand = {
   me:       () => apiFetch<{ profile: any; totals: { ads: number; impressions: number; clicks: number; leads: number } }>('/api/brand/me'),
@@ -280,6 +289,10 @@ export const adminApi = {
   // Ad leads — "Shop now" enquiries
   adLeads:      () => apiFetch<{ leads: any[] }>('/api/admin/ad-leads'),
   setLeadStatus:(id: string, status: 'NEW' | 'CONTACTED' | 'CLOSED') => apiFetch(`/api/admin/ad-leads/${id}/status`, { method: 'POST', body: JSON.stringify({ status }) }),
+  // Cylinder returns
+  cylinderReturns: () => apiFetch<{ returns: any[] }>('/api/admin/cylinder-returns'),
+  approveReturn:   (id: string) => apiFetch(`/api/admin/cylinder-returns/${id}/approve`, { method: 'POST' }),
+  rejectReturn:    (id: string) => apiFetch(`/api/admin/cylinder-returns/${id}/reject`, { method: 'POST' }),
   // T1 — cash-out disbursements
   cashouts:     () => apiFetch<{ requests: any[] }>('/api/admin/cashouts'),
   payCashout:   (id: string, ref?: string) => apiFetch(`/api/admin/cashouts/${id}/paid`, { method: 'POST', body: JSON.stringify({ ref }) }),

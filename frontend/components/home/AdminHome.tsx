@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Users, ShieldCheck, Activity, Phone, Home, Store, Bike, Trash2, Star, Megaphone, Plus, TrendingUp, Banknote, Check, X, Flag, Lock, Unlock, Siren, Image as ImageIcon, Pencil, Inbox } from 'lucide-react';
+import { Users, ShieldCheck, Activity, Phone, Home, Store, Bike, Trash2, Star, Megaphone, Plus, TrendingUp, Banknote, Check, X, Flag, Lock, Unlock, Siren, Image as ImageIcon, Pencil, Inbox, Flame } from 'lucide-react';
 import { adminApi, JikoUser } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 import { TZ_REGIONS } from '../../lib/tanzania';
@@ -32,22 +32,27 @@ export function AdminHome({ user }: { user: JikoUser }) {
   const [disputes, setDisputes] = useState<any[]>([]);
   const [sec, setSec] = useState<{ locked: any[]; sos: any[]; openDisputes: number }>({ locked: [], sos: [], openDisputes: 0 });
   const [leads, setLeads] = useState<any[]>([]);
+  const [cylReturns, setCylReturns] = useState<any[]>([]);
   const editing = !!adForm.id;
 
   async function load() {
-    const [s, u, o, k, sp, ad, co, dp, se, ld] = await Promise.all([
+    const [s, u, o, k, sp, ad, co, dp, se, ld, cr] = await Promise.all([
       adminApi.stats().catch(() => null), adminApi.users().catch(() => ({ users: [] })),
       adminApi.orders().catch(() => ({ orders: [] })), adminApi.kycPending().catch(() => ({ pending: [] })),
       adminApi.suppliers().catch(() => ({ suppliers: [] })), adminApi.ads().catch(() => ({ ads: [] })),
       adminApi.cashouts().catch(() => ({ requests: [] })), adminApi.disputes().catch(() => ({ disputes: [] })),
       adminApi.security().catch(() => ({ locked: [], sos: [], openDisputes: 0 })),
       adminApi.adLeads().catch(() => ({ leads: [] })),
+      adminApi.cylinderReturns().catch(() => ({ returns: [] })),
     ]);
     setStats(s); setUsers(u.users ?? []); setOrders(o.orders ?? []); setKyc(k.pending ?? []);
     setSups(sp.suppliers ?? []); setAdList(ad.ads ?? []); setCashouts(co.requests ?? []); setDisputes(dp.disputes ?? []);
-    setSec(se as any); setLeads(ld.leads ?? []);
+    setSec(se as any); setLeads(ld.leads ?? []); setCylReturns((cr as any).returns ?? []);
   }
   useEffect(() => { load(); }, []);
+
+  async function approveReturn(id: string) { try { await adminApi.approveReturn(id); toast.success(t('Approved — deposit refunded', 'Imeidhinishwa — amana imerejeshwa')); load(); } catch (e: any) { toast.error(e?.message ?? t('Failed', 'Imeshindikana')); } }
+  async function rejectReturn(id: string) { try { await adminApi.rejectReturn(id); load(); } catch { toast.error(t('Failed', 'Imeshindikana')); } }
 
   async function setLeadStatus(id: string, status: 'NEW' | 'CONTACTED' | 'CLOSED') {
     setLeads((arr) => arr.map((l) => l.id === id ? { ...l, status } : l));
@@ -124,7 +129,7 @@ export function AdminHome({ user }: { user: JikoUser }) {
     { id: 'overview', label: t('Overview', 'Muhtasari') },
     { id: 'users',    label: t('Users', 'Watumiaji'), badge: kycList.length },
     { id: 'security', label: t('Security', 'Usalama'), badge: sec.locked.length + sec.openDisputes },
-    { id: 'money',    label: t('Transactions', 'Miamala'), badge: cashouts.length },
+    { id: 'money',    label: t('Transactions', 'Miamala'), badge: cashouts.length + cylReturns.length },
     { id: 'ads',      label: t('Ads', 'Matangazo'), badge: adList.filter((a) => a.status === 'PENDING').length + leads.filter((l) => l.status === 'NEW').length },
   ];
   const inputCls = 'w-full rounded-xl border border-black/15 bg-white px-3 py-2 text-sm text-ink outline-none focus:border-flame';
@@ -322,6 +327,28 @@ export function AdminHome({ user }: { user: JikoUser }) {
                       </div>
                       <button onClick={() => rejectCashout(c.id)} className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-lg bg-black/5 text-danger"><X size={16} /></button>
                       <Button variant="leaf" onClick={() => payCashout(c.id)} className="flex-shrink-0 !px-3"><Check size={16} /> {t('Paid', 'Lipa')}</Button>
+                    </Card>
+                  ))}
+                </div>}
+            </div>
+
+            <div>
+              <h2 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-ink/70"><Flame size={15} className="text-flame" /> {t('Cylinder returns', 'Marejesho ya mitungi')} ({cylReturns.length})</h2>
+              {cylReturns.length === 0 ? <p className="py-3 text-center text-sm text-ink/50">{t('No return requests.', 'Hakuna marejesho.')}</p> :
+                <div className="space-y-2">
+                  {cylReturns.map((c) => (
+                    <Card key={c.id} className="!p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate font-semibold">{c.brand} · {c.sizeKg}kg</div>
+                          <div className="text-xs text-ink/50">{c.owner?.name ?? '—'} · {localPhone(c.owner?.phone)}{c.owner?.region ? ` · ${c.owner.region}` : ''}</div>
+                        </div>
+                        <Money value={c.deposit} className="flex-shrink-0 text-sm" />
+                      </div>
+                      <div className="mt-2 flex gap-2">
+                        <Button variant="ghost" className="flex-1 !text-xs" onClick={() => rejectReturn(c.id)}>{t('Reject', 'Kataa')}</Button>
+                        <Button variant="leaf" className="flex-1 !text-xs" onClick={() => approveReturn(c.id)}>{t('Approve & refund deposit', 'Idhinisha & rejesha')}</Button>
+                      </div>
                     </Card>
                   ))}
                 </div>}

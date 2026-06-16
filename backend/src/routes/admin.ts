@@ -408,4 +408,31 @@ router.post('/ad-leads/:id/status', requireAdmin, async (req: AuthRequest, res) 
   res.json({ ok: true });
 });
 
+// ── Cylinder returns ─ approve refunds the deposit to the household wallet ────────
+router.get('/cylinder-returns', requireAdmin, async (_req: AuthRequest, res) => {
+  const cyl = await prisma.cylinder.findMany({ where: { status: 'RETURN_REQUESTED' }, orderBy: { createdAt: 'asc' }, take: 200 });
+  const ownerIds = cyl.map((c) => c.ownerId).filter((x): x is string => !!x);
+  const owners = ownerIds.length ? await prisma.user.findMany({ where: { id: { in: ownerIds } }, select: { id: true, name: true, phone: true, region: true } }) : [];
+  const byId = new Map(owners.map((o) => [o.id, o]));
+  res.json({ returns: cyl.map((c) => ({ ...c, owner: c.ownerId ? byId.get(c.ownerId) ?? null : null })) });
+});
+
+router.post('/cylinder-returns/:id/approve', requireAdmin, async (req: AuthRequest, res) => {
+  const c = await prisma.cylinder.findUnique({ where: { id: req.params.id } });
+  if (!c || c.status !== 'RETURN_REQUESTED') return res.status(404).json({ error: 'Return not found' });
+  await prisma.cylinder.update({ where: { id: c.id }, data: { status: 'RETURNED', returnedAt: new Date() } });
+  if (c.ownerId && c.deposit > 0) {
+    await postTxn(c.ownerId, 'ADJUSTMENT', c.deposit, { note: `Cylinder deposit refund (${c.brand} ${c.sizeKg}kg)` });
+    await notify(c.ownerId, { title: 'Deposit refunded 💸', body: `TZS ${c.deposit.toLocaleString()} for your returned ${c.brand} cylinder is now in your wallet.`, type: 'cylinder' }).catch(() => {});
+  } else if (c.ownerId) {
+    await notify(c.ownerId, { title: 'Cylinder return confirmed ✅', body: `Your ${c.brand} ${c.sizeKg}kg cylinder return is complete.`, type: 'cylinder' }).catch(() => {});
+  }
+  res.json({ ok: true });
+});
+
+router.post('/cylinder-returns/:id/reject', requireAdmin, async (req: AuthRequest, res) => {
+  await prisma.cylinder.updateMany({ where: { id: req.params.id, status: 'RETURN_REQUESTED' }, data: { status: 'WITH_HOUSEHOLD' } });
+  res.json({ ok: true });
+});
+
 export { router as adminRouter };

@@ -18,12 +18,13 @@ import { notify } from '../services/notify';
 let _io: Server | null = null;
 
 // Deliveries we've already sent an "arrived" alert for (reset on restart).
-const arrivedNotified = new Set<string>();
+const arrivedNotified = new Set<string>();        // arrival at the customer (drop)
+const pickupArrivedNotified = new Set<string>();  // arrival at the supplier (pickup)
 
 // Live-location scale guards: relay every ping in-memory, but cache the
 // delivery→order metadata and throttle DB writes so thousands of riders pinging
 // every few seconds don't hammer Postgres.
-const deliveryMeta = new Map<string, { householdId: string; supplierUserId?: string; dropLat: number | null; dropLng: number | null; orderId: string; orderNo: string; status: string }>();
+const deliveryMeta = new Map<string, { householdId: string; supplierUserId?: string; dropLat: number | null; dropLng: number | null; pickupLat: number | null; pickupLng: number | null; orderId: string; orderNo: string; status: string }>();
 const lastRiderWrite = new Map<string, number>();
 const lastDeliveryWrite = new Map<string, number>();
 const LOC_WRITE_MS = 12_000;
@@ -118,10 +119,10 @@ export function initSocket(httpServer: HttpServer): Server {
       if (!meta) {
         const d = await prisma.delivery.findUnique({
           where:  { id: deliveryId },
-          select: { dropLat: true, dropLng: true, order: { select: { id: true, orderNo: true, status: true, householdId: true, supplier: { select: { userId: true } } } } },
+          select: { dropLat: true, dropLng: true, order: { select: { id: true, orderNo: true, status: true, householdId: true, supplier: { select: { userId: true, lat: true, lng: true } } } } },
         }).catch(() => null);
         if (!d?.order) return;
-        meta = { householdId: d.order.householdId, supplierUserId: d.order.supplier?.userId ?? undefined, dropLat: d.dropLat, dropLng: d.dropLng, orderId: d.order.id, orderNo: d.order.orderNo, status: d.order.status };
+        meta = { householdId: d.order.householdId, supplierUserId: d.order.supplier?.userId ?? undefined, dropLat: d.dropLat, dropLng: d.dropLng, pickupLat: d.order.supplier?.lat ?? null, pickupLng: d.order.supplier?.lng ?? null, orderId: d.order.id, orderNo: d.order.orderNo, status: d.order.status };
         deliveryMeta.set(deliveryId, meta);
       }
 
@@ -129,11 +130,18 @@ export function initSocket(httpServer: HttpServer): Server {
       emitToUser(meta.householdId, 'delivery:location', { deliveryId, lat, lng });
       if (meta.supplierUserId) emitToUser(meta.supplierUserId, 'delivery:location', { deliveryId, lat, lng });
 
-      // Geofence arrival — one alert per delivery.
+      // Geofence: arrival at the customer (carrying gas) → alert the household once.
       if (meta.status === 'PICKED' && meta.dropLat != null && meta.dropLng != null && !arrivedNotified.has(deliveryId) && haversineKm(lat, lng, meta.dropLat, meta.dropLng) <= 0.15) {
         arrivedNotified.add(deliveryId);
         emitToUser(meta.householdId, 'order:arriving', { orderId: meta.orderId });
         await notify(meta.householdId, { title: 'Your rider has arrived 🏍️', body: `${meta.orderNo}: the rider is at your location. Have your code ready.`, type: 'order', data: { orderId: meta.orderId } });
+      }
+
+      // Geofence: arrival at the supplier (heading to pickup) → alert the supplier once.
+      if (meta.status === 'FEE_CONFIRMED' && meta.supplierUserId && meta.pickupLat != null && meta.pickupLng != null && !pickupArrivedNotified.has(deliveryId) && haversineKm(lat, lng, meta.pickupLat, meta.pickupLng) <= 0.15) {
+        pickupArrivedNotified.add(deliveryId);
+        emitToUser(meta.supplierUserId, 'order:arriving', { orderId: meta.orderId });
+        await notify(meta.supplierUserId, { title: 'Rider is here to collect 🏍️', body: `${meta.orderNo}: the rider has arrived to pick up the order.`, type: 'order', data: { orderId: meta.orderId } });
       }
 
       // Persist last-known position + refresh status (so the geofence fires after
