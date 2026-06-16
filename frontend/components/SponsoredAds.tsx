@@ -17,6 +17,9 @@ function isLight(hex?: string | null): boolean {
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.72;
 }
 
+// Entrance effects the carousel cycles through, so consecutive ads feel different.
+const EFFECTS = ['slide', 'pop', 'fade', 'zoom', 'up', 'flip'];
+
 function AdCard({ ad }: { ad: BrandAd }) {
   const { t } = useT();
   const light = isLight(ad.bgColor);
@@ -50,8 +53,7 @@ function AdCard({ ad }: { ad: BrandAd }) {
 export function SponsoredAds({ region, userName, userPhone, onShop, className }: { region?: string; userName?: string | null; userPhone?: string | null; onShop?: (ad: BrandAd) => Promise<boolean>; className?: string }) {
   const { t } = useT();
   const [list, setList] = useState<BrandAd[]>([]);
-  const [idx, setIdx]   = useState(0);
-  const [withAnim, setWithAnim] = useState(true);
+  const [tick, setTick] = useState(0); // monotonic step; drives both which ad shows and which effect
   const seen = useRef<Set<string>>(new Set());
 
   // Lead form
@@ -61,27 +63,21 @@ export function SponsoredAds({ region, userName, userPhone, onShop, className }:
 
   useEffect(() => {
     let alive = true;
-    ads.active(region).then((r) => { if (alive) { setList(r.ads ?? []); setIdx(0); setWithAnim(true); } }).catch(() => { if (alive) setList([]); });
+    ads.active(region).then((r) => { if (alive) { setList(r.ads ?? []); setTick(0); } }).catch(() => { if (alive) setList([]); });
     return () => { alive = false; };
   }, [region]);
 
-  // Auto-advance every 3 seconds.
+  // Auto-advance every 3.5s. Depends only on list length, so a tap/re-render can
+  // never leave the rotation stuck — it just keeps cycling.
   useEffect(() => {
     if (list.length < 2) return;
-    const id = setInterval(() => setIdx((i) => i + 1), 3000);
+    const id = setInterval(() => setTick((x) => x + 1), 3500);
     return () => clearInterval(id);
   }, [list.length]);
 
-  // After sliding onto the cloned first slide, snap back to 0 with no animation → seamless loop.
-  useEffect(() => {
-    if (!withAnim) {
-      const r = requestAnimationFrame(() => requestAnimationFrame(() => setWithAnim(true)));
-      return () => cancelAnimationFrame(r);
-    }
-  }, [withAnim]);
-
-  const realIdx = list.length ? idx % list.length : 0;
+  const realIdx = list.length ? tick % list.length : 0;
   const current = list[realIdx];
+  const effect = EFFECTS[tick % EFFECTS.length];
 
   // One impression per ad per mount, as it becomes the visible slide.
   useEffect(() => {
@@ -91,8 +87,6 @@ export function SponsoredAds({ region, userName, userPhone, onShop, className }:
   }, [current?.id]);
 
   if (!current) return null;
-
-  const slides = list.length > 1 ? [...list, list[0]] : list;
 
   async function tap(ad: BrandAd) {
     ads.click(ad.id).catch(() => {});
@@ -117,26 +111,18 @@ export function SponsoredAds({ region, userName, userPhone, onShop, className }:
 
   return (
     <div className={className}>
-      {/* Sliding track */}
-      <div className="overflow-hidden">
-        <div
-          className="flex"
-          style={{ transform: `translateX(-${idx * 100}%)`, transition: withAnim ? 'transform .6s cubic-bezier(.22,1,.36,1)' : 'none' }}
-          onTransitionEnd={() => { if (list.length > 1 && idx === list.length) { setWithAnim(false); setIdx(0); } }}
-        >
-          {slides.map((ad, i) => (
-            <button key={`${ad.id}-${i}`} type="button" onClick={() => tap(ad)} className="w-full flex-shrink-0 px-0.5 text-left active:scale-[.99]">
-              <AdCard ad={ad} />
-            </button>
-          ))}
-        </div>
+      {/* One ad at a time; each transition replays a cycled entrance effect. */}
+      <div className="[perspective:800px]">
+        <button key={tick} type="button" onClick={() => tap(current)} className={cn('block w-full text-left active:scale-[.99]', `ad-fx-${effect}`)}>
+          <AdCard ad={current} />
+        </button>
       </div>
 
       {/* Dots */}
       {list.length > 1 && (
         <div className="mt-1.5 flex items-center justify-center gap-1.5">
           {list.map((a, i) => (
-            <button key={a.id} onClick={() => { setWithAnim(true); setIdx(i); }} aria-label={`Ad ${i + 1}`} className={cn('h-1.5 rounded-full transition-all', i === realIdx ? 'w-4 bg-flame' : 'w-1.5 bg-ink/20')} />
+            <button key={a.id} onClick={() => setTick(i)} aria-label={`Ad ${i + 1}`} className={cn('h-1.5 rounded-full transition-all', i === realIdx ? 'w-4 bg-flame' : 'w-1.5 bg-ink/20')} />
           ))}
         </div>
       )}

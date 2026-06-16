@@ -650,3 +650,20 @@ table { max-width: 100%; }
   .ad-anim-float, .ad-anim-zoom, .ad-anim-pulse, .ad-enter { animation: none; }
   .ad-shine::after { display:none; }
 }
+
+/* ── Sponsored-ad ENTRANCE effects (carousel cycles through these per slide) ──── */
+@keyframes adFxSlide { from{opacity:0;transform:translateX(70px)}      to{opacity:1;transform:none} }
+@keyframes adFxUp    { from{opacity:0;transform:translateY(48px)}      to{opacity:1;transform:none} }
+@keyframes adFxFade  { from{opacity:0}                                  to{opacity:1} }
+@keyframes adFxZoom  { from{opacity:0;transform:scale(.82)}            to{opacity:1;transform:none} }
+@keyframes adFxPop   { 0%{opacity:0;transform:scale(.55)} 60%{opacity:1;transform:scale(1.06)} 80%{transform:scale(.98)} 100%{transform:scale(1)} }
+@keyframes adFxFlip  { from{opacity:0;transform:perspective(700px) rotateY(85deg)} to{opacity:1;transform:perspective(700px) rotateY(0)} }
+.ad-fx-slide { animation: adFxSlide .5s cubic-bezier(.22,1,.36,1) both; }
+.ad-fx-up    { animation: adFxUp .5s cubic-bezier(.22,1,.36,1) both; }
+.ad-fx-fade  { animation: adFxFade .55s ease-out both; }
+.ad-fx-zoom  { animation: adFxZoom .5s cubic-bezier(.22,1,.36,1) both; }
+.ad-fx-pop   { animation: adFxPop .55s cubic-bezier(.34,1.56,.64,1) both; transform-origin:center; }
+.ad-fx-flip  { animation: adFxFlip .6s ease-out both; transform-origin:center; }
+@media (prefers-reduced-motion: reduce) {
+  .ad-fx-slide, .ad-fx-up, .ad-fx-fade, .ad-fx-zoom, .ad-fx-pop, .ad-fx-flip { animation: none; }
+}
