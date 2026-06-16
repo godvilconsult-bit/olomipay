@@ -102,6 +102,10 @@ export function AdminHome({ user }: { user: JikoUser }) {
     } catch (e: any) { toast.error(e?.message ?? t('Failed', 'Imeshindikana')); } finally { setAdBusy(false); }
   }
   async function toggleAd(a: any) { try { await adminApi.patchAd(a.id, { isActive: !a.isActive }); load(); } catch { toast.error(t('Failed', 'Imeshindikana')); } }
+  async function moderateAd(id: string, status: 'APPROVED' | 'REJECTED') {
+    try { await adminApi.setAdStatus(id, status); toast.success(status === 'APPROVED' ? t('Ad approved — now live', 'Tangazo limeidhinishwa') : t('Ad rejected', 'Tangazo limekataliwa')); load(); }
+    catch (e: any) { toast.error(e?.message ?? t('Failed', 'Imeshindikana')); }
+  }
   async function delAd(id: string) { if (!confirm(t('Delete this ad?', 'Futa tangazo hili?'))) return; try { await adminApi.deleteAd(id); if (adForm.id === id) setAdForm({ ...EMPTY_AD }); load(); } catch { toast.error(t('Failed', 'Imeshindikana')); } }
 
   async function decide(id: string, status: 'APPROVED' | 'REJECTED') {
@@ -121,7 +125,7 @@ export function AdminHome({ user }: { user: JikoUser }) {
     { id: 'users',    label: t('Users', 'Watumiaji'), badge: kycList.length },
     { id: 'security', label: t('Security', 'Usalama'), badge: sec.locked.length + sec.openDisputes },
     { id: 'money',    label: t('Transactions', 'Miamala'), badge: cashouts.length },
-    { id: 'ads',      label: t('Ads', 'Matangazo'), badge: leads.filter((l) => l.status === 'NEW').length },
+    { id: 'ads',      label: t('Ads', 'Matangazo'), badge: adList.filter((a) => a.status === 'PENDING').length + leads.filter((l) => l.status === 'NEW').length },
   ];
   const inputCls = 'w-full rounded-xl border border-black/15 bg-white px-3 py-2 text-sm text-ink outline-none focus:border-flame';
   const animClass = adForm.animation === 'pulse' ? 'ad-anim-pulse' : adForm.animation === 'float' ? 'ad-anim-float' : adForm.animation === 'zoom' ? 'ad-anim-zoom' : '';
@@ -455,8 +459,9 @@ export function AdminHome({ user }: { user: JikoUser }) {
 
                 <div className="flex gap-2 pt-1">
                   {editing && <Button variant="ghost" onClick={() => setAdForm({ ...EMPTY_AD })} className="flex-shrink-0">{t('Cancel', 'Ghairi')}</Button>}
-                  <Button variant="primary" loading={adBusy} onClick={saveAd} className="flex-1">{editing ? <><Pencil size={15} /> {t('Save changes', 'Hifadhi')}</> : <><Plus size={15} /> {t('Publish ad', 'Weka tangazo')}</>}</Button>
+                  <Button variant="primary" loading={adBusy} onClick={saveAd} className="flex-1">{editing ? <><Pencil size={15} /> {t('Save changes', 'Hifadhi')}</> : <><Plus size={15} /> {t('Submit for approval', 'Wasilisha kuidhinishwa')}</>}</Button>
                 </div>
+                {!editing && <p className="text-center text-[11px] text-ink/40">{t('New ads stay hidden until you approve them below.', 'Matangazo mapya hayaonekani hadi uidhinishe hapa chini.')}</p>}
               </Card>
             </div>
 
@@ -475,11 +480,15 @@ export function AdminHome({ user }: { user: JikoUser }) {
                             <div className="truncate font-semibold">{a.title}</div>
                             <div className="truncate text-xs text-ink/50">{a.brand} · {a.region || t('All TZ', 'TZ nzima')} · {a.animation}</div>
                           </div>
-                          <button onClick={() => toggleAd(a)} className={cn('flex-shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold', a.isActive ? 'bg-leaf/15 text-leaf-dark' : 'bg-black/10 text-ink/40')}>{a.isActive ? t('Live', 'Hai') : t('Off', 'Imezimwa')}</button>
+                          {a.status === 'APPROVED'
+                            ? <button onClick={() => toggleAd(a)} className={cn('flex-shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold', a.isActive ? 'bg-leaf/15 text-leaf-dark' : 'bg-black/10 text-ink/40')}>{a.isActive ? t('Live', 'Hai') : t('Off', 'Imezimwa')}</button>
+                            : <span className={cn('flex-shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold', a.status === 'REJECTED' ? 'bg-danger/10 text-danger' : 'bg-warning/15 text-warning')}>{a.status === 'REJECTED' ? t('Rejected', 'Imekataliwa') : t('Pending', 'Inasubiri')}</span>}
                         </div>
-                        <div className="mt-2 flex items-center justify-between border-t border-black/5 pt-2 text-[11px] text-ink/50">
-                          <span>{a.impressions} {t('views', 'mionekano')} · {a.clicks} {t('clicks', 'mibofyo')} · {ctr}% CTR</span>
-                          <div className="flex gap-1">
+                        <div className="mt-2 flex items-center justify-between gap-2 border-t border-black/5 pt-2 text-[11px] text-ink/50">
+                          <span className="min-w-0 truncate">{a.impressions} {t('views', 'mionekano')} · {a.clicks} {t('clicks', 'mibofyo')} · {a.leads ?? 0} {t('leads', 'maombi')} · {ctr}% CTR</span>
+                          <div className="flex flex-shrink-0 gap-1">
+                            {a.status !== 'APPROVED' && <button onClick={() => moderateAd(a.id, 'APPROVED')} className="rounded-lg bg-leaf/15 px-2 py-1 text-[11px] font-bold text-leaf-dark">{t('Approve', 'Idhinisha')}</button>}
+                            {a.status === 'PENDING' && <button onClick={() => moderateAd(a.id, 'REJECTED')} className="rounded-lg bg-black/5 px-2 py-1 text-[11px] font-bold text-ink/50">{t('Reject', 'Kataa')}</button>}
                             <button onClick={() => editAd(a)} className="grid h-7 w-7 place-items-center rounded-lg bg-black/5 text-ink/60"><Pencil size={14} /></button>
                             <button onClick={() => delAd(a.id)} className="grid h-7 w-7 place-items-center rounded-lg text-danger"><Trash2 size={14} /></button>
                           </div>

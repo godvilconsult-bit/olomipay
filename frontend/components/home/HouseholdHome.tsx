@@ -135,6 +135,21 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
     try { const r = await vendors.favorite(supplierId); setVlist((cur) => (cur ?? []).map((x) => x.supplierId === supplierId ? { ...x, favorited: r.favorited } : x)); } catch {}
   }
 
+  // Ad "Shop now": if a nearby shop stocks the brand, surface them so the tap turns
+  // into a real order. Returns false (→ SponsoredAds opens the lead form) if none do.
+  async function shopAd(ad: any): Promise<boolean> {
+    try {
+      const r = await vendors.search({ lat: center.lat, lng: center.lng, brand: ad.brand, type: ad.type || undefined, radiusKm: 50 });
+      const found = r.vendors ?? [];
+      if (found.length === 0) return false;
+      setFilter((f) => ({ ...f, brand: ad.brand, type: (ad.type as string) || f.type }));
+      setVlist(found);
+      toast.success(found.length === 1 ? t(`1 shop near you stocks ${ad.brand}`, `Duka 1 karibu lina ${ad.brand}`) : t(`${found.length} shops near you stock ${ad.brand}`, `Maduka ${found.length} karibu yana ${ad.brand}`));
+      setTimeout(() => document.getElementById('vendor-list')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+      return true;
+    } catch { return false; }
+  }
+
   const markers = (vlist ?? []).filter((v) => v.lat != null).map((v) => ({ lat: v.lat, lng: v.lng, kind: 'vendor' as const, label: v.businessName, id: v.supplierId, shop: v.businessName }))
     .concat([{ lat: center.lat, lng: center.lng, kind: 'me' as const, label: savedAddr?.label ?? t('You', 'Wewe'), id: '', shop: '' }]);
 
@@ -295,12 +310,12 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
               </select>
             </div>
           </div>
-          <SponsoredAds region={adRegion} userName={user.name} userPhone={user.phone} />
+          <SponsoredAds region={adRegion} userName={user.name} userPhone={user.phone} onShop={shopAd} />
         </div>
 
         {/* ── Vendors ─────────────────────────────────────────────────────── */}
         {vlist !== null && (
-          <div>
+          <div id="vendor-list" className="scroll-mt-20">
             <div className="mb-2 flex items-center justify-between">
               <h2 className="text-sm font-bold">{vlist.length} {t('vendors nearby', 'wauzaji karibu')}</h2>
               <div className="flex items-center rounded-full bg-black/5 p-0.5 text-xs font-bold">

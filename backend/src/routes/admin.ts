@@ -224,6 +224,7 @@ const adBody = z.object({
   type:      z.enum(['REFILL', 'CYLINDER', 'ACCESSORY']).optional(),
   weight:    z.number().int().min(1).max(100).default(1),
   isActive:  z.boolean().default(true),
+  status:    z.enum(['PENDING', 'APPROVED', 'REJECTED']).optional(),
 });
 
 router.post('/ads', requireAdmin, async (req: AuthRequest, res) => {
@@ -236,6 +237,7 @@ router.post('/ads', requireAdmin, async (req: AuthRequest, res) => {
       brand: d.brand, title: d.title, subtitle: d.subtitle || null, imageUrl: d.imageUrl || null,
       ctaLabel: d.ctaLabel || null, linkUrl: d.linkUrl || null, bgColor: d.bgColor || null,
       animation: d.animation, region: d.region || null, type: d.type, weight: d.weight, isActive: d.isActive,
+      status: 'PENDING', // every ad waits for admin approval before it can go live
     },
   });
   res.status(201).json({ ad });
@@ -247,7 +249,7 @@ router.patch('/ads/:id', requireAdmin, async (req: AuthRequest, res) => {
   if (!parse.success) return res.status(400).json({ error: parse.error.errors[0].message });
   const d = parse.data;
   const data: any = {};
-  for (const k of ['brand', 'title', 'animation', 'weight', 'isActive', 'type'] as const) if (d[k] !== undefined) data[k] = d[k];
+  for (const k of ['brand', 'title', 'animation', 'weight', 'isActive', 'type', 'status'] as const) if (d[k] !== undefined) data[k] = d[k];
   for (const k of ['subtitle', 'imageUrl', 'ctaLabel', 'linkUrl', 'bgColor', 'region'] as const) if (d[k] !== undefined) data[k] = (d[k] as string) || null;
   const ad = await prisma.brandAd.update({ where: { id: req.params.id }, data }).catch(() => null);
   if (!ad) return res.status(404).json({ error: 'Ad not found' });

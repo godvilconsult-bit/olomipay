@@ -638,7 +638,8 @@ model BrandAd {
   region    String?                       // null = nationwide
   type      ProductType?                  // optional: deep-link the search type
   weight    Int      @default(1)          // higher = shown more often
-  isActive  Boolean  @default(true)
+  status    String   @default("PENDING")  // moderation: PENDING | APPROVED | REJECTED
+  isActive  Boolean  @default(true)        // advertiser on/off (only matters once APPROVED)
   impressions Int    @default(0)
   clicks    Int      @default(0)
   leads     Int      @default(0)          // "Shop now" details submitted

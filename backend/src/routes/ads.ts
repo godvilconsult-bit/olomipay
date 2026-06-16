@@ -25,6 +25,7 @@ router.get('/active', requireAuth, async (req: AuthRequest, res) => {
   const now = new Date();
   const ads = await prisma.brandAd.findMany({
     where: {
+      status:   'APPROVED', // only admin-approved ads ever reach households
       isActive: true,
       ...(region ? { OR: [{ region: null }, { region }] } : {}),
       AND: [

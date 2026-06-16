@@ -224,7 +224,7 @@ export const ads = {
   lead:       (id: string, body: { name: string; phone: string; note?: string }) => apiFetch(`/api/ads/${id}/lead`, { method: 'POST', body: JSON.stringify(body) }),
 };
 export interface BrandAd { id: string; brand: string; title: string; subtitle?: string | null; imageUrl?: string | null; ctaLabel?: string | null; linkUrl?: string | null; bgColor?: string | null; animation?: string | null; type?: string | null }
-export interface AdInput { brand: string; title: string; subtitle?: string; imageUrl?: string; ctaLabel?: string; linkUrl?: string; bgColor?: string; animation?: string; region?: string; type?: string; weight?: number; isActive?: boolean }
+export interface AdInput { brand: string; title: string; subtitle?: string; imageUrl?: string; ctaLabel?: string; linkUrl?: string; bgColor?: string; animation?: string; region?: string; type?: string; weight?: number; isActive?: boolean; status?: 'PENDING' | 'APPROVED' | 'REJECTED' }
 
 export const adminApi = {
   stats:      () => apiFetch('/api/admin/stats'),
@@ -240,6 +240,7 @@ export const adminApi = {
   ads:        () => apiFetch<{ ads: any[] }>('/api/admin/ads'),
   createAd:   (body: AdInput) => apiFetch('/api/admin/ads', { method: 'POST', body: JSON.stringify(body) }),
   patchAd:    (id: string, body: Partial<AdInput>) => apiFetch(`/api/admin/ads/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  setAdStatus:(id: string, status: 'PENDING' | 'APPROVED' | 'REJECTED') => apiFetch(`/api/admin/ads/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
   deleteAd:   (id: string) => apiFetch(`/api/admin/ads/${id}`, { method: 'DELETE' }),
   // Security — account safety
   security:   () => apiFetch<{ locked: any[]; sos: any[]; openDisputes: number }>('/api/admin/security'),

@@ -47,7 +47,7 @@ function AdCard({ ad }: { ad: BrandAd }) {
  * brand's chosen motion. Tapping "Shop now" opens a quick details form so the
  * advertiser/distributor can follow up (unless the ad has its own link).
  */
-export function SponsoredAds({ region, userName, userPhone, className }: { region?: string; userName?: string | null; userPhone?: string | null; className?: string }) {
+export function SponsoredAds({ region, userName, userPhone, onShop, className }: { region?: string; userName?: string | null; userPhone?: string | null; onShop?: (ad: BrandAd) => Promise<boolean>; className?: string }) {
   const { t } = useT();
   const [list, setList] = useState<BrandAd[]>([]);
   const [idx, setIdx]   = useState(0);
@@ -94,9 +94,12 @@ export function SponsoredAds({ region, userName, userPhone, className }: { regio
 
   const slides = list.length > 1 ? [...list, list[0]] : list;
 
-  function tap(ad: BrandAd) {
+  async function tap(ad: BrandAd) {
     ads.click(ad.id).catch(() => {});
     if (ad.linkUrl) { window.open(ad.linkUrl, '_blank', 'noopener'); return; }
+    // First try to convert the click into a real order: if a nearby shop stocks
+    // this brand, the parent shows them. Only if none do, fall back to the lead form.
+    if (onShop) { try { if (await onShop(ad)) return; } catch { /* fall through to lead */ } }
     setForm({ name: userName ?? '', phone: userPhone ?? '', note: '' });
     setLeadAd(ad);
   }
