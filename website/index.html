@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JIKO CONNECT — Your gas, delivered to your door | Tanzania LPG network</title>
+  <meta name="description" content="JIKO CONNECT is Tanzania's LPG cooking-gas delivery network. Households find nearby vendors with stock, order, and a rider delivers in minutes. Pay with M-Pesa, Tigo Pesa, Airtel Money at EWURA prices." />
+  <meta name="theme-color" content="#F15A24" />
+
+  <!-- Open Graph / social -->
+  <meta property="og:title" content="JIKO CONNECT — Your gas, delivered to your door" />
+  <meta property="og:description" content="Tanzania's LPG cooking-gas delivery network. Order gas from a nearby vendor and a rider brings it to you — in minutes." />
+  <meta property="og:type" content="website" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ════════════════════════════════════════════════════════════════════
+       JIKO CONNECT — Marketing site (standalone, does not touch the app)
+       Brand tokens mirror frontend/tailwind.config.ts
+       ════════════════════════════════════════════════════════════════════ */
+    :root {
+      --flame: #F15A24;  --flame-light: #FB7B4A;  --flame-dark: #C9430F;
+      --leaf: #1FA463;   --leaf-light: #34C77B;   --leaf-dark: #157A49;
+      --ember: #FFB100;
+      --ink: #1A130E;    --ink-2: #2A1F17;
+      --sand: #FBF7F2;   --sand-2: #F4EDE3;
+      --white: #ffffff;
+      --muted: #6b5e54;
+
+      --grad-brand: linear-gradient(135deg, #F15A24 0%, #FFB100 100%);
+      --grad-flame: linear-gradient(135deg, #F15A24 0%, #FB7B4A 100%);
+      --grad-leaf:  linear-gradient(135deg, #1FA463 0%, #34C77B 100%);
+      --grad-hero:  radial-gradient(125% 95% at 50% 0%, #2A1206 0%, #1a0c05 55%, #120803 100%);
+
+      --shadow-btn:  0 10px 25px -5px rgba(241,90,36,0.35);
+      --shadow-card: 0 18px 50px -20px rgba(201,67,15,0.22);
+      --r-md: 0.9rem; --r-lg: 1.25rem; --r-xl: 1.75rem; --r-full: 999px;
+      --maxw: 1160px;
+      --font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; min-width: 0; -webkit-tap-highlight-color: transparent; }
+    html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+    body {
+      font-family: var(--font);
+      color: var(--ink);
+      background: var(--sand);
+      line-height: 1.55;
+      overflow-x: hidden;
+    }
+    img, svg { max-width: 100%; display: block; }
+    a { color: inherit; text-decoration: none; }
+    h1, h2, h3, h4 { line-height: 1.1; letter-spacing: -0.02em; font-weight: 800; }
+    section { position: relative; }
+    .wrap { width: 100%; max-width: var(--maxw); margin: 0 auto; padding: 0 22px; }
+    .grad-text {
+      background: var(--grad-brand);
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent; color: transparent;
+    }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-size: 12px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--flame-dark);
+    }
+    .eyebrow .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--leaf); }
+
+    /* ── Buttons ───────────────────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+      font-weight: 700; font-size: 15.5px; border: 0; cursor: pointer;
+      padding: 14px 26px; border-radius: var(--r-full);
+      transition: transform .15s ease, box-shadow .25s ease, background .2s ease, color .2s ease;
+      white-space: nowrap;
+    }
+    .btn svg { width: 18px; height: 18px; }
+    .btn-primary { background: var(--grad-brand); color: #fff; box-shadow: var(--shadow-btn); }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 16px 34px -8px rgba(241,90,36,0.5); }
+    .btn-ghost { background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.18); }
+    .btn-ghost:hover { background: rgba(255,255,255,0.16); transform: translateY(-2px); }
+    .btn-dark { background: var(--ink); color: #fff; }
+    .btn-dark:hover { transform: translateY(-2px); background: var(--ink-2); }
+    .btn-outline { background: #fff; color: var(--ink); border: 1.5px solid rgba(26,19,14,0.12); }
+    .btn-outline:hover { border-color: var(--flame); color: var(--flame-dark); transform: translateY(-2px); }
+    .btn-sm { padding: 10px 18px; font-size: 14px; }
+    .btn-lg { padding: 17px 32px; font-size: 16.5px; }
+
+    /* ── Header ───────────────────────────────────────────── */
+    header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      transition: background .3s ease, box-shadow .3s ease, border-color .3s ease;
+      border-bottom: 1px solid transparent;
+    }
+    header.scrolled {
+      background: rgba(251,247,242,0.82);
+      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+      border-bottom: 1px solid rgba(26,19,14,0.08);
+      box-shadow: 0 6px 24px -16px rgba(0,0,0,0.4);
+    }
+    .nav { display: flex; align-items: center; justify-content: space-between; height: 70px; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 900; font-size: 19px; letter-spacing: -0.02em; color: #fff; transition: color .3s; }
+    header.scrolled .brand { color: var(--ink); }
+    .brand .logo {
+      width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center;
+      background: var(--grad-brand); color: #fff; box-shadow: var(--shadow-btn); flex: none;
+    }
+    .brand .logo svg { width: 21px; height: 21px; }
+    .nav-links { display: flex; align-items: center; gap: 30px; }
+    .nav-links a.link { font-size: 14.5px; font-weight: 600; color: rgba(255,255,255,0.82); transition: color .2s; }
+    .nav-links a.link:hover { color: #fff; }
+    header.scrolled .nav-links a.link { color: var(--muted); }
+    header.scrolled .nav-links a.link:hover { color: var(--flame-dark); }
+    .nav-actions { display: flex; align-items: center; gap: 12px; }
+
+    /* Language toggle (mirrors app LangToggle) */
+    .lang {
+      display: inline-flex; align-items: center; background: rgba(255,255,255,0.12);
+      border-radius: var(--r-full); padding: 3px; font-size: 12px; font-weight: 800;
+    }
+    header.scrolled .lang { background: rgba(26,19,14,0.06); }
+    .lang button {
+      border: 0; background: transparent; cursor: pointer; color: rgba(255,255,255,0.6);
+      padding: 5px 11px; border-radius: var(--r-full); transition: all .2s; font-weight: 800; font-size: 12px;
+    }
+    header.scrolled .lang button { color: rgba(26,19,14,0.45); }
+    .lang button.active { background: var(--flame); color: #fff !important; }
+
+    .signin-link { font-size: 14.5px; font-weight: 700; color: #fff; }
+    header.scrolled .signin-link { color: var(--ink); }
+    .signin-link:hover { color: var(--flame-light); }
+
+    .hamburger { display: none; background: transparent; border: 0; cursor: pointer; color: #fff; }
+    header.scrolled .hamburger { color: var(--ink); }
+    .hamburger svg { width: 26px; height: 26px; }
+
+    /* Mobile menu */
+    .mobile-menu {
+      display: none; position: fixed; inset: 0; z-index: 99; background: var(--grad-hero);
+      flex-direction: column; padding: 90px 26px 40px; gap: 6px;
+    }
+    .mobile-menu.open { display: flex; }
+    .mobile-menu a { color: #fff; font-size: 19px; font-weight: 700; padding: 15px 0; border-bottom: 1px solid rgba(255,255,255,0.08); }
+    .mobile-menu .btn { margin-top: 18px; padding: 15px 26px; border-bottom: 0; }
+    .mobile-menu a.btn-outline { color: var(--ink); }
+    .mobile-menu a.btn-primary { color: #fff; }
+
+    /* ── Hero ───────────────────────────────────────────── */
+    .hero { background: var(--grad-hero); color: #fff; padding: 150px 0 90px; overflow: hidden; }
+    .hero::before, .hero::after {
+      content: ''; position: absolute; border-radius: 50%; filter: blur(90px); pointer-events: none; z-index: 0;
+    }
+    .hero::before { top: -120px; left: -80px; width: 60vmax; height: 60vmax; background: radial-gradient(circle, rgba(241,90,36,0.45), transparent 60%); }
+    .hero::after { bottom: -180px; right: -120px; width: 55vmax; height: 55vmax; background: radial-gradient(circle, rgba(255,177,0,0.30), transparent 60%); }
+    .hero-grid { position: relative; z-index: 2; display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 50px; align-items: center; }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 9px; padding: 7px 15px; border-radius: var(--r-full);
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14);
+      font-size: 12.5px; color: rgba(255,255,255,0.85); font-weight: 600; margin-bottom: 22px;
+    }
+    .hero-badge .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--leaf-light); box-shadow: 0 0 0 0 rgba(52,199,123,.6); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(52,199,123,.55)} 70%{box-shadow:0 0 0 9px rgba(52,199,123,0)} 100%{box-shadow:0 0 0 0 rgba(52,199,123,0)} }
+    .hero h1 { font-size: clamp(38px, 6vw, 62px); font-weight: 900; line-height: 1.02; }
+    .hero h1 .grad-text { background: var(--grad-brand); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+    .hero p.sub { margin-top: 22px; font-size: clamp(16px, 2vw, 19px); color: rgba(255,255,255,0.72); max-width: 520px; line-height: 1.6; }
+    .hero-cta { margin-top: 34px; display: flex; flex-wrap: wrap; gap: 14px; }
+    .hero-pay { margin-top: 22px; font-size: 13px; color: rgba(255,255,255,0.5); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .hero-pay b { color: rgba(255,255,255,0.78); font-weight: 700; }
+
+    /* Phone mockup */
+    .phone-wrap { position: relative; display: flex; justify-content: center; }
+    .phone {
+      position: relative; z-index: 2; width: 290px; max-width: 78vw; background: #0d0805;
+      border-radius: 42px; padding: 12px; box-shadow: 0 40px 90px -30px rgba(0,0,0,0.8), inset 0 0 0 2px rgba(255,255,255,0.06);
+      animation: floaty 6s ease-in-out infinite;
+    }
+    @keyframes floaty { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-14px)} }
+    .phone-screen { background: var(--sand); border-radius: 32px; overflow: hidden; }
+    .ps-top { background: var(--grad-hero); padding: 18px 16px 22px; color: #fff; }
+    .ps-top .row { display: flex; align-items: center; justify-content: space-between; }
+    .ps-top .greet { font-size: 11px; color: rgba(255,255,255,0.6); }
+    .ps-top .name { font-size: 16px; font-weight: 800; }
+    .ps-avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--grad-brand); display: grid; place-items: center; font-weight: 800; font-size: 13px; }
+    .ps-search { margin-top: 14px; background: rgba(255,255,255,0.1); border-radius: var(--r-full); padding: 10px 14px; font-size: 12px; color: rgba(255,255,255,0.6); display: flex; align-items: center; gap: 8px; }
+    .ps-body { padding: 14px; }
+    .ps-card { background: #fff; border-radius: 16px; padding: 13px; box-shadow: 0 10px 30px -18px rgba(201,67,15,0.4); border: 1px solid rgba(26,19,14,0.05); }
+    .ps-card + .ps-card { margin-top: 11px; }
+    .ps-card .top { display: flex; align-items: center; gap: 11px; }
+    .ps-vlogo { width: 42px; height: 42px; border-radius: 12px; background: var(--grad-leaf); display: grid; place-items: center; color: #fff; flex: none; }
+    .ps-vlogo svg { width: 20px; height: 20px; }
+    .ps-vname { font-weight: 800; font-size: 13.5px; }
+    .ps-vmeta { font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+    .ps-stock { margin-left: auto; font-size: 10px; font-weight: 800; color: var(--leaf-dark); background: rgba(31,164,99,0.12); padding: 4px 8px; border-radius: var(--r-full); }
+    .ps-price { display: flex; align-items: baseline; justify-content: space-between; margin-top: 12px; padding-top: 11px; border-top: 1px dashed rgba(26,19,14,0.1); }
+    .ps-price .lbl { font-size: 11px; color: var(--muted); }
+    .ps-price .amt { font-weight: 900; font-size: 17px; color: var(--ink); }
+    .ps-track { margin-top: 11px; background: var(--ink); border-radius: 16px; padding: 12px 13px; color: #fff; display: flex; align-items: center; gap: 11px; }
+    .ps-track .ico { width: 34px; height: 34px; border-radius: 10px; background: var(--grad-brand); display: grid; place-items: center; flex: none; }
+    .ps-track .ico svg { width: 17px; height: 17px; }
+    .ps-track .t1 { font-size: 12.5px; font-weight: 800; }
+    .ps-track .t2 { font-size: 10.5px; color: rgba(255,255,255,0.6); }
+    .ps-track .eta { margin-left: auto; text-align: right; }
+    .ps-track .eta b { font-size: 15px; font-weight: 900; color: var(--ember); }
+    .ps-track .eta span { font-size: 9px; color: rgba(255,255,255,0.5); display: block; }
+
+    .float-chip {
+      position: absolute; z-index: 3; background: rgba(255,255,255,0.95); backdrop-filter: blur(8px);
+      border-radius: 14px; padding: 11px 14px; box-shadow: 0 20px 40px -16px rgba(0,0,0,0.4);
+      display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 12.5px; color: var(--ink);
+    }
+    .float-chip .ic { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; color: #fff; flex: none; }
+    .float-chip small { display: block; font-size: 10px; color: var(--muted); font-weight: 600; }
+    .chip-1 { top: 38px; left: -8px; animation: floaty 5s ease-in-out infinite; }
+    .chip-2 { bottom: 70px; right: -14px; animation: floaty 7s ease-in-out infinite .5s; }
+
+    /* ── Generic section heads ───────────────────────────── */
+    .sec { padding: 92px 0; }
+    .sec-head { max-width: 640px; margin: 0 auto 56px; text-align: center; }
+    .sec-head h2 { font-size: clamp(28px, 4vw, 42px); margin-top: 14px; }
+    .sec-head p { margin-top: 16px; font-size: 17px; color: var(--muted); }
+    .sec-tight { padding: 70px 0; }
+
+    /* ── Trust strip ─────────────────────────────────────── */
+    .trust { background: var(--ink); color: #fff; padding: 26px 0; }
+    .trust-inner { display: flex; align-items: center; justify-content: center; gap: 14px 38px; flex-wrap: wrap; }
+    .trust-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.16em; color: rgba(255,255,255,0.4); font-weight: 700; }
+    .pay-pill { display: inline-flex; align-items: center; gap: 9px; font-weight: 800; font-size: 14.5px; color: rgba(255,255,255,0.9); }
+    .pay-pill .d { width: 9px; height: 9px; border-radius: 3px; }
+
+    /* ── Steps (how it works) ────────────────────────────── */
+    .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 26px; }
+    .step { position: relative; background: #fff; border-radius: var(--r-xl); padding: 32px 26px; border: 1px solid rgba(26,19,14,0.06); box-shadow: var(--shadow-card); }
+    .step .num { font-size: 13px; font-weight: 900; color: var(--flame); letter-spacing: 0.1em; }
+    .step .icon { width: 56px; height: 56px; border-radius: 16px; background: var(--grad-brand); display: grid; place-items: center; color: #fff; margin: 14px 0 18px; box-shadow: var(--shadow-btn); }
+    .step .icon svg { width: 27px; height: 27px; }
+    .step h3 { font-size: 20px; }
+    .step p { margin-top: 10px; color: var(--muted); font-size: 15px; }
+
+    /* ── Role cards (choose your side) ───────────────────── */
+    .roles-band { background: linear-gradient(180deg, var(--sand) 0%, var(--sand-2) 100%); }
+    .roles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+    .role {
+      position: relative; background: #fff; border-radius: var(--r-xl); padding: 28px;
+      border: 1px solid rgba(26,19,14,0.07); box-shadow: var(--shadow-card);
+      display: flex; flex-direction: column; transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease;
+      overflow: hidden;
+    }
+    .role::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 5px; background: var(--accent, var(--grad-brand)); }
+    .role:hover { transform: translateY(-6px); box-shadow: 0 30px 60px -24px rgba(201,67,15,0.32); border-color: rgba(241,90,36,0.25); }
+    .role-icon { width: 60px; height: 60px; border-radius: 17px; display: grid; place-items: center; color: #fff; background: var(--accent, var(--grad-brand)); box-shadow: 0 12px 26px -10px rgba(0,0,0,0.3); }
+    .role-icon svg { width: 29px; height: 29px; }
+    .role h3 { font-size: 21px; margin-top: 20px; display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+    .role h3 .sw { font-size: 13px; font-weight: 700; color: var(--muted); }
+    .role .role-desc { margin-top: 10px; color: var(--muted); font-size: 14.5px; }
+    .role ul { list-style: none; margin: 18px 0 0; display: flex; flex-direction: column; gap: 9px; }
+    .role li { display: flex; gap: 9px; font-size: 14px; color: var(--ink-2); }
+    .role li svg { width: 18px; height: 18px; color: var(--leaf); flex: none; margin-top: 1px; }
+    .role .role-cta { margin-top: 24px; }
+    .role .role-cta .btn { width: 100%; }
+
+    /* ── Feature grid (services) ─────────────────────────── */
+    .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+    .feature { background: #fff; border-radius: var(--r-lg); padding: 26px; border: 1px solid rgba(26,19,14,0.06); transition: transform .2s, box-shadow .2s; }
+    .feature:hover { transform: translateY(-4px); box-shadow: var(--shadow-card); }
+    .feature .fic { width: 50px; height: 50px; border-radius: 14px; display: grid; place-items: center; margin-bottom: 16px; }
+    .feature .fic svg { width: 24px; height: 24px; }
+    .feature h3 { font-size: 17.5px; }
+    .feature p { margin-top: 8px; color: var(--muted); font-size: 14.5px; line-height: 1.6; }
+    .fic.f1 { background: rgba(241,90,36,0.12); color: var(--flame-dark); }
+    .fic.f2 { background: rgba(31,164,99,0.12); color: var(--leaf-dark); }
+    .fic.f3 { background: rgba(255,177,0,0.16); color: #a8730a; }
+
+    /* ── Split value section ─────────────────────────────── */
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; }
+    .split-card { background: var(--ink); color: #fff; border-radius: var(--r-xl); padding: 40px; position: relative; overflow: hidden; }
+    .split-card::after { content: ''; position: absolute; top: -60px; right: -60px; width: 220px; height: 220px; background: radial-gradient(circle, rgba(241,90,36,0.4), transparent 65%); filter: blur(30px); }
+    .split-stats { position: relative; z-index: 2; display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+    .split-stat .v { font-size: 34px; font-weight: 900; }
+    .split-stat .v .grad-text { background: var(--grad-brand); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+    .split-stat .l { font-size: 13px; color: rgba(255,255,255,0.6); margin-top: 4px; }
+    .check-list { list-style: none; display: flex; flex-direction: column; gap: 16px; margin-top: 26px; }
+    .check-list li { display: flex; gap: 13px; align-items: flex-start; }
+    .check-list .ck { width: 26px; height: 26px; border-radius: 8px; background: var(--grad-leaf); display: grid; place-items: center; flex: none; color: #fff; }
+    .check-list .ck svg { width: 15px; height: 15px; }
+    .check-list b { font-size: 15.5px; }
+    .check-list span { color: var(--muted); font-size: 14px; }
+
+    /* ── Download ────────────────────────────────────────── */
+    .download { background: var(--grad-hero); color: #fff; text-align: center; overflow: hidden; }
+    .download .wrap { position: relative; z-index: 2; }
+    .download h2 { font-size: clamp(28px, 4vw, 44px); }
+    .download p { margin: 16px auto 0; max-width: 560px; color: rgba(255,255,255,0.72); font-size: 17px; }
+    .store-badges { margin-top: 34px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+    .store-badge {
+      display: inline-flex; align-items: center; gap: 13px; padding: 13px 22px; border-radius: 15px;
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14); position: relative; cursor: default;
+    }
+    .store-badge svg { width: 28px; height: 28px; flex: none; }
+    .store-badge .sb-small { font-size: 10px; color: rgba(255,255,255,0.55); text-transform: uppercase; letter-spacing: 0.08em; }
+    .store-badge .sb-big { font-size: 17px; font-weight: 800; }
+    .store-badge .soon { position: absolute; top: -10px; right: 12px; background: var(--ember); color: var(--ink); font-size: 9.5px; font-weight: 900; padding: 3px 8px; border-radius: var(--r-full); letter-spacing: 0.04em; }
+    .download .or { margin-top: 28px; font-size: 14px; color: rgba(255,255,255,0.55); }
+    .download .or a { color: var(--ember); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+
+    /* ── FAQ ─────────────────────────────────────────────── */
+    .faq-list { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+    .faq-item { background: #fff; border: 1px solid rgba(26,19,14,0.08); border-radius: var(--r-md); overflow: hidden; }
+    .faq-q { width: 100%; text-align: left; background: transparent; border: 0; cursor: pointer; padding: 20px 22px; font-size: 16.5px; font-weight: 700; color: var(--ink); display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+    .faq-q .chev { transition: transform .25s; color: var(--flame); flex: none; }
+    .faq-item.open .faq-q .chev { transform: rotate(180deg); }
+    .faq-a { max-height: 0; overflow: hidden; transition: max-height .3s ease; }
+    .faq-a-inner { padding: 0 22px 20px; color: var(--muted); font-size: 15px; line-height: 1.65; }
+
+    /* ── Final CTA ───────────────────────────────────────── */
+    .cta-band { padding: 80px 0; }
+    .cta-box { background: var(--grad-brand); border-radius: var(--r-xl); padding: 56px 40px; text-align: center; color: #fff; position: relative; overflow: hidden; box-shadow: var(--shadow-card); }
+    .cta-box::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 80% 20%, rgba(255,255,255,0.22), transparent 50%); }
+    .cta-box > * { position: relative; z-index: 2; }
+    .cta-box h2 { font-size: clamp(26px, 4vw, 40px); }
+    .cta-box p { margin: 14px auto 0; max-width: 500px; font-size: 17px; color: rgba(255,255,255,0.9); }
+    .cta-box .btn { margin-top: 28px; }
+
+    /* ── Footer ──────────────────────────────────────────── */
+    footer { background: var(--ink); color: rgba(255,255,255,0.7); padding: 60px 0 30px; }
+    .foot-grid { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 36px; }
+    .foot-brand .brand { color: #fff; margin-bottom: 16px; }
+    .foot-brand p { font-size: 14px; max-width: 280px; }
+    .foot-col h4 { color: #fff; font-size: 13px; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 16px; font-weight: 800; }
+    .foot-col a { display: block; font-size: 14px; padding: 6px 0; color: rgba(255,255,255,0.6); transition: color .2s; }
+    .foot-col a:hover { color: var(--flame-light); }
+    .foot-bottom { margin-top: 44px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; font-size: 13px; color: rgba(255,255,255,0.45); }
+
+    /* ── Reveal on scroll ────────────────────────────────── */
+    .reveal { opacity: 0; transform: translateY(28px); transition: opacity .7s cubic-bezier(.22,1,.36,1), transform .7s cubic-bezier(.22,1,.36,1); }
+    .reveal.in { opacity: 1; transform: none; }
+    .reveal.d1 { transition-delay: .08s; } .reveal.d2 { transition-delay: .16s; } .reveal.d3 { transition-delay: .24s; }
+
+    /* ── Responsive ──────────────────────────────────────── */
+    @media (max-width: 980px) {
+      .hero-grid { grid-template-columns: 1fr; gap: 40px; }
+      .phone-wrap { order: -1; }
+      .steps, .roles, .features { grid-template-columns: 1fr 1fr; }
+      .split { grid-template-columns: 1fr; gap: 36px; }
+      .foot-grid { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 720px) {
+      .nav-links { display: none; }
+      .hamburger { display: block; }
+      .signin-link.desktop-only { display: none; }
+      .nav-actions .btn.desktop-only { display: none; }
+      .sec { padding: 70px 0; }
+      .steps, .roles, .features { grid-template-columns: 1fr; }
+      .foot-grid { grid-template-columns: 1fr 1fr; }
+      .hero { padding: 120px 0 70px; }
+    }
+    @media (max-width: 460px) {
+      .foot-grid { grid-template-columns: 1fr; }
+      .float-chip { display: none; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+      .reveal { opacity: 1; transform: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ════════════ HEADER ════════════ -->
+  <header id="header">
+    <div class="wrap nav">
+      <a href="#" class="brand" aria-label="JIKO CONNECT home">
+        <span class="logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
+        </span>
+        JIKO CONNECT
+      </a>
+
+      <nav class="nav-links">
+        <a class="link" href="#how" data-en="How it works" data-sw="Inavyofanya kazi">How it works</a>
+        <a class="link" href="#join" data-en="Choose your side" data-sw="Chagua upande wako">Choose your side</a>
+        <a class="link" href="#services" data-en="Services" data-sw="Huduma">Services</a>
+        <a class="link" href="#faq" data-en="FAQ" data-sw="Maswali">FAQ</a>
+      </nav>
+
+      <div class="nav-actions">
+        <div class="lang" role="group" aria-label="Language">
+          <button data-lang="en" class="active" aria-pressed="true">EN</button>
+          <button data-lang="sw" aria-pressed="false">SW</button>
+        </div>
+        <a class="signin-link desktop-only" data-app-path="/auth/login" data-en="Sign in" data-sw="Ingia">Sign in</a>
+        <a class="btn btn-primary btn-sm desktop-only" data-app-path="/auth/register" data-en="Get started" data-sw="Anza sasa">Get started</a>
+        <button class="hamburger" id="hamburger" aria-label="Open menu" aria-expanded="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Mobile menu -->
+  <div class="mobile-menu" id="mobileMenu">
+    <a href="#how" data-en="How it works" data-sw="Inavyofanya kazi">How it works</a>
+    <a href="#join" data-en="Choose your side" data-sw="Chagua upande wako">Choose your side</a>
+    <a href="#services" data-en="Services" data-sw="Huduma">Services</a>
+    <a href="#download" data-en="Get the app" data-sw="Pata app">Get the app</a>
+    <a href="#faq" data-en="FAQ" data-sw="Maswali">FAQ</a>
+    <a class="btn btn-outline" data-app-path="/auth/login" data-en="Sign in" data-sw="Ingia">Sign in</a>
+    <a class="btn btn-primary" data-app-path="/auth/register" data-en="Get started — it's free" data-sw="Anza sasa — ni bure">Get started — it's free</a>
+  </div>
+
+  <!-- ════════════ HERO ════════════ -->
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
+        <span class="hero-badge"><span class="pulse"></span><span data-en="Tanzania · LPG delivery network" data-sw="Tanzania · Mtandao wa gesi">Tanzania · LPG delivery network</span></span>
+        <h1>
+          <span data-en="Your gas," data-sw="Gesi yako,">Your gas,</span><br />
+          <span data-en="delivered to your " data-sw="ikiletwa ">delivered to your </span><span class="grad-text" data-en="door." data-sw="mlangoni.">door.</span>
+        </h1>
+        <p class="sub" data-en="Find a nearby vendor that has stock, order, and a rider brings it to you — in minutes. The all-in-one LPG cooking-gas network for households, gas shops, riders, distributors and brands." data-sw="Tafuta muuzaji wa gesi aliye karibu mwenye stock, agiza, na dereva akuletee — ndani ya dakika. Mtandao kamili wa gesi kwa kaya, maduka, madereva, wasambazaji na kampuni.">
+          Find a nearby vendor that has stock, order, and a rider brings it to you — in minutes. The all-in-one LPG cooking-gas network for households, gas shops, riders, distributors and brands.
+        </p>
+        <div class="hero-cta">
+          <a class="btn btn-primary btn-lg" data-app-path="/auth/register" data-en="Get started — it's free" data-sw="Anza sasa — ni bure">Get started — it's free
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </a>
+          <a class="btn btn-ghost btn-lg" href="#join" data-en="Explore the network" data-sw="Chunguza mtandao">Explore the network</a>
+        </div>
+        <p class="hero-pay">
+          <span data-en="Pay with" data-sw="Lipa kwa">Pay with</span>
+          <b>M-Pesa · Tigo Pesa · Airtel Money · HaloPesa</b>
+          <span data-en="· EWURA prices" data-sw="· Bei za EWURA">· EWURA prices</span>
+        </p>
+      </div>
+
+      <!-- Phone mockup -->
+      <div class="phone-wrap">
+        <div class="float-chip chip-1">
+          <span class="ic" style="background:var(--grad-leaf)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </span>
+          <span><span data-en="Order accepted" data-sw="Oda imekubaliwa">Order accepted</span><small data-en="Mwenge Gas Centre" data-sw="Mwenge Gas Centre">Mwenge Gas Centre</small></span>
+        </div>
+        <div class="float-chip chip-2">
+          <span class="ic" style="background:var(--grad-brand)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/></svg>
+          </span>
+          <span><span data-en="Rider 1.2 km away" data-sw="Dereva km 1.2">Rider 1.2 km away</span><small data-en="Arriving soon" data-sw="Anakaribia">Arriving soon</small></span>
+        </div>
+
+        <div class="phone">
+          <div class="phone-screen">
+            <div class="ps-top">
+              <div class="row">
+                <div>
+                  <div class="greet" data-en="Habari, Amina 👋" data-sw="Habari, Amina 👋">Habari, Amina 👋</div>
+                  <div class="name" data-en="Order cooking gas" data-sw="Agiza gesi ya kupikia">Order cooking gas</div>
+                </div>
+                <div class="ps-avatar">A</div>
+              </div>
+              <div class="ps-search">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <span data-en="Find vendors near you…" data-sw="Tafuta wauzaji karibu nawe…">Find vendors near you…</span>
+              </div>
+            </div>
+            <div class="ps-body">
+              <div class="ps-card">
+                <div class="top">
+                  <span class="ps-vlogo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l1-5h16l1 5"/><path d="M4 9v11h16V9"/><path d="M9 22v-6h6v6"/></svg></span>
+                  <div>
+                    <div class="ps-vname">Mwenge Gas Centre</div>
+                    <div class="ps-vmeta">★ 4.8 · 1.2 km · <span data-en="20 min" data-sw="dakika 20">20 min</span></div>
+                  </div>
+                  <span class="ps-stock" data-en="In stock" data-sw="Ipo">In stock</span>
+                </div>
+                <div class="ps-price">
+                  <span class="lbl" data-en="Oryx 15kg refill" data-sw="Oryx 15kg jaza">Oryx 15kg refill</span>
+                  <span class="amt">TZS 45,000</span>
+                </div>
+              </div>
+
+              <div class="ps-track">
+                <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/></svg></span>
+                <div>
+                  <div class="t1" data-en="Rider on the way" data-sw="Dereva njiani">Rider on the way</div>
+                  <div class="t2" data-en="Juma · Pikipiki · live tracking" data-sw="Juma · Pikipiki · ufuatiliaji">Juma · Pikipiki · live tracking</div>
+                </div>
+                <div class="eta"><b>8</b><span data-en="min away" data-sw="dakika">min away</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════ TRUST STRIP ════════════ -->
+  <div class="trust">
+    <div class="wrap trust-inner">
+      <span class="trust-label" data-en="Mobile-money payments" data-sw="Malipo ya simu">Mobile-money payments</span>
+      <span class="pay-pill"><span class="d" style="background:#e3001b"></span>M-Pesa</span>
+      <span class="pay-pill"><span class="d" style="background:#0033a0"></span>Tigo Pesa</span>
+      <span class="pay-pill"><span class="d" style="background:#ed1c24"></span>Airtel Money</span>
+      <span class="pay-pill"><span class="d" style="background:#f7941e"></span>HaloPesa</span>
+      <span class="pay-pill"><span class="d" style="background:var(--leaf)"></span><span data-en="Cash on delivery" data-sw="Taslimu">Cash on delivery</span></span>
+    </div>
+  </div>
+
+  <!-- ════════════ HOW IT WORKS ════════════ -->
+  <section class="sec" id="how">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <span class="eyebrow"><span class="dot"></span><span data-en="How it works" data-sw="Inavyofanya kazi">How it works</span></span>
+        <h2 data-en="Gas at your door in 3 simple steps" data-sw="Gesi mlangoni kwa hatua 3 rahisi">Gas at your door in 3 simple steps</h2>
+        <p data-en="No more empty cylinders or queueing at the depot. JIKO CONNECT puts every nearby vendor in your pocket." data-sw="Hakuna tena mitungi mitupu au foleni ghalani. JIKO CONNECT inaweka kila muuzaji wa karibu mfukoni mwako.">No more empty cylinders or queueing at the depot. JIKO CONNECT puts every nearby vendor in your pocket.</p>
+      </div>
+      <div class="steps">
+        <div class="step reveal d1">
+          <div class="num">01</div>
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
+          <h3 data-en="Find a vendor" data-sw="Tafuta muuzaji">Find a vendor</h3>
+          <p data-en="We show gas shops near you that actually have your cylinder size in stock — with live prices and ratings." data-sw="Tunakuonyesha maduka ya gesi karibu nawe yenye saizi ya mtungi wako — pamoja na bei na ukadiriaji.">We show gas shops near you that actually have your cylinder size in stock — with live prices and ratings.</p>
+        </div>
+        <div class="step reveal d2">
+          <div class="num">02</div>
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></div>
+          <h3 data-en="Order & pay" data-sw="Agiza & lipa">Order & pay</h3>
+          <p data-en="Pick your gas, pay securely with M-Pesa, Tigo Pesa, Airtel Money — or cash on delivery. EWURA-fair prices, always." data-sw="Chagua gesi, lipa salama kwa M-Pesa, Tigo Pesa, Airtel Money — au taslimu. Bei za haki za EWURA, kila wakati.">Pick your gas, pay securely with M-Pesa, Tigo Pesa, Airtel Money — or cash on delivery. EWURA-fair prices, always.</p>
+        </div>
+        <div class="step reveal d3">
+          <div class="num">03</div>
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/></svg></div>
+          <h3 data-en="Track to your door" data-sw="Fuatilia mlangoni">Track to your door</h3>
+          <p data-en="A nearby rider picks it up and delivers. Watch them on a live map and confirm with a one-time delivery code." data-sw="Dereva wa karibu anachukua na kuleta. Mtazame kwenye ramani na uthibitishe kwa namba ya siri ya mara moja.">A nearby rider picks it up and delivers. Watch them on a live map and confirm with a one-time delivery code.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════ CHOOSE YOUR SIDE (ROLES) ════════════ -->
+  <section class="sec roles-band" id="join">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <span class="eyebrow"><span class="dot"></span><span data-en="Choose your side" data-sw="Chagua upande wako">Choose your side</span></span>
+        <h2 data-en="One network. Five ways to win." data-sw="Mtandao mmoja. Njia tano za kufanikiwa.">One network. Five ways to win.</h2>
+        <p data-en="Whoever you are on the gas value chain, there's an account built for you. Pick yours and create it in under a minute." data-sw="Yeyote uwe kwenye mnyororo wa gesi, kuna akaunti iliyoundwa kwa ajili yako. Chagua yako na uifungue kwa chini ya dakika.">Whoever you are on the gas value chain, there's an account built for you. Pick yours and create it in under a minute.</p>
+      </div>
+
+      <div class="roles">
+        <!-- HOUSEHOLD -->
+        <div class="role reveal d1" style="--accent: var(--grad-brand)">
+          <div class="role-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L12 3l9 6.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-6h6v6"/></svg></div>
+          <h3><span data-en="Household" data-sw="Kaya">Household</span> <span class="sw" data-en="· Order gas" data-sw="· Agiza gesi">· Order gas</span></h3>
+          <p class="role-desc" data-en="Order LPG from trusted nearby shops and get it delivered fast." data-sw="Agiza gesi kutoka maduka ya karibu yanayoaminika na upate ufikishwe haraka.">Order LPG from trusted nearby shops and get it delivered fast.</p>
+          <ul>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-en="See vendors with stock & live prices" data-sw="Ona wauzaji wenye stock & bei halisi">See vendors with stock & live prices</span></li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-en="Live delivery tracking + OTP" data-sw="Ufuatiliaji wa moja kwa moja + OTP">Live delivery tracking + OTP</span></li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-en="Auto-refill & loyalty rewards" data-sw="Kujaza otomatiki & zawadi">Auto-refill & loyalty rewards</span></li>
+          </ul>
+          <div class="role-cta"><a class="btn btn-primary" data-app-path="/auth/register?role=HOUSEHOLD" data-en="Sign up as Household" data-sw="Jisajili kama Kaya">Sign up as Household</a></div>
+        </div>
+
+        <!-- SUPPLIER -->
+        <div class="role reveal d2" style="--accent: var(--grad-leaf)">
+          <div class="role-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l1-5h16l1 5"/><path d="M4 9v11h16V9"/><path d="M4 9h16"/><path d="M9 22v-6h6v6"/></svg></div>
+          <h3><span data-en="Gas Shop" data-sw="Duka">Gas Shop</span> <span class="sw" data-en="· Sell to homes" data-sw="· Uza kwa kaya">· Sell to homes</span></h3>
+          <p class="role-desc" data-en="Get instant orders from households nearby and grow your sales." data-sw="Pata oda za papo kwa papo kutoka kaya za karibu na ukuze mauzo.">Get instant orders from households nearby and grow your sales.</p>
+          <ul>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-en="Instant order alerts → accept → dispatch" data-sw="Arifa za oda → kubali → tuma">Instant order alerts → accept → dispatch</span></li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-en="Inventory, hours & sales analytics" data-sw="Stock, saa & takwimu za mauzo">Inventory, hours & sales analytics</span></li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-en="Wallet payouts & easy restock" data-sw="Malipo ya pochi & kujaza stock">Wallet payouts & easy restock</span></li>
+          </ul>
+          <div class="role-cta"><a class="btn btn-dark" data-app-path="/auth/register?role=SUPPLIER" data-en="Sign up as Gas Shop" data-sw="Jisajili kama Duka">Sign up as Gas Shop</a></div>
+        </div>
+
+        <!-- RIDER -->
+        <div class="role reveal d3" style="--accent: var(--grad-flame)">
+          <div class="role-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/></svg></div>
+          <h3><span data-en="Rider" data-sw="Dereva">Rider</span> <span class="sw" data-en="· Deliver & earn" data-sw="· Sambaza & pata">· Deliver & earn</span></h3>
+          <p class="role-desc" data-en="Turn your motorbike or bajaji into income — deliver gas nearby." data-sw="Geuza pikipiki au bajaji yako kuwa kipato — sambaza gesi karibu.">Turn your motorbike or bajaji into income — deliver gas nearby.</p>
+          <ul>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-en="Claim jobs near you, your schedule" data-sw="Chukua kazi karibu, ratiba yako">Claim jobs near you, your schedule</span></li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-en="Daily & weekly earnings + cash float" data-sw="Mapato ya kila siku & wiki">Daily & weekly earnings + cash float</span></li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-en="In-app navigation & SOS safety" data-sw="Uelekezaji & usalama wa SOS">In-app navigation & SOS safety</span></li>
+          </ul>
+          <div class="role-cta"><a class="btn btn-primary" data-app-path="/auth/register?role=RIDER" data-en="Sign up as Rider" data-sw="Jisajili kama Dereva">Sign up as Rider</a></div>
+        </div>
+
+        <!-- DISTRIBUTOR -->
+        <div class="role reveal d1" style="--accent: var(--grad-leaf)">
+          <div class="role-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 8.35V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8.35"/><path d="M2 8.35L12 2l10 6.35"/><path d="M6 22V12h4v10"/><path d="M14 12h4v4h-4z"/></svg></div>
+          <h3><span data-en="Distributor" data-sw="Msambazaji">Distributor</span> <span class="sw" data-en="· Supply shops" data-sw="· Sambazia maduka">· Supply shops</span></h3>
+          <p class="role-desc" data-en="Sell wholesale to gas shops and keep their shelves full (B2B)." data-sw="Uza jumla kwa maduka ya gesi na uhakikishe stock haziishi (B2B).">Sell wholesale to gas shops and keep their shelves full (B2B).</p>
+          <ul>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-en="Wholesale catalog & pricing" data-sw="Katalogi ya jumla & bei">Wholesale catalog & pricing</span></li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-en="Restock orders → accept → dispatch" data-sw="Oda za kujaza → kubali → tuma">Restock orders → accept → dispatch</span></li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-en="Auto-syncs shop inventory" data-sw="Inasawazisha stock za maduka">Auto-syncs shop inventory</span></li>
+          </ul>
+          <div class="role-cta"><a class="btn btn-dark" data-app-path="/auth/register?role=DISTRIBUTOR" data-en="Sign up as Distributor" data-sw="Jisajili kama Msambazaji">Sign up as Distributor</a></div>
+        </div>
+
+        <!-- BRAND -->
+        <div class="role reveal d2" style="--accent: var(--grad-brand)">
+          <div class="role-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg></div>
+          <h3><span data-en="Brand" data-sw="Kampuni">Brand</span> <span class="sw" data-en="· Advertise" data-sw="· Tangaza">· Advertise</span></h3>
+          <p class="role-desc" data-en="LPG brands: reach buyers with targeted ads and capture demand." data-sw="Kampuni za gesi: fika kwa wateja kwa matangazo lengwa na ukamate mahitaji.">LPG brands: reach buyers with targeted ads and capture demand.</p>
+          <ul>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-en="Region-targeted sponsored campaigns" data-sw="Kampeni lengwa za mikoa">Region-targeted sponsored campaigns</span></li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-en="Leads with customer contacts" data-sw="Miongozo na mawasiliano ya wateja">Leads with customer contacts</span></li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-en="Live demand analytics by region" data-sw="Takwimu za mahitaji kwa mkoa">Live demand analytics by region</span></li>
+          </ul>
+          <div class="role-cta"><a class="btn btn-primary" data-app-path="/auth/register?role=BRAND" data-en="Sign up as Brand" data-sw="Jisajili kama Kampuni">Sign up as Brand</a></div>
+        </div>
+
+        <!-- SIGN IN CARD -->
+        <div class="role reveal d3" style="--accent: var(--ink); background: var(--ink); color:#fff;">
+          <div class="role-icon" style="background: rgba(255,255,255,0.1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg></div>
+          <h3 style="color:#fff"><span data-en="Already with us?" data-sw="Tayari nasi?">Already with us?</span></h3>
+          <p class="role-desc" style="color:rgba(255,255,255,0.65)" data-en="Welcome back. Sign in to your account — household, shop, rider, distributor or brand — and pick up where you left off." data-sw="Karibu tena. Ingia kwenye akaunti yako — kaya, duka, dereva, msambazaji au kampuni — uendelee ulipoishia.">Welcome back. Sign in to your account — household, shop, rider, distributor or brand — and pick up where you left off.</p>
+          <div class="role-cta" style="margin-top:auto"><a class="btn btn-primary" data-app-path="/auth/login" data-en="Sign in to your account" data-sw="Ingia kwenye akaunti yako">Sign in to your account</a></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════ SERVICES / FEATURES ════════════ -->
+  <section class="sec" id="services">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <span class="eyebrow"><span class="dot"></span><span data-en="Everything in one app" data-sw="Yote katika app moja">Everything in one app</span></span>
+        <h2 data-en="Built for the whole gas journey" data-sw="Imeundwa kwa safari nzima ya gesi">Built for the whole gas journey</h2>
+        <p data-en="From the first tap to the cylinder at your door — and the books behind it — JIKO CONNECT handles it all." data-sw="Kutoka mguso wa kwanza hadi mtungi mlangoni — na hesabu nyuma yake — JIKO CONNECT inashughulikia yote.">From the first tap to the cylinder at your door — and the books behind it — JIKO CONNECT handles it all.</p>
+      </div>
+
+      <div class="features">
+        <div class="feature reveal d1">
+          <div class="fic f1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
+          <h3 data-en="Live GPS tracking" data-sw="Ufuatiliaji wa GPS">Live GPS tracking</h3>
+          <p data-en="Watch your rider move on a real-time map from pickup to your door, with arrival alerts at every step." data-sw="Mtazame dereva wako kwenye ramani ya moja kwa moja kutoka dukani hadi mlangoni, na arifa za kuwasili.">Watch your rider move on a real-time map from pickup to your door, with arrival alerts at every step.</p>
+        </div>
+        <div class="feature reveal d2">
+          <div class="fic f2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></div>
+          <h3 data-en="Mobile-money payments" data-sw="Malipo ya simu">Mobile-money payments</h3>
+          <p data-en="Pay with M-Pesa, Tigo Pesa, Airtel Money or HaloPesa — or cash on delivery. Secure and instant." data-sw="Lipa kwa M-Pesa, Tigo Pesa, Airtel Money au HaloPesa — au taslimu. Salama na papo kwa papo.">Pay with M-Pesa, Tigo Pesa, Airtel Money or HaloPesa — or cash on delivery. Secure and instant.</p>
+        </div>
+        <div class="feature reveal d3">
+          <div class="fic f3"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 9l-5 5-3-3-4 4"/></svg></div>
+          <h3 data-en="EWURA-fair pricing" data-sw="Bei za haki za EWURA">EWURA-fair pricing</h3>
+          <p data-en="Prices are capped to EWURA guidance so households always pay a fair, transparent rate for LPG." data-sw="Bei zinadhibitiwa kulingana na mwongozo wa EWURA ili kaya zilipe bei ya haki kila wakati.">Prices are capped to EWURA guidance so households always pay a fair, transparent rate for LPG.</p>
+        </div>
+        <div class="feature reveal d1">
+          <div class="fic f2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/></svg></div>
+          <h3 data-en="Wallets & instant payouts" data-sw="Pochi & malipo ya papo">Wallets & instant payouts</h3>
+          <p data-en="Every shop, rider and distributor gets a wallet with a full ledger, cash-float tracking and easy cash-out." data-sw="Kila duka, dereva na msambazaji anapata pochi yenye leja kamili na utoaji rahisi wa pesa.">Every shop, rider and distributor gets a wallet with a full ledger, cash-float tracking and easy cash-out.</p>
+        </div>
+        <div class="feature reveal d2">
+          <div class="fic f1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v6h6"/><path d="M3 13a9 9 0 1 0 3-7.7L3 8"/></svg></div>
+          <h3 data-en="Auto-refill subscriptions" data-sw="Kujaza otomatiki">Auto-refill subscriptions</h3>
+          <p data-en="Never run out mid-meal. Set a refill schedule and JIKO orders for you automatically before the gas runs low." data-sw="Usiishiwe katikati ya kupika. Weka ratiba na JIKO itaagiza kwa niaba yako kabla gesi haijaisha.">Never run out mid-meal. Set a refill schedule and JIKO orders for you automatically before the gas runs low.</p>
+        </div>
+        <div class="feature reveal d3">
+          <div class="fic f3"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"/></svg></div>
+          <h3 data-en="Rewards & referrals" data-sw="Zawadi & rufaa">Rewards & referrals</h3>
+          <p data-en="Earn loyalty points on every order and bonus credit when friends you invite place their first order." data-sw="Pata pointi za uaminifu kwa kila oda na bonasi marafiki unaowaalika wanapoagiza mara ya kwanza.">Earn loyalty points on every order and bonus credit when friends you invite place their first order.</p>
+        </div>
+        <div class="feature reveal d1">
+          <div class="fic f1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+          <h3 data-en="In-app chat & support" data-sw="Mazungumzo & msaada">In-app chat & support</h3>
+          <p data-en="Message your rider or shop directly per order, raise disputes, and get help fast — no phone numbers shared." data-sw="Wasiliana na dereva au duka kwa kila oda, fungua malalamiko, na upate msaada haraka.">Message your rider or shop directly per order, raise disputes, and get help fast — no phone numbers shared.</p>
+        </div>
+        <div class="feature reveal d2">
+          <div class="fic f2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></div>
+          <h3 data-en="Cylinder deposits & returns" data-sw="Amana & marejesho ya mitungi">Cylinder deposits & returns</h3>
+          <p data-en="Register your cylinders, track deposits, and request a return with the deposit refunded straight to your wallet." data-sw="Sajili mitungi yako, fuatilia amana, na omba marejesho ukirudishiwa amana moja kwa moja kwenye pochi.">Register your cylinders, track deposits, and request a return with the deposit refunded straight to your wallet.</p>
+        </div>
+        <div class="feature reveal d3">
+          <div class="fic f3"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div>
+          <h3 data-en="Push & SMS notifications" data-sw="Arifa za push & SMS">Push & SMS notifications</h3>
+          <p data-en="Stay updated at every stage with web-push alerts, and an SMS fallback so you never miss an order — even offline." data-sw="Pata taarifa kila hatua kwa arifa za push, na SMS mbadala usikose oda — hata bila intaneti.">Stay updated at every stage with web-push alerts, and an SMS fallback so you never miss an order — even offline.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════ FOR BUSINESSES (SPLIT) ════════════ -->
+  <section class="sec" style="background: var(--sand-2)">
+    <div class="wrap split">
+      <div class="reveal">
+        <span class="eyebrow"><span class="dot"></span><span data-en="For businesses" data-sw="Kwa biashara">For businesses</span></span>
+        <h2 style="font-size: clamp(28px,4vw,40px); margin-top:14px" data-en="Grow your gas business — we bring the customers" data-sw="Kuza biashara yako ya gesi — sisi tunaleta wateja">Grow your gas business — we bring the customers</h2>
+        <p style="margin-top:16px; color:var(--muted); font-size:16.5px" data-en="Gas shops, distributors and brands run their entire operation from one dashboard: orders, stock, deliveries, payouts and analytics. Spend less time on the phone and more time selling." data-sw="Maduka, wasambazaji na kampuni wanaendesha shughuli zote kutoka dashibodi moja: oda, stock, usafirishaji, malipo na takwimu.">Gas shops, distributors and brands run their entire operation from one dashboard: orders, stock, deliveries, payouts and analytics. Spend less time on the phone and more time selling.</p>
+        <ul class="check-list">
+          <li><span class="ck"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><div><b data-en="Reach nearby households instantly" data-sw="Fika kaya za karibu papo hapo">Reach nearby households instantly</b><br /><span data-en="Appear in search the moment a customer needs gas." data-sw="Onekana kwenye utafutaji pale mteja anapohitaji gesi.">Appear in search the moment a customer needs gas.</span></div></li>
+          <li><span class="ck"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><div><b data-en="Get paid your way" data-sw="Lipwa kwa njia yako">Get paid your way</b><br /><span data-en="Mobile-money settlements and wallet cash-out on demand." data-sw="Malipo ya simu na utoaji wa pochi wakati wowote.">Mobile-money settlements and wallet cash-out on demand.</span></div></li>
+          <li><span class="ck"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><div><b data-en="Know your numbers" data-sw="Jua takwimu zako">Know your numbers</b><br /><span data-en="Sales trends, top products and demand by region." data-sw="Mwenendo wa mauzo, bidhaa bora na mahitaji kwa mkoa.">Sales trends, top products and demand by region.</span></div></li>
+        </ul>
+        <div style="margin-top:30px; display:flex; gap:12px; flex-wrap:wrap">
+          <a class="btn btn-primary" data-app-path="/auth/register?role=SUPPLIER" data-en="Open a Gas Shop" data-sw="Fungua Duka">Open a Gas Shop</a>
+          <a class="btn btn-outline" data-app-path="/auth/register?role=DISTRIBUTOR" data-en="Become a Distributor" data-sw="Kuwa Msambazaji">Become a Distributor</a>
+        </div>
+      </div>
+
+      <div class="split-card reveal d1">
+        <div class="split-stats">
+          <div class="split-stat"><div class="v"><span class="grad-text">6</span></div><div class="l" data-en="Account types in one network" data-sw="Aina za akaunti mtandao mmoja">Account types in one network</div></div>
+          <div class="split-stat"><div class="v"><span class="grad-text">&lt;30</span><span style="font-size:18px"> min</span></div><div class="l" data-en="Typical door delivery" data-sw="Ufikishaji wa kawaida">Typical door delivery</div></div>
+          <div class="split-stat"><div class="v"><span class="grad-text">4</span></div><div class="l" data-en="Mobile-money networks" data-sw="Mitandao ya malipo">Mobile-money networks</div></div>
+          <div class="split-stat"><div class="v"><span class="grad-text">100%</span></div><div class="l" data-en="EWURA price compliance" data-sw="Uzingatiaji wa bei za EWURA">EWURA price compliance</div></div>
+        </div>
+        <div style="position:relative; z-index:2; margin-top:28px; padding-top:24px; border-top:1px solid rgba(255,255,255,0.12); color:rgba(255,255,255,0.75); font-size:14.5px" data-en="“From order to doorstep, JIKO CONNECT keeps the whole LPG chain moving — fairly, safely and on time.”" data-sw="“Kutoka oda hadi mlangoni, JIKO CONNECT inaendesha mnyororo wote wa gesi — kwa haki, usalama na kwa wakati.”">“From order to doorstep, JIKO CONNECT keeps the whole LPG chain moving — fairly, safely and on time.”</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════ DOWNLOAD ════════════ -->
+  <section class="sec download" id="download">
+    <div class="wrap">
+      <div class="reveal">
+        <span class="eyebrow" style="color:var(--ember); justify-content:center"><span class="dot" style="background:var(--ember)"></span><span data-en="Get the app" data-sw="Pata app">Get the app</span></span>
+        <h2 style="margin-top:14px" data-en="Use JIKO CONNECT today on the web" data-sw="Tumia JIKO CONNECT leo kwenye wavuti">Use JIKO CONNECT today on the web</h2>
+        <p data-en="The full app runs in your browser right now — install it to your home screen like a native app. Dedicated Android and iOS apps are on the way." data-sw="App kamili inafanya kazi kwenye kivinjari chako sasa hivi — isakinishe kwenye skrini yako kama app halisi. App za Android na iOS zinakuja.">The full app runs in your browser right now — install it to your home screen like a native app. Dedicated Android and iOS apps are on the way.</p>
+
+        <div class="store-badges">
+          <div class="store-badge">
+            <span class="soon" data-en="COMING SOON" data-sw="INAKUJA">COMING SOON</span>
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3.6 1.8l11.9 10.2L3.6 22.2c-.4-.3-.6-.8-.6-1.4V3.2c0-.6.2-1.1.6-1.4zm13.5 11.5l2.9 2.5-3.4 1.9-2.7-2.3 3.2-2.1zm0-2.6l-3.2-2.1 2.7-2.3 3.4 1.9-2.9 2.5zM5.1 1l9.8 5.5-2.5 2.1L5.1 1z"/></svg>
+            <span><span class="sb-small" data-en="Get it on" data-sw="Pata kwenye">Get it on</span><span class="sb-big">Google Play</span></span>
+          </div>
+          <div class="store-badge">
+            <span class="soon" data-en="COMING SOON" data-sw="INAKUJA">COMING SOON</span>
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.4 12.7c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.1-2.8.9-3.5.9-.7 0-1.8-.8-3-.8-1.5 0-2.9.9-3.7 2.3-1.6 2.7-.4 6.8 1.1 9 .7 1.1 1.6 2.3 2.8 2.3 1.1 0 1.5-.7 2.9-.7 1.3 0 1.7.7 2.9.7 1.2 0 2-1.1 2.7-2.2.9-1.3 1.2-2.5 1.3-2.6-.1 0-2.4-.9-2.4-3.6zM14.2 5.3c.6-.8 1-1.8.9-2.9-.9.1-2 .6-2.6 1.4-.6.7-1.1 1.7-1 2.7 1 .1 2-.5 2.7-1.2z"/></svg>
+            <span><span class="sb-small" data-en="Download on the" data-sw="Pakua kwenye">Download on the</span><span class="sb-big">App Store</span></span>
+          </div>
+        </div>
+        <p class="or"><span data-en="Don't want to wait?" data-sw="Hutaki kusubiri?">Don't want to wait?</span> <a data-app-path="/auth/register" data-en="Open the web app now →" data-sw="Fungua app ya wavuti sasa →">Open the web app now →</a></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════ FAQ ════════════ -->
+  <section class="sec" id="faq">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <span class="eyebrow"><span class="dot"></span><span data-en="Questions" data-sw="Maswali">Questions</span></span>
+        <h2 data-en="Frequently asked questions" data-sw="Maswali yanayoulizwa mara kwa mara">Frequently asked questions</h2>
+      </div>
+      <div class="faq-list">
+        <div class="faq-item reveal">
+          <button class="faq-q"><span data-en="What is JIKO CONNECT?" data-sw="JIKO CONNECT ni nini?">What is JIKO CONNECT?</span><span class="chev"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span></button>
+          <div class="faq-a"><div class="faq-a-inner" data-en="JIKO CONNECT is Tanzania's LPG cooking-gas delivery network. Households order gas from nearby shops that have stock, pay by mobile money, and a rider delivers it to the door — all tracked live in the app." data-sw="JIKO CONNECT ni mtandao wa kufikisha gesi ya kupikia Tanzania. Kaya zinaagiza gesi kutoka maduka ya karibu yenye stock, zinalipa kwa simu, na dereva anafikisha mlangoni — yote yakifuatiliwa kwenye app.">JIKO CONNECT is Tanzania's LPG cooking-gas delivery network. Households order gas from nearby shops that have stock, pay by mobile money, and a rider delivers it to the door — all tracked live in the app.</div></div>
+        </div>
+        <div class="faq-item reveal">
+          <button class="faq-q"><span data-en="How much does it cost to join?" data-sw="Inagharimu kiasi gani kujiunga?">How much does it cost to join?</span><span class="chev"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span></button>
+          <div class="faq-a"><div class="faq-a-inner" data-en="Creating an account is completely free for everyone — households, gas shops, riders, distributors and brands. You only pay for the gas you order, at EWURA-fair prices." data-sw="Kufungua akaunti ni bure kabisa kwa kila mtu — kaya, maduka, madereva, wasambazaji na kampuni. Unalipa tu kwa gesi unayoagiza, kwa bei za haki za EWURA.">Creating an account is completely free for everyone — households, gas shops, riders, distributors and brands. You only pay for the gas you order, at EWURA-fair prices.</div></div>
+        </div>
+        <div class="faq-item reveal">
+          <button class="faq-q"><span data-en="Which payment methods are supported?" data-sw="Njia gani za malipo zinakubalika?">Which payment methods are supported?</span><span class="chev"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span></button>
+          <div class="faq-a"><div class="faq-a-inner" data-en="M-Pesa, Tigo Pesa, Airtel Money and HaloPesa, plus cash on delivery. Payments are secure and confirmed instantly in the app." data-sw="M-Pesa, Tigo Pesa, Airtel Money na HaloPesa, pamoja na taslimu wakati wa kupokea. Malipo ni salama na yanathibitishwa papo hapo.">M-Pesa, Tigo Pesa, Airtel Money and HaloPesa, plus cash on delivery. Payments are secure and confirmed instantly in the app.</div></div>
+        </div>
+        <div class="faq-item reveal">
+          <button class="faq-q"><span data-en="Do I need to download an app?" data-sw="Je, nahitaji kupakua app?">Do I need to download an app?</span><span class="chev"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span></button>
+          <div class="faq-a"><div class="faq-a-inner" data-en="Not yet — JIKO CONNECT works right in your phone's browser and can be added to your home screen. Native Android and iOS apps are coming soon." data-sw="Bado — JIKO CONNECT inafanya kazi kwenye kivinjari cha simu yako na inaweza kuongezwa kwenye skrini ya nyumbani. App za Android na iOS zinakuja hivi karibuni.">Not yet — JIKO CONNECT works right in your phone's browser and can be added to your home screen. Native Android and iOS apps are coming soon.</div></div>
+        </div>
+        <div class="faq-item reveal">
+          <button class="faq-q"><span data-en="Where is JIKO CONNECT available?" data-sw="JIKO CONNECT inapatikana wapi?">Where is JIKO CONNECT available?</span><span class="chev"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span></button>
+          <div class="faq-a"><div class="faq-a-inner" data-en="We're rolling out across Tanzania, region by region. Sign up and set your location — if vendors are active near you, you can order right away, and we're adding new areas all the time." data-sw="Tunasambaa kote Tanzania, mkoa kwa mkoa. Jisajili na uweke eneo lako — kama kuna wauzaji karibu nawe, unaweza kuagiza mara moja.">We're rolling out across Tanzania, region by region. Sign up and set your location — if vendors are active near you, you can order right away, and we're adding new areas all the time.</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════ FINAL CTA ════════════ -->
+  <section class="cta-band">
+    <div class="wrap">
+      <div class="cta-box reveal">
+        <h2 data-en="Ready to never run out of gas again?" data-sw="Tayari kutokuishiwa gesi tena?">Ready to never run out of gas again?</h2>
+        <p data-en="Join the network powering cleaner, faster cooking-gas delivery across Tanzania." data-sw="Jiunge na mtandao unaowezesha ufikishaji wa gesi safi na wa haraka kote Tanzania.">Join the network powering cleaner, faster cooking-gas delivery across Tanzania.</p>
+        <a class="btn btn-dark btn-lg" data-app-path="/auth/register" data-en="Create your free account" data-sw="Fungua akaunti yako bure">Create your free account
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════ FOOTER ════════════ -->
+  <footer>
+    <div class="wrap">
+      <div class="foot-grid">
+        <div class="foot-brand">
+          <div class="brand">
+            <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg></span>
+            JIKO CONNECT
+          </div>
+          <p data-en="Tanzania's LPG cooking-gas delivery network — connecting households, gas shops, riders, distributors and brands." data-sw="Mtandao wa kufikisha gesi ya kupikia Tanzania — unaunganisha kaya, maduka, madereva, wasambazaji na kampuni.">Tanzania's LPG cooking-gas delivery network — connecting households, gas shops, riders, distributors and brands.</p>
+        </div>
+        <div class="foot-col">
+          <h4 data-en="Get started" data-sw="Anza">Get started</h4>
+          <a data-app-path="/auth/register?role=HOUSEHOLD" data-en="Order gas (Household)" data-sw="Agiza gesi (Kaya)">Order gas (Household)</a>
+          <a data-app-path="/auth/register?role=SUPPLIER" data-en="Open a Gas Shop" data-sw="Fungua Duka">Open a Gas Shop</a>
+          <a data-app-path="/auth/register?role=RIDER" data-en="Deliver as a Rider" data-sw="Sambaza kama Dereva">Deliver as a Rider</a>
+          <a data-app-path="/auth/register?role=DISTRIBUTOR" data-en="Become a Distributor" data-sw="Kuwa Msambazaji">Become a Distributor</a>
+          <a data-app-path="/auth/register?role=BRAND" data-en="Advertise as a Brand" data-sw="Tangaza kama Kampuni">Advertise as a Brand</a>
+        </div>
+        <div class="foot-col">
+          <h4 data-en="Product" data-sw="Bidhaa">Product</h4>
+          <a href="#how" data-en="How it works" data-sw="Inavyofanya kazi">How it works</a>
+          <a href="#services" data-en="Services" data-sw="Huduma">Services</a>
+          <a href="#download" data-en="Mobile app" data-sw="App ya simu">Mobile app</a>
+          <a href="#faq" data-en="FAQ" data-sw="Maswali">FAQ</a>
+          <a data-app-path="/auth/login" data-en="Sign in" data-sw="Ingia">Sign in</a>
+        </div>
+        <div class="foot-col">
+          <h4 data-en="Company" data-sw="Kampuni">Company</h4>
+          <a href="#" data-en="About us" data-sw="Kuhusu sisi">About us</a>
+          <a href="#" data-en="Contact" data-sw="Mawasiliano">Contact</a>
+          <a href="#" data-en="Privacy" data-sw="Faragha">Privacy</a>
+          <a href="#" data-en="Terms" data-sw="Masharti">Terms</a>
+        </div>
+      </div>
+      <div class="foot-bottom">
+        <span>© <span id="year"></span> JIKO CONNECT. <span data-en="All rights reserved." data-sw="Haki zote zimehifadhiwa.">All rights reserved.</span></span>
+        <span data-en="Made for Tanzania 🇹🇿 · Powered by mobile money" data-sw="Imetengenezwa kwa Tanzania 🇹🇿 · Inaendeshwa na malipo ya simu">Made for Tanzania 🇹🇿 · Powered by mobile money</span>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    /* ════════════════════════════════════════════════════════════════════
+       CONFIG — point all app links at the live JIKO CONNECT app.
+       Change APP_BASE here if your app URL changes (e.g. a custom domain).
+       ════════════════════════════════════════════════════════════════════ */
+    var APP_BASE = 'https://olomipay.vercel.app';
+
+    // Wire every [data-app-path] link to APP_BASE + path.
+    document.querySelectorAll('[data-app-path]').forEach(function (a) {
+      a.setAttribute('href', APP_BASE + a.getAttribute('data-app-path'));
+    });
+
+    /* ── Bilingual EN / SW (mirrors the app's jiko_lang preference) ── */
+    function applyLang(lang) {
+      document.documentElement.lang = lang;
+      document.querySelectorAll('[data-en]').forEach(function (el) {
+        var val = el.getAttribute('data-' + lang);
+        if (val !== null) el.textContent = val;
+      });
+      document.querySelectorAll('.lang button').forEach(function (b) {
+        var on = b.getAttribute('data-lang') === lang;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+      try { localStorage.setItem('jiko_lang', lang); } catch (e) {}
+    }
+    document.querySelectorAll('.lang button').forEach(function (b) {
+      b.addEventListener('click', function () { applyLang(b.getAttribute('data-lang')); });
+    });
+    var saved = 'en';
+    try { var s = localStorage.getItem('jiko_lang'); if (s === 'sw' || s === 'en') saved = s; } catch (e) {}
+    applyLang(saved);
+
+    /* ── Sticky header background on scroll ── */
+    var header = document.getElementById('header');
+    function onScroll() { header.classList.toggle('scrolled', window.scrollY > 20); }
+    onScroll(); window.addEventListener('scroll', onScroll, { passive: true });
+
+    /* ── Mobile menu ── */
+    var ham = document.getElementById('hamburger');
+    var menu = document.getElementById('mobileMenu');
+    function closeMenu() { menu.classList.remove('open'); ham.setAttribute('aria-expanded', 'false'); document.body.style.overflow = ''; }
+    ham.addEventListener('click', function () {
+      var open = menu.classList.toggle('open');
+      ham.setAttribute('aria-expanded', open ? 'true' : 'false');
+      document.body.style.overflow = open ? 'hidden' : '';
+    });
+    menu.querySelectorAll('a').forEach(function (a) { a.addEventListener('click', closeMenu); });
+
+    /* ── FAQ accordion ── */
+    document.querySelectorAll('.faq-item').forEach(function (item) {
+      var q = item.querySelector('.faq-q');
+      var a = item.querySelector('.faq-a');
+      q.addEventListener('click', function () {
+        var open = item.classList.toggle('open');
+        a.style.maxHeight = open ? a.scrollHeight + 'px' : '0';
+      });
+    });
+
+    /* ── Reveal on scroll ── */
+    if ('IntersectionObserver' in window) {
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+      }, { threshold: 0.12 });
+      document.querySelectorAll('.reveal').forEach(function (el) { io.observe(el); });
+    } else {
+      document.querySelectorAll('.reveal').forEach(function (el) { el.classList.add('in'); });
+    }
+
+    /* ── Year ── */
+    document.getElementById('year').textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>
