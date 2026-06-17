@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeft, Send } from 'lucide-react';
 import { chat, getAccessToken } from '../../../lib/api';
@@ -19,11 +19,42 @@ export default function ChatPage() {
   const [busy, setBusy] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { chat.list(orderId).then((r) => { setMsgs(r.messages ?? []); setMe(r.me); }).catch(() => setMsgs([])); }, [orderId]);
+  // Merge server history with what we have: de-dupe by id and keep any
+  // not-yet-confirmed optimistic (tmp-) messages until the server echoes them.
+  const merge = useCallback((cur: any[] | null, incoming: any[]) => {
+    const seen = new Set(incoming.map((m) => `${m.senderId}|${m.body}`));
+    const pending = (cur ?? []).filter((m) => String(m.id).startsWith('tmp-') && !seen.has(`${m.senderId}|${m.body}`));
+    return [...incoming, ...pending].sort((a, b) => +new Date(a.createdAt) - +new Date(b.createdAt));
+  }, []);
+
+  const refetch = useCallback(() => {
+    chat.list(orderId).then((r) => { setMe(r.me); setMsgs((cur) => merge(cur, r.messages ?? [])); }).catch(() => {});
+  }, [orderId, merge]);
+
+  // Initial history load.
+  useEffect(() => { setMsgs(null); refetch(); }, [orderId, refetch]);
+
+  // Realtime via socket (instant when connected) — de-dupe by id.
   useEffect(() => {
-    const off = on('chat:message', (m: any) => { if (m?.orderId === orderId) setMsgs((cur) => [...(cur ?? []), m]); });
+    const off = on('chat:message', (m: any) => {
+      if (m?.orderId !== orderId) return;
+      setMsgs((cur) => ((cur ?? []).some((x) => x.id === m.id) ? cur : [...(cur ?? []), m]));
+    });
     return () => { off?.(); };
   }, [on, orderId]);
+
+  // Reliability fallback for mobile (Android WebView): the socket can silently
+  // drop when the app is backgrounded or the network switches, so messages
+  // wouldn't arrive until a manual reload. Poll while the screen is visible and
+  // refetch the instant the app regains focus, so chat stays live without a socket.
+  useEffect(() => {
+    const tick = () => { if (document.visibilityState === 'visible') refetch(); };
+    const id = window.setInterval(tick, 4000);
+    document.addEventListener('visibilitychange', tick);
+    window.addEventListener('focus', tick);
+    return () => { window.clearInterval(id); document.removeEventListener('visibilitychange', tick); window.removeEventListener('focus', tick); };
+  }, [refetch]);
+
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [msgs]);
 
   async function send() {
