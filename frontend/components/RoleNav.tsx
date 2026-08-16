@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Package, MapPin, Bell, Store, Boxes, Bike, Wallet, ShieldCheck, Truck, Megaphone } from 'lucide-react';
+import { Home, Package, MapPin, Bell, Store, Boxes, Bike, Wallet, ShieldCheck, Truck, Megaphone, ShoppingBag } from 'lucide-react';
 import { Role } from '../lib/api';
 import { useT } from '../lib/i18n';
 import { cn } from './ui';
@@ -12,8 +12,12 @@ export function RoleNav({ role }: { role: Role }) {
   const { t } = useT();
 
   const TABS: Record<Role, { href: string; label: string; icon: any }[]> = {
+    // Every role that can buy gets the marketplace tab. A shop restocking from
+    // a wholesaler is an ordinary buyer, which is the whole premise of the
+    // universal marketplace.
     HOUSEHOLD: [
       { href: '/dashboard',     label: t('Home', 'Nyumbani'),    icon: Home },
+      { href: '/shop',          label: t('Shop', 'Soko'),        icon: ShoppingBag },
       { href: '/orders',        label: t('Orders', 'Oda'),       icon: Package },
       { href: '/addresses',     label: t('Addresses', 'Anwani'), icon: MapPin },
       { href: '/notifications', label: t('Alerts', 'Arifa'),     icon: Bell },
@@ -21,6 +25,7 @@ export function RoleNav({ role }: { role: Role }) {
     SUPPLIER: [
       { href: '/dashboard',          label: t('Orders', 'Oda'),    icon: Store },
       { href: '/supplier/inventory', label: t('Stock', 'Bidhaa'),  icon: Boxes },
+      { href: '/shop',               label: t('Shop', 'Soko'),     icon: ShoppingBag },
       { href: '/supplier/setup',     label: t('Shop', 'Duka'),     icon: MapPin },
       { href: '/notifications',      label: t('Alerts', 'Arifa'),  icon: Bell },
     ],
@@ -35,6 +40,7 @@ export function RoleNav({ role }: { role: Role }) {
     DISTRIBUTOR: [
       { href: '/dashboard',          label: t('Orders', 'Oda'),     icon: Truck },
       { href: '/distributor/stock',  label: t('Stock', 'Bidhaa'),   icon: Boxes },
+      { href: '/shop',               label: t('Shop', 'Soko'),      icon: ShoppingBag },
       { href: '/notifications',      label: t('Alerts', 'Arifa'),   icon: Bell },
     ],
     BRAND: [
