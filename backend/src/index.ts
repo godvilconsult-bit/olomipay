@@ -40,6 +40,9 @@ app.get('/ready', async (_req, res) => {
 // ── Routes ──────────────────────────────────────────────────────────────────────
 async function loadRoutes() {
   const mounts: [string, () => Promise<any>, string][] = [
+    // Public storefront — no auth. Mounted first so browsing never depends on
+    // any authenticated route loading successfully.
+    ['/api/catalog',   () => import('./routes/catalog'),   'catalogRouter'],
     ['/api/auth',      () => import('./routes/auth'),      'authRouter'],
     ['/api/vendors',   () => import('./routes/vendors'),   'vendorsRouter'],
     ['/api/orders',    () => import('./routes/orders'),    'ordersRouter'],
