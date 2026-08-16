@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Package, MapPin, Bell, Store, Boxes, Bike, Wallet, ShieldCheck, Truck, Megaphone, ShoppingBag, PackagePlus } from 'lucide-react';
+import { Home, Package, MapPin, Bell, Store, Boxes, Bike, Wallet, ShieldCheck, Truck, Megaphone, ShoppingBag, PackagePlus, MessageSquare } from 'lucide-react';
 import { Role } from '../lib/api';
 import { useT } from '../lib/i18n';
 import { cn } from './ui';
@@ -15,11 +15,14 @@ export function RoleNav({ role }: { role: Role }) {
     // Every role that can buy gets the marketplace tab. A shop restocking from
     // a wholesaler is an ordinary buyer, which is the whole premise of the
     // universal marketplace.
+    // Five is the most a bottom bar holds legibly, so each addition is a swap.
+    // Addresses moved out: they are set during checkout, whereas messaging a
+    // seller is something you do while browsing.
     HOUSEHOLD: [
       { href: '/dashboard',     label: t('Home', 'Nyumbani'),    icon: Home },
       { href: '/shop',          label: t('Shop', 'Soko'),        icon: ShoppingBag },
       { href: '/orders',        label: t('Orders', 'Oda'),       icon: Package },
-      { href: '/addresses',     label: t('Addresses', 'Anwani'), icon: MapPin },
+      { href: '/messages',      label: t('Chat', 'Ujumbe'),      icon: MessageSquare },
       { href: '/notifications', label: t('Alerts', 'Arifa'),     icon: Bell },
     ],
     // /sell replaces the shop-setup tab: setup is a one-time task that lives in
@@ -29,13 +32,14 @@ export function RoleNav({ role }: { role: Role }) {
     SUPPLIER: [
       { href: '/dashboard',          label: t('Orders', 'Oda'),    icon: Store },
       { href: '/sell',               label: t('Sell', 'Uza'),      icon: PackagePlus },
-      { href: '/supplier/inventory', label: t('Stock', 'Bidhaa'),  icon: Boxes },
+      { href: '/messages',           label: t('Chat', 'Ujumbe'),   icon: MessageSquare },
       { href: '/shop',               label: t('Shop', 'Soko'),     icon: ShoppingBag },
       { href: '/notifications',      label: t('Alerts', 'Arifa'),  icon: Bell },
     ],
     RIDER: [
       { href: '/dashboard',      label: t('Jobs', 'Kazi'),        icon: Bike },
       { href: '/rider/earnings', label: t('Earnings', 'Mapato'),  icon: Wallet },
+      { href: '/messages',       label: t('Chat', 'Ujumbe'),      icon: MessageSquare },
       { href: '/notifications',  label: t('Alerts', 'Arifa'),     icon: Bell },
     ],
     ADMIN: [
@@ -44,7 +48,7 @@ export function RoleNav({ role }: { role: Role }) {
     DISTRIBUTOR: [
       { href: '/dashboard',          label: t('Orders', 'Oda'),     icon: Truck },
       { href: '/sell',               label: t('Sell', 'Uza'),       icon: PackagePlus },
-      { href: '/distributor/stock',  label: t('Stock', 'Bidhaa'),   icon: Boxes },
+      { href: '/messages',           label: t('Chat', 'Ujumbe'),    icon: MessageSquare },
       { href: '/shop',               label: t('Shop', 'Soko'),      icon: ShoppingBag },
       { href: '/notifications',      label: t('Alerts', 'Arifa'),   icon: Bell },
     ],

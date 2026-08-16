@@ -18,6 +18,20 @@ export function exponentFor(currency: string): number {
 }
 
 /**
+ * Minor units → major units. Always use this rather than dividing by 100:
+ * yen has no minor unit and dinar has three, so a hardcoded 100 is wrong in
+ * both directions.
+ */
+export function fromMinor(minor: number, currency = 'TZS'): number {
+  return minor / 10 ** exponentFor(currency);
+}
+
+/** Format a minor-unit amount directly. */
+export function formatMinor(minor: number, currency = 'TZS', locale = 'en'): string {
+  return formatMoney(fromMinor(minor, currency), currency, locale);
+}
+
+/**
  * Format major units for display. Tanzanian shillings are quoted as whole
  * numbers in practice, so trailing ".00" is suppressed when the amount is
  * whole — showing "TZS 45,000" rather than "TZS 45,000.00".

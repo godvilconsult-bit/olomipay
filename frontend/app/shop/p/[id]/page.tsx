@@ -15,6 +15,7 @@ import { notFound } from 'next/navigation';
 import { BadgeCheck, Store, Star, ArrowLeft } from 'lucide-react';
 import { getProduct } from '../../../../lib/catalogServer';
 import { formatMoney } from '../../../../lib/money';
+import ContactSellerButton from '../../../../components/ContactSellerButton';
 
 interface Props { params: { id: string } }
 
@@ -178,8 +179,12 @@ export default async function ProductPage({ params }: Props) {
           </div>
         )}
 
+        {/* Ask before you buy — the Alibaba pattern. Needs an account, unlike
+            browsing, because a conversation has two identified parties. */}
+        <ContactSellerButton productId={p.id} productName={p.name} />
+
         <p className="mt-4 text-xs text-ink/50">
-          Sign in to place an order. Browsing is open to everyone.
+          Sign in to place an order or message a seller. Browsing is open to everyone.
         </p>
       </section>
     </div>
