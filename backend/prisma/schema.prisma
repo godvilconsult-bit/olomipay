@@ -127,6 +127,12 @@ enum VehicleType {
   CAR
   TRUCK
   BICYCLE
+  // Freight marketplace additions — last-mile vehicles above, haulage below.
+  VAN
+  LORRY
+  TRAILER
+  TANKER
+  REEFER      // refrigerated
 }
 
 enum SupplierTier {
@@ -906,6 +912,12 @@ model Organization {
   supplierProfile    SupplierProfile?
   distributorProfile DistributorProfile?
 
+  // Freight marketplace (phase 6).
+  loads              Load[]         @relation("ShipperLoads")
+  quotes             Quote[]        @relation("CarrierQuotes")
+  vehicles           Vehicle[]
+  carrierRoutes      CarrierRoute[] @relation("CarrierRoutes")
+
   @@index([kind, isActive])
   @@index([countryCode, kind])
   @@index([canSell, isActive])
@@ -1050,6 +1062,146 @@ model ShipmentLeg {
   @@unique([shipmentId, seq])
   @@index([driverUserId, status])
   @@index([status])
+}
+
+// ── Freight marketplace (phase 6) ────────────────────────────────────────────
+// Two-sided and it must work from BOTH directions: shippers post Loads and
+// receive Quotes, and carriers post the lanes they already run (CarrierRoute)
+// so the matcher can offer them loads along the way. That second direction is
+// backhaul matching — the feature that makes a load board pay for itself, since
+// empty return trips are the industry's largest single waste.
+
+enum LoadStatus {
+  OPEN        // accepting quotes
+  QUOTED      // at least one quote received
+  AWARDED     // a quote accepted, shipment created
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+}
+
+enum QuoteStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+}
+
+/// Cargo a shipper needs moved. Independent of any product order — a Load may
+/// be raised from an order too heavy for the local rider pool, or posted
+/// directly by anyone with something to move.
+model Load {
+  id            String     @id @default(cuid())
+  reference     String     @unique
+  shipperOrgId  String
+
+  originLat     Float
+  originLng     Float
+  destLat       Float
+  destLng       Float
+  originLabel   String?
+  destLabel     String?
+
+  pickupFrom    DateTime
+  pickupTo      DateTime
+
+  weightKg      Float
+  volumeM3      Float?
+  cargoType     String     @default("general")
+  isHazmat      Boolean    @default(false)
+  needsRefrigeration Boolean @default(false)
+
+  budgetMinor   Int?                        // optional target price, minor units
+  currency      String     @default("TZS")
+
+  status        LoadStatus @default(OPEN)
+  shipmentId    String?                     // set on award
+  notes         String?
+
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  shipper Organization @relation("ShipperLoads", fields: [shipperOrgId], references: [id], onDelete: Cascade)
+  quotes  Quote[]
+
+  @@index([status, pickupFrom])
+  @@index([shipperOrgId, status])
+  // Bounding-box prefilter before the exact corridor test.
+  @@index([status, originLat, originLng])
+}
+
+/// A carrier's bid on a load. `rfqId` is deliberately absent for now: product
+/// RFQs are the same shape and will reuse this model in a later phase.
+model Quote {
+  id           String      @id @default(cuid())
+  loadId       String
+  bidderOrgId  String
+
+  amountMinor  Int
+  currency     String      @default("TZS")
+  etaPickup    DateTime?
+  etaDrop      DateTime?
+  message      String?
+
+  status       QuoteStatus @default(PENDING)
+  createdAt    DateTime    @default(now())
+  decidedAt    DateTime?
+
+  load   Load         @relation(fields: [loadId],      references: [id], onDelete: Cascade)
+  bidder Organization @relation("CarrierQuotes", fields: [bidderOrgId], references: [id], onDelete: Cascade)
+
+  // One live bid per carrier per load — re-bidding updates rather than stacks.
+  @@unique([loadId, bidderOrgId])
+  @@index([bidderOrgId, status])
+  @@index([loadId, amountMinor])
+}
+
+/// A carrier's vehicle. Capacity is what makes freight matching possible at all.
+model Vehicle {
+  id             String      @id @default(cuid())
+  orgId          String
+  type           VehicleType @default(TRUCK)
+  plateNo        String?
+  capacityKg     Float
+  capacityM3     Float?
+  isRefrigerated Boolean     @default(false)
+  isActive       Boolean     @default(true)
+
+  currentLat     Float?
+  currentLng     Float?
+  createdAt      DateTime    @default(now())
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, isActive])
+}
+
+/// A lane a carrier already runs — "Dar to Mwanza on Friday, 2 t spare".
+/// The matcher offers OPEN loads whose pickup AND drop lie within `corridorKm`
+/// of this lane and in the direction of travel.
+model CarrierRoute {
+  id             String   @id @default(cuid())
+  carrierOrgId   String
+  vehicleId      String?
+
+  originLat      Float
+  originLng      Float
+  destLat        Float
+  destLng        Float
+  originLabel    String?
+  destLabel      String?
+
+  corridorKm     Float    @default(50)      // how far off-lane is still worth a detour
+  departsAt      DateTime
+  arrivesBy      DateTime?
+  capacityKgFree Float
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  carrier Organization @relation("CarrierRoutes", fields: [carrierOrgId], references: [id], onDelete: Cascade)
+
+  @@index([carrierOrgId, isActive])
+  @@index([isActive, departsAt])
 }
 
 /// Location history for a leg. Written throttled (the socket layer already rate

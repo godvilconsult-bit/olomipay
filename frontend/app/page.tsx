@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Flame, MapPin, Bike, Store } from 'lucide-react';
+import { ArrowRight, Flame, MapPin, Bike, Store, ShoppingBag } from 'lucide-react';
 import { getAccessToken } from '../lib/api';
 import { useT, LangToggle } from '../lib/i18n';
 
@@ -61,6 +61,17 @@ export default function Landing() {
           <Link href="/auth/register" className="flex w-full max-w-sm items-center justify-center gap-2 rounded-full bg-grad-brand px-7 py-4 text-base font-bold text-white shadow-ds-btn">
             {t("Get started — it's free", 'Anza sasa — ni bure')} <ArrowRight size={18} strokeWidth={2.4} />
           </Link>
+
+          {/* The public front door. Browsing needs no account, so this is the
+              one CTA a first-time visitor can act on immediately. */}
+          <Link
+            href="/shop"
+            className="flex w-full max-w-sm items-center justify-center gap-2 rounded-full border border-white/20 bg-white/5 px-7 py-3.5 text-sm font-semibold text-white"
+          >
+            <ShoppingBag size={17} strokeWidth={2.2} />
+            {t('Browse the marketplace', 'Vinjari soko')}
+          </Link>
+
           <p className="text-xs text-white/50">{t('Pay with M-Pesa, Tigo Pesa, Airtel Money · EWURA prices', 'Lipa kwa M-Pesa, Tigo Pesa, Airtel Money · Bei za EWURA')}</p>
         </div>
       </div>
