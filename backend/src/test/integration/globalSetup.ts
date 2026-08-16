@@ -47,7 +47,12 @@ export async function setup(): Promise<void> {
 
   // Build the schema straight from schema.prisma. Using db push rather than
   // migrate keeps the suite independent of migration history.
-  execSync('npx prisma db push --skip-generate --accept-data-loss', {
+  //
+  // Deliberately NOT --skip-generate: the pushed database and the generated
+  // client must describe the same schema. Skipping it means a schema edit
+  // without a manual `prisma generate` fails deep inside a query with an
+  // unhelpful error, which cost a debugging cycle here.
+  execSync('npx prisma db push --accept-data-loss', {
     cwd:   process.cwd(),
     env:   { ...process.env, DATABASE_URL: TEST_DATABASE_URL },
     stdio: 'inherit',

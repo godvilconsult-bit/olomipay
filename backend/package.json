@@ -13,6 +13,7 @@
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "pg": "node scripts/pg-dev.mjs",
     "seed": "tsx scripts/seed.ts",
+    "backfill": "tsx scripts/backfill-marketplace.ts",
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:studio": "prisma studio"

@@ -194,6 +194,13 @@ model User {
   // Universal marketplace (phase 1) — virtual back-relations, no column changes.
   memberships       Membership[]
   driverLegs        ShipmentLeg[]      @relation("DriverLegs")
+
+  // Phase 2 bridge: the org this user acts as by default. Nullable until the
+  // backfill runs; a user may belong to several orgs via Membership.
+  primaryOrgId      String?
+  primaryOrg        Organization?      @relation("PrimaryOrg", fields: [primaryOrgId], references: [id])
+
+  @@index([primaryOrgId])
 }
 
 // ── Favourite vendors (Tier 3 retention) ─────────────────────────────────────────
@@ -272,6 +279,10 @@ model SupplierProfile {
 
   createdAt     DateTime     @default(now())
 
+  // Phase 2 bridge: this shop as a trading Organization (RETAILER).
+  orgId         String?      @unique
+  org           Organization? @relation(fields: [orgId], references: [id])
+
   user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   inventory       Inventory[]
   orders          Order[]
@@ -325,7 +336,14 @@ model Product {
   // DistributorStock; all three coexist until phase 8 contracts the old ones.
   offers     Offer[]
 
+  // Phase 2 bridge: generic identity. `brand`/`sizeKg`/`type` above are dual-read
+  // until phase 8 drops them; `attributes` is the new home for both.
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id])
+  attributes Json?
+
   @@index([brand, type])
+  @@index([categoryId])
 }
 
 model Inventory {
@@ -608,6 +626,10 @@ model DistributorProfile {
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
 
+  // Phase 2 bridge: this depot as a trading Organization (WHOLESALER).
+  orgId         String?            @unique
+  org           Organization?      @relation(fields: [orgId], references: [id])
+
   user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   stock         DistributorStock[]
   restockOrders RestockOrder[]
@@ -879,6 +901,11 @@ model Organization {
   shipmentsAsShipper Shipment[]   @relation("ShipperOrg")
   shipmentsAsCarrier Shipment[]   @relation("CarrierOrg")
 
+  // Phase 2 bridges back to the legacy profiles (1:1 while both coexist).
+  primaryForUsers    User[]              @relation("PrimaryOrg")
+  supplierProfile    SupplierProfile?
+  distributorProfile DistributorProfile?
+
   @@index([kind, isActive])
   @@index([countryCode, kind])
   @@index([canSell, isActive])
@@ -917,6 +944,7 @@ model Category {
 
   parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
   children Category[] @relation("CategoryTree")
+  products Product[]
 
   @@index([parentId, isActive])
 }
