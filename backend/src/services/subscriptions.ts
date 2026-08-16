@@ -5,7 +5,7 @@
  * interval — fine for a single Railway instance.
  */
 import { prisma } from '../lib/prisma';
-import { placeOrder } from '../routes/orders';
+import { placeOrder } from './placeOrder';
 import { notify } from './notify';
 
 const DAY = 864e5;

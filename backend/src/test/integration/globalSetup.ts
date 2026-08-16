@@ -41,8 +41,18 @@ export async function setup(): Promise<void> {
     initdbFlags: ['--encoding=UTF8', '--locale=C'],
   });
 
-  await pg.initialise();
-  await pg.start();
+  try {
+    await pg.initialise();
+    await pg.start();
+  } catch (e: any) {
+    // The usual cause is the dev cluster from `npm run pg` still running: two
+    // embedded clusters from the same install collide on Windows shared memory
+    // even though they use different ports and data directories.
+    throw new Error(
+      `Could not start the test Postgres. If \`npm run pg\` is running, stop it ` +
+      `first — the two clusters collide on Windows.\n\nUnderlying error: ${e?.message ?? e}`,
+    );
+  }
   await pg.createDatabase('jiko_test');
 
   // Build the schema straight from schema.prisma. Using db push rather than

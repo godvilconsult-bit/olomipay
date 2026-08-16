@@ -1,114 +1,20 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
-import { requireRole, AuthRequest } from '../middleware/auth';
-import { computeOrderMoney } from '../lib/fees';
-import { makeOrderNo } from '../lib/ids';
+import { requireAuth, requireRole, AuthRequest } from '../middleware/auth';
 import { notify } from '../services/notify';
 import { refundPayment } from '../services/payments';
 import { sendSms } from '../services/sms';
 import { onOrderCompleted } from '../services/rewards';
 import { emitToUser } from '../socket';
+import { placeOrder, orderInclude } from '../services/placeOrder';
+import { placeOrderFromOffers } from '../services/offerCheckout';
+
+// Placement now lives in services/placeOrder. Re-exported so existing importers
+// (subscriptions, tests) keep working unchanged.
+export { placeOrder };
 
 const router = Router();
-
-const orderInclude = {
-  items:    true,
-  payment:  true,
-  delivery: { include: { rider: { select: { id: true, name: true, phone: true, profilePicUrl: true, riderProfile: { select: { vehicleType: true, plateNo: true, rating: true } } } } } },
-  supplier: { select: { id: true, businessName: true, phone: true, lat: true, lng: true, region: true, payProvider: true, payNumber: true, payName: true } },
-  address:  true,
-  review:   true,
-} as const;
-
-// Core placement logic — shared by POST / (manual), POST /:id/reorder (1-tap),
-// and the auto-refill subscription scheduler.
-// Throws Error with an `http` status code on validation failures.
-export async function placeOrder(
-  userId: string, supplierId: string, addressId: string,
-  items: { inventoryId: string; qty: number }[], note?: string,
-) {
-  const [supplier, address] = await Promise.all([
-    prisma.supplierProfile.findUnique({ where: { id: supplierId } }),
-    prisma.address.findFirst({ where: { id: addressId, userId } }),
-  ]);
-  if (!supplier || !supplier.isOpen) throw Object.assign(new Error('Vendor unavailable'), { http: 404 });
-  if (!address) throw Object.assign(new Error('Delivery address not found'), { http: 404 });
-
-  const invIds = items.map(i => i.inventoryId);
-  const invs   = await prisma.inventory.findMany({ where: { id: { in: invIds }, supplierId }, include: { product: true } });
-  if (invs.length !== invIds.length) throw Object.assign(new Error('Some items are not sold by this vendor'), { http: 400 });
-
-  const lineItems = items.map(i => {
-    const inv = invs.find(v => v.id === i.inventoryId)!;
-    if (inv.stock < i.qty) throw Object.assign(new Error(`${inv.product.brand} ${inv.product.name} is out of stock`), { http: 409 });
-    return {
-      productId: inv.productId, productName: inv.product.name, brand: inv.product.brand,
-      sizeKg: inv.product.sizeKg, qty: i.qty, unitPrice: inv.price, lineTotal: inv.price * i.qty,
-    };
-  });
-
-  const itemsTotal = lineItems.reduce((s, l) => s + l.lineTotal, 0);
-  // Per-line types drive accessory-aware commission (Phase 3); tier drives the
-  // gas commission rate (Phase 2).
-  const moneyLines = items.map(i => {
-    const inv = invs.find(v => v.id === i.inventoryId)!;
-    return { type: inv.product.type, lineTotal: inv.price * i.qty };
-  });
-  const money = computeOrderMoney({
-    itemsTotal, lines: moneyLines, tier: supplier.tier,
-    supplierLat: supplier.lat, supplierLng: supplier.lng,
-    dropLat: address.lat, dropLng: address.lng,
-  });
-
-  const order = await prisma.$transaction(async (tx) => {
-    const created = await tx.order.create({
-      data: {
-        orderNo:          makeOrderNo(),
-        householdId:      userId,
-        supplierId,
-        addressId,
-        note:             note ?? null,
-        status:           'ALERTED',
-        itemsTotal:       money.itemsTotal,
-        deliveryFee:      money.deliveryFee,
-        serviceFee:       money.serviceFee,
-        surgeMultiplier:  money.surgeMultiplier,
-        total:            money.total,
-        commissionPct:    money.commissionPct,
-        commissionAmount: money.commissionAmount,
-        riderNet:         money.riderAmount,
-        platformAmount:   money.platformAmount,
-        items:   { create: lineItems },
-        // Collected now by mobile money: gas + service fee. The rider fee is
-        // settled on delivery; the platform's delivery margin is taken from it.
-        payment: { create: { amount: money.upfrontAmount, status: 'PENDING' } },
-      },
-      include: orderInclude,
-    });
-    for (const i of items) {
-      await tx.inventory.update({ where: { id: i.inventoryId }, data: { stock: { decrement: i.qty } } });
-    }
-    return created;
-  });
-
-  emitToUser(supplier.userId, 'order:new', order);
-  await notify(supplier.userId, {
-    title: 'New order! 🔔',
-    body:  `${order.orderNo} · TZS ${money.total.toLocaleString()} · ${money.distanceKm} km`,
-    type:  'order', data: { orderId: order.id },
-  });
-  await notify(userId, { title: 'Order placed ✅', body: `${order.orderNo} sent to ${supplier.businessName}. Complete your payment.`, type: 'order', data: { orderId: order.id } });
-
-  // Low-stock auto-nudge: tell the supplier to reorder anything this order drained.
-  const LOW = Number(process.env.JIKO_LOW_STOCK ?? 3);
-  const lowItems = items
-    .map(i => { const inv = invs.find(v => v.id === i.inventoryId)!; return { name: `${inv.product.brand} ${inv.product.name}`, left: inv.stock - i.qty }; })
-    .filter(x => x.left <= LOW);
-  if (lowItems.length) await notify(supplier.userId, { title: 'Low stock ⚠️', body: `${lowItems.map(x => `${x.name} (${x.left} left)`).join(', ')}. Reorder soon.`, type: 'restock' }).catch(() => {});
-
-  return { order, money };
-}
 
 // ── POST /api/orders ─ place an order (household) ────────────────────────────────
 router.post('/', requireRole('HOUSEHOLD'), async (req: AuthRequest, res) => {
@@ -122,6 +28,29 @@ router.post('/', requireRole('HOUSEHOLD'), async (req: AuthRequest, res) => {
 
   try {
     const { order, money } = await placeOrder(req.userId!, parse.data.supplierId, parse.data.addressId, parse.data.items as { inventoryId: string; qty: number }[], parse.data.note);
+    res.status(201).json({ order, money });
+  } catch (e: any) {
+    res.status(e?.http ?? 500).json({ error: e?.message ?? 'Failed to place order' });
+  }
+});
+
+// ── POST /api/orders/from-offers ─ checkout from the storefront ──────────────────
+// requireAuth, not requireRole('HOUSEHOLD'): in a universal marketplace a shop
+// buying stock from a wholesaler is an ordinary buyer, not a special case.
+router.post('/from-offers', requireAuth, async (req: AuthRequest, res) => {
+  const parse = z.object({
+    addressId: z.string().optional(),
+    note:      z.string().max(300).optional(),
+    items:     z.array(z.object({ offerId: z.string(), qty: z.number().int().min(1).max(999) })).min(1),
+  }).safeParse(req.body);
+  if (!parse.success) return res.status(400).json({ error: parse.error.errors[0].message });
+
+  try {
+    const { order, money } = await placeOrderFromOffers(
+      req.userId!,
+      parse.data.items as { offerId: string; qty: number }[],
+      { addressId: parse.data.addressId, note: parse.data.note },
+    );
     res.status(201).json({ order, money });
   } catch (e: any) {
     res.status(e?.http ?? 500).json({ error: e?.message ?? 'Failed to place order' });
@@ -191,9 +120,17 @@ router.post('/:id/cancel', requireRole('HOUSEHOLD'), async (req: AuthRequest, re
 
   await prisma.$transaction(async (tx) => {
     await tx.order.update({ where: { id: order.id }, data: { status: 'CANCELLED', cancelledAt: new Date(), cancelReason: req.body?.reason ?? 'Cancelled by household' } });
-    // Return reserved stock.
+    // Return reserved stock — to the legacy Inventory and to the storefront
+    // Offer, mirroring the dual-write in placeOrder. Missing the Offer here
+    // would leak stock out of the catalog on every cancellation.
     for (const it of order.items) {
       await tx.inventory.updateMany({ where: { supplierId: order.supplierId, productId: it.productId }, data: { stock: { increment: it.qty } } });
+      if (order.supplier.orgId) {
+        await tx.offer.updateMany({
+          where: { sellerOrgId: order.supplier.orgId, productId: it.productId },
+          data:  { stock: { increment: it.qty } },
+        });
+      }
     }
   });
 

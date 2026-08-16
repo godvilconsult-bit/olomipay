@@ -204,6 +204,10 @@ export const catalog = {
 export const orders = {
   place:   (body: { supplierId: string; addressId: string; items: { inventoryId: string; qty: number }[]; note?: string }) =>
     apiFetch('/api/orders', { method: 'POST', body: JSON.stringify(body) }),
+  // Storefront checkout. All items must come from one seller; the API rejects a
+  // mixed basket rather than silently splitting it into several orders.
+  fromOffers: (body: { items: { offerId: string; qty: number }[]; addressId?: string; note?: string }) =>
+    apiFetch('/api/orders/from-offers', { method: 'POST', body: JSON.stringify(body) }),
   list:    () => apiFetch('/api/orders'),
   get:     (id: string) => apiFetch(`/api/orders/${id}`),
   reorder: (id: string) => apiFetch(`/api/orders/${id}/reorder`, { method: 'POST' }),
