@@ -12,7 +12,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
-import { Plus, Trash2, Store, PackagePlus, ExternalLink, Loader2, ImagePlus, X } from 'lucide-react';
+import { Plus, Trash2, Store, PackagePlus, ExternalLink, Loader2, ImagePlus, X, Settings } from 'lucide-react';
 import { prepareImages, dataUrlBytes, formatBytes, MAX_IMAGES } from '../../lib/imageResize';
 import {
   listings, ApiError,
@@ -81,11 +81,16 @@ export default function SellPage() {
             {t('Sell anything — pick a category and add your product.', 'Uza chochote — chagua kundi na ongeza bidhaa yako.')}
           </p>
         </div>
-        {slug && (
-          <Link href={`/shop/s/${slug}`} className="mt-1 inline-flex shrink-0 items-center gap-1 text-sm font-medium text-flame">
-            {t('View storefront', 'Ona duka')} <ExternalLink size={14} />
+        <div className="mt-1 flex shrink-0 flex-col items-end gap-1">
+          <Link href="/sell/store" className="inline-flex items-center gap-1 text-sm font-medium text-flame">
+            {t('Store details', 'Maelezo ya duka')} <Settings size={14} />
           </Link>
-        )}
+          {slug && (
+            <Link href={`/shop/s/${slug}`} className="inline-flex items-center gap-1 text-xs text-ink/50 hover:text-flame">
+              {t('View storefront', 'Ona duka')} <ExternalLink size={12} />
+            </Link>
+          )}
+        </div>
       </div>
 
       {blocked ? (

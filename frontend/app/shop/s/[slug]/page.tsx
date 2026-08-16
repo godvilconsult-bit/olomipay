@@ -9,7 +9,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { BadgeCheck, Store, Star, ArrowLeft } from 'lucide-react';
+import { BadgeCheck, Store, Star, ArrowLeft, MapPin, Phone } from 'lucide-react';
 import { getSeller } from '../../../../lib/catalogServer';
 import { formatMoney } from '../../../../lib/money';
 
@@ -50,6 +50,11 @@ export default async function SellerPage({ params, searchParams }: Props) {
   const { seller, listings, total, limit } = data;
   const pages = Math.max(1, Math.ceil(total / limit));
 
+  const s = seller as any;
+  const address = [s.addressLine1, s.addressLine2, s.city, s.state, s.postalCode, s.countryCode]
+    .filter(Boolean).join(', ');
+  const contact = [s.contactPhone, s.contactEmail].filter(Boolean).join(' · ');
+
   return (
     <div className="mx-auto w-full max-w-5xl px-4 pb-16 pt-4">
       <Link href="/shop" className="mb-3 inline-flex items-center gap-1 text-sm text-ink/60 hover:text-flame">
@@ -87,6 +92,21 @@ export default async function SellerPage({ params, searchParams }: Props) {
 
           {seller.description && (
             <p className="mt-2 max-w-prose text-sm text-ink/70 dark:text-sand/70">{seller.description}</p>
+          )}
+
+          {/* Address and contact, shown only when the seller has filled them in
+              — an empty "Address:" label is worse than no label. */}
+          {address && (
+            <p className="mt-2 flex items-start gap-1.5 text-sm text-ink/60 dark:text-sand/60">
+              <MapPin size={14} className="mt-0.5 shrink-0" />
+              <span>{address}</span>
+            </p>
+          )}
+          {contact && (
+            <p className="mt-1 flex items-center gap-1.5 text-sm text-ink/60 dark:text-sand/60">
+              <Phone size={14} className="shrink-0" />
+              <span>{contact}</span>
+            </p>
           )}
         </div>
       </div>
