@@ -36,8 +36,11 @@ export function RoleNav({ role }: { role: Role }) {
       { href: '/shop',               label: t('Shop', 'Soko'),     icon: ShoppingBag },
       { href: '/notifications',      label: t('Alerts', 'Arifa'),  icon: Bell },
     ],
+    // Transporters get the load board: last-mile jobs and long-haul freight are
+    // the same trade at different distances.
     RIDER: [
       { href: '/dashboard',      label: t('Jobs', 'Kazi'),        icon: Bike },
+      { href: '/freight',        label: t('Freight', 'Mizigo'),   icon: Truck },
       { href: '/rider/earnings', label: t('Earnings', 'Mapato'),  icon: Wallet },
       { href: '/messages',       label: t('Chat', 'Ujumbe'),      icon: MessageSquare },
       { href: '/notifications',  label: t('Alerts', 'Arifa'),     icon: Bell },

@@ -12,7 +12,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
-import { Plus, Trash2, Store, PackagePlus, ExternalLink, Loader2, ImagePlus, X, Settings } from 'lucide-react';
+import { Plus, Trash2, Store, PackagePlus, ExternalLink, Loader2, ImagePlus, X, Settings, Truck } from 'lucide-react';
 import { prepareImages, dataUrlBytes, formatBytes, MAX_IMAGES } from '../../lib/imageResize';
 import {
   listings, ApiError,
@@ -84,6 +84,10 @@ export default function SellPage() {
         <div className="mt-1 flex shrink-0 flex-col items-end gap-1">
           <Link href="/sell/store" className="inline-flex items-center gap-1 text-sm font-medium text-flame">
             {t('Store details', 'Maelezo ya duka')} <Settings size={14} />
+          </Link>
+          {/* Sellers are shippers: bulk stock has to move somehow. */}
+          <Link href="/freight" className="inline-flex items-center gap-1 text-xs text-ink/50 hover:text-flame">
+            {t('Freight', 'Usafirishaji')} <Truck size={12} />
           </Link>
           {slug && (
             <Link href={`/shop/s/${slug}`} className="inline-flex items-center gap-1 text-xs text-ink/50 hover:text-flame">
