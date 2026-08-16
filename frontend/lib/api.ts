@@ -227,9 +227,16 @@ export interface MyListing {
 export const listings = {
   categories: () => apiFetch<{ categories: ListingCategory[] }>('/api/listings/categories'),
 
-  createProduct: (body: { categoryId: string; name: string; attributes: Record<string, any>; imageUrl?: string; gtin?: string }) =>
+  createProduct: (body: {
+    categoryId: string; name: string; attributes: Record<string, any>;
+    description?: string; images?: string[]; gtin?: string;
+  }) =>
     apiFetch<{ product: { id: string; name: string }; reused?: boolean }>(
       '/api/listings/products', { method: 'POST', body: JSON.stringify(body) }),
+
+  store:     () => apiFetch<{ store: any }>('/api/listings/store'),
+  saveStore: (body: Record<string, any>) =>
+    apiFetch<{ store: any }>('/api/listings/store', { method: 'PUT', body: JSON.stringify(body) }),
 
   createOffer: (body: { productId: string; price: number; currency?: string; stock: number; moq?: number; isAvailable?: boolean }) =>
     apiFetch<{ offer: MyListing }>('/api/listings/offers', { method: 'POST', body: JSON.stringify(body) }),

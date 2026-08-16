@@ -49,6 +49,9 @@ export default async function ProductPage({ params }: Props) {
   const p = data.product;
   const attrs = (p.attributes ?? {}) as Record<string, any>;
   const offers = p.offers ?? [];
+  // The API always returns an array, falling back to the legacy single image.
+  const gallery: string[] = Array.isArray((p as any).images) ? (p as any).images : (p.imageUrl ? [p.imageUrl] : []);
+  const description: string | null = (p as any).description ?? null;
 
   return (
     <div className="mx-auto w-full max-w-4xl px-4 pb-16 pt-4">
@@ -57,10 +60,24 @@ export default async function ProductPage({ params }: Props) {
       </Link>
 
       <div className="grid gap-6 sm:grid-cols-2">
-        <div className="flex aspect-square items-center justify-center overflow-hidden rounded-ds-xl bg-black/5 dark:bg-white/5">
-          {p.imageUrl
-            ? <img src={p.imageUrl} alt={p.name} className="h-full w-full object-cover" />
-            : <Store className="text-ink/20" size={64} />}
+        <div>
+          <div className="flex aspect-square items-center justify-center overflow-hidden rounded-ds-xl bg-black/5 dark:bg-white/5">
+            {gallery.length > 0
+              ? <img src={gallery[0]} alt={p.name} className="h-full w-full object-cover" />
+              : <Store className="text-ink/20" size={64} />}
+          </div>
+
+          {/* Remaining shots. Kept static so the page still renders on the
+              server and stays indexable; a lightbox would cost that. */}
+          {gallery.length > 1 && (
+            <div className="mt-2 grid grid-cols-4 gap-2">
+              {gallery.slice(0, 4).map((src, i) => (
+                <div key={i} className="aspect-square overflow-hidden rounded-xl bg-black/5 dark:bg-white/5">
+                  <img src={src} alt={`${p.name} — ${i + 1}`} className="h-full w-full object-cover" loading="lazy" />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div>
@@ -95,6 +112,17 @@ export default async function ProductPage({ params }: Props) {
           )}
         </div>
       </div>
+
+      {description && (
+        <section className="mt-8">
+          <h2 className="mb-2 text-lg font-bold text-ink dark:text-sand">About this product</h2>
+          {/* whitespace-pre-line keeps the seller's own line breaks without
+              rendering their text as HTML. */}
+          <p className="max-w-prose whitespace-pre-line text-sm leading-relaxed text-ink/75 dark:text-sand/75">
+            {description}
+          </p>
+        </section>
+      )}
 
       {/* Competing offers */}
       <section className="mt-8">

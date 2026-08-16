@@ -12,7 +12,8 @@
 import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
-import { Plus, Trash2, Store, PackagePlus, ExternalLink, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Store, PackagePlus, ExternalLink, Loader2, ImagePlus, X } from 'lucide-react';
+import { prepareImages, dataUrlBytes, formatBytes, MAX_IMAGES } from '../../lib/imageResize';
 import {
   listings, ApiError,
   type ListingCategory, type MyListing, type AttributeDef,
@@ -165,7 +166,26 @@ function NewListingForm(
   const [stock, setStock] = useState('');
   const [moq, setMoq]     = useState('1');
   const [attrs, setAttrs] = useState<Record<string, string>>({});
+  const [description, setDescription] = useState('');
+  const [images, setImages] = useState<string[]>([]);
+  const [imgBusy, setImgBusy] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  const imagesBytes = images.reduce((n, s) => n + dataUrlBytes(s), 0);
+
+  async function addImages(fileList: FileList | null) {
+    if (!fileList?.length) return;
+    setImgBusy(true);
+    try {
+      // Shrinking happens here, not on the server: a phone photo is 3–8 MB and
+      // a product card never needs that resolution.
+      const { images: next, error } = await prepareImages(Array.from(fileList), images);
+      setImages(next);
+      if (error) toast.error(error);
+    } finally {
+      setImgBusy(false);
+    }
+  }
 
   const category = useMemo(() => categories.find(c => c.id === categoryId), [categories, categoryId]);
   const schema   = category?.attributeSchema ?? null;
@@ -197,7 +217,11 @@ function NewListingForm(
 
     setSaving(true);
     try {
-      const { product } = await listings.createProduct({ categoryId, name: name.trim(), attributes: typed });
+      const { product } = await listings.createProduct({
+        categoryId, name: name.trim(), attributes: typed,
+        description: description.trim() || undefined,
+        images,
+      });
       await listings.createOffer({
         productId: product.id,
         price: priceNum,
@@ -265,6 +289,69 @@ function NewListingForm(
             />
           );
         })}
+
+        <label className="block">
+          <span className="mb-1.5 block text-sm font-medium text-ink/70 dark:text-sand/70">
+            {t('Description', 'Maelezo')}
+          </span>
+          <textarea
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            rows={4}
+            maxLength={5000}
+            placeholder={t('Condition, specifications, what is included, delivery notes…', 'Hali, vipimo, kilichomo, maelezo ya usafirishaji…')}
+            className="w-full rounded-2xl border border-black/10 bg-white p-4 text-ink outline-none focus:border-flame focus:ring-2 focus:ring-flame/20 dark:border-white/10 dark:bg-ink-2 dark:text-sand"
+          />
+        </label>
+
+        {/* Photos */}
+        <div>
+          <span className="mb-1.5 block text-sm font-medium text-ink/70 dark:text-sand/70">
+            {t('Photos', 'Picha')}{' '}
+            <span className="font-normal text-ink/45">
+              {images.length}/{MAX_IMAGES}{images.length > 0 && ` · ${formatBytes(imagesBytes)}`}
+            </span>
+          </span>
+
+          <div className="flex flex-wrap gap-2">
+            {images.map((src, i) => (
+              <div key={i} className="relative h-20 w-20 overflow-hidden rounded-ds-xl bg-black/5 dark:bg-white/5">
+                <img src={src} alt={t('Product photo', 'Picha ya bidhaa')} className="h-full w-full object-cover" />
+                {i === 0 && (
+                  <span className="absolute inset-x-0 bottom-0 bg-black/55 py-0.5 text-center text-[9px] font-bold text-white">
+                    {t('MAIN', 'KUU')}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setImages(imgs => imgs.filter((_, j) => j !== i))}
+                  aria-label={t('Remove photo', 'Ondoa picha')}
+                  className="absolute right-0.5 top-0.5 grid h-5 w-5 place-items-center rounded-full bg-black/60 text-white"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            ))}
+
+            {images.length < MAX_IMAGES && (
+              <label className={cn(
+                'grid h-20 w-20 cursor-pointer place-items-center rounded-ds-xl border-2 border-dashed',
+                'border-black/15 text-ink/40 hover:border-flame hover:text-flame dark:border-white/15',
+              )}>
+                {imgBusy
+                  ? <Loader2 className="animate-spin" size={20} />
+                  : <ImagePlus size={20} />}
+                <input
+                  type="file" accept="image/*" multiple hidden
+                  onChange={e => { addImages(e.target.files); e.target.value = ''; }}
+                />
+              </label>
+            )}
+          </div>
+          <p className="mt-1.5 text-xs text-ink/45">
+            {t('Up to 4 photos. Large photos are shrunk automatically before upload.', 'Hadi picha 4. Picha kubwa hupunguzwa kabla ya kupakia.')}
+          </p>
+        </div>
 
         <div className="grid grid-cols-3 gap-2">
           <Field label={t('Price', 'Bei')} type="number" inputMode="decimal" value={price} onChange={e => setPrice(e.target.value)} />
