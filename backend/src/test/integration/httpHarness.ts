@@ -10,7 +10,9 @@ import { createServer, type Server } from 'node:http';
 
 export interface TestClient {
   base: string;
-  get(path: string): Promise<{ status: number; body: any }>;
+  get(path: string, token?: string): Promise<{ status: number; body: any }>;
+  post(path: string, body?: any, token?: string): Promise<{ status: number; body: any }>;
+  del(path: string, token?: string): Promise<{ status: number; body: any }>;
   close(): Promise<void>;
 }
 
@@ -24,15 +26,26 @@ export async function serveRouter(mountPath: string, router: Router): Promise<Te
   const { port } = server.address() as { port: number };
   const base = `http://127.0.0.1:${port}`;
 
+  async function send(method: string, path: string, body?: any, token?: string) {
+    const res = await fetch(base + path, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    });
+    const text = await res.text();
+    let parsed: any = null;
+    try { parsed = text ? JSON.parse(text) : null; } catch { parsed = text; }
+    return { status: res.status, body: parsed };
+  }
+
   return {
     base,
-    async get(path: string) {
-      const res = await fetch(base + path);
-      const text = await res.text();
-      let body: any = null;
-      try { body = text ? JSON.parse(text) : null; } catch { body = text; }
-      return { status: res.status, body };
-    },
+    get:  (path, token)       => send('GET', path, undefined, token),
+    post: (path, body, token) => send('POST', path, body, token),
+    del:  (path, token)       => send('DELETE', path, undefined, token),
     close() {
       return new Promise<void>(resolve => server.close(() => resolve()));
     },

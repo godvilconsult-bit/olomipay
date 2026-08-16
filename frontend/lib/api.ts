@@ -201,6 +201,44 @@ export const catalog = {
   },
 };
 
+// ── Seller listings (authenticated) ───────────────────────────────────────────
+// A seller creates a Product in any category, then an Offer prices it. The
+// category's attributeSchema drives which fields the form shows, so a new
+// vertical needs no frontend change.
+export interface AttributeDef {
+  type?: 'string' | 'number';
+  title?: string;
+  enum?: (string | number)[];
+}
+export interface ListingCategory {
+  id: string; key: string; name: string; unitType: string; path: string;
+  attributeSchema?: { required?: string[]; properties?: Record<string, AttributeDef> } | null;
+}
+export interface MyListing {
+  id: string; price: number; priceMinor: number; currency: string;
+  stock: number; moq: number; isAvailable: boolean;
+  product: {
+    id: string; name: string; imageUrl?: string | null;
+    attributes: Record<string, any> | null;
+    category?: { key: string; name: string } | null;
+  };
+}
+
+export const listings = {
+  categories: () => apiFetch<{ categories: ListingCategory[] }>('/api/listings/categories'),
+
+  createProduct: (body: { categoryId: string; name: string; attributes: Record<string, any>; imageUrl?: string; gtin?: string }) =>
+    apiFetch<{ product: { id: string; name: string }; reused?: boolean }>(
+      '/api/listings/products', { method: 'POST', body: JSON.stringify(body) }),
+
+  createOffer: (body: { productId: string; price: number; currency?: string; stock: number; moq?: number; isAvailable?: boolean }) =>
+    apiFetch<{ offer: MyListing }>('/api/listings/offers', { method: 'POST', body: JSON.stringify(body) }),
+
+  mine: () => apiFetch<{ sellerSlug: string; listings: MyListing[] }>('/api/listings/mine'),
+
+  remove: (offerId: string) => apiFetch<{ ok: boolean }>(`/api/listings/offers/${offerId}`, { method: 'DELETE' }),
+};
+
 export const orders = {
   place:   (body: { supplierId: string; addressId: string; items: { inventoryId: string; qty: number }[]; note?: string }) =>
     apiFetch('/api/orders', { method: 'POST', body: JSON.stringify(body) }),
