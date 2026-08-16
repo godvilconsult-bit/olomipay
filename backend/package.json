@@ -10,6 +10,7 @@
     "postinstall": "prisma generate",
     "typecheck": "tsc --noEmit --skipLibCheck",
     "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
     "pg": "node scripts/pg-dev.mjs",
     "seed": "tsx scripts/seed.ts",
     "db:migrate": "prisma migrate dev",

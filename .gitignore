@@ -17,6 +17,10 @@ Cargo.lock
 *.db
 *.sqlite
 
+# Embedded Postgres data dirs (npm run pg / integration suite)
+.pgdata/
+.pgdata-test/
+
 # OS
 .DS_Store
 Thumbs.db

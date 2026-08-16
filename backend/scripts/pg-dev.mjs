@@ -19,6 +19,11 @@ const pg = new EmbeddedPostgres({
   password: 'postgres',
   port: 5433,
   persistent: true,
+  // On Windows initdb otherwise inherits WIN1252 from the system locale, and the
+  // emoji in notification titles ("New order! 🔔") cannot be stored. notify()
+  // catches the failure silently, so notifications just vanish in local dev.
+  // Only applied on first init — delete .pgdata to re-create an existing cluster.
+  initdbFlags: ['--encoding=UTF8', '--locale=C'],
 });
 
 if (fresh) {
