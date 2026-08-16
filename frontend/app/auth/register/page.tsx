@@ -20,9 +20,15 @@ export default function RegisterPage() {
   const [role, setRole] = useState<Role>('HOUSEHOLD');
   const [form, setForm] = useState({ name: '', phone: '', pin: '', region: 'Dar es Salaam', businessName: '', vehicleType: 'MOTORBIKE', referralCode: '' });
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
-  // Pre-fill an invite code from a shared link (/auth/register?ref=CODE).
+  // Pre-fill from a shared link: ?ref=CODE (invite) and ?role=RIDER (pre-select role).
   useEffect(() => {
-    try { const ref = new URLSearchParams(window.location.search).get('ref'); if (ref) setForm((f) => ({ ...f, referralCode: ref.toUpperCase() })); } catch {}
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const ref = params.get('ref');
+      if (ref) setForm((f) => ({ ...f, referralCode: ref.toUpperCase() }));
+      const r = params.get('role')?.toUpperCase();
+      if (r && ['HOUSEHOLD', 'SUPPLIER', 'RIDER', 'DISTRIBUTOR', 'BRAND'].includes(r)) setRole(r as Role);
+    } catch {}
   }, []);
   const [locating, setLocating] = useState(false);
   const [loading, setLoading] = useState(false);

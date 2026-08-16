@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="-5%" r="125%">
+      <stop offset="0%" stop-color="#2A1206"/>
+      <stop offset="55%" stop-color="#1a0c05"/>
+      <stop offset="100%" stop-color="#120803"/>
+    </radialGradient>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F15A24"/>
+      <stop offset="1" stop-color="#FFB100"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#F15A24" stop-opacity="0.50"/>
+      <stop offset="100%" stop-color="#F15A24" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glow2" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FFB100" stop-opacity="0.34"/>
+      <stop offset="100%" stop-color="#FFB100" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <circle cx="140" cy="60" r="420" fill="url(#glow)"/>
+  <circle cx="1140" cy="640" r="380" fill="url(#glow2)"/>
+
+  <!-- brand lockup -->
+  <g transform="translate(82,74)">
+    <rect width="96" height="96" rx="26" fill="url(#brand)"/>
+    <g transform="translate(20,20) scale(2.333)" fill="#fff">
+      <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>
+    </g>
+    <text x="122" y="64" font-family="Segoe UI, Arial, sans-serif" font-size="46" font-weight="800" fill="#fff" letter-spacing="-1">JIKO CONNECT</text>
+  </g>
+
+  <!-- headline -->
+  <text x="84" y="332" font-family="Segoe UI, Arial, sans-serif" font-size="84" font-weight="800" fill="#ffffff" letter-spacing="-2.5">Your gas, delivered</text>
+  <text x="84" y="432" font-family="Segoe UI, Arial, sans-serif" font-size="84" font-weight="800" letter-spacing="-2.5"><tspan fill="#ffffff">to your</tspan><tspan fill="#FFB100" dx="26">door.</tspan></text>
+
+  <!-- subline -->
+  <text x="86" y="506" font-family="Segoe UI, Arial, sans-serif" font-size="29" font-weight="500" fill="#d9c8bd">Tanzania's LPG cooking-gas delivery network</text>
+
+  <!-- payments -->
+  <text x="86" y="576" font-family="Segoe UI, Arial, sans-serif" font-size="25" font-weight="500" fill="#9b8a7e">Pay with <tspan fill="#ffffff" font-weight="700">M-Pesa · Tigo Pesa · Airtel Money</tspan> · EWURA prices</text>
+</svg>

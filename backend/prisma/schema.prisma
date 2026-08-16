@@ -190,6 +190,17 @@ model User {
   subscriptions     Subscription[]
   referralsMade     Referral[]         @relation("Referrer")
   favorites         Favorite[]
+
+  // Universal marketplace (phase 1) — virtual back-relations, no column changes.
+  memberships       Membership[]
+  driverLegs        ShipmentLeg[]      @relation("DriverLegs")
+
+  // Phase 2 bridge: the org this user acts as by default. Nullable until the
+  // backfill runs; a user may belong to several orgs via Membership.
+  primaryOrgId      String?
+  primaryOrg        Organization?      @relation("PrimaryOrg", fields: [primaryOrgId], references: [id])
+
+  @@index([primaryOrgId])
 }
 
 // ── Favourite vendors (Tier 3 retention) ─────────────────────────────────────────
@@ -268,6 +279,10 @@ model SupplierProfile {
 
   createdAt     DateTime     @default(now())
 
+  // Phase 2 bridge: this shop as a trading Organization (RETAILER).
+  orgId         String?      @unique
+  org           Organization? @relation(fields: [orgId], references: [id])
+
   user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   inventory       Inventory[]
   orders          Order[]
@@ -317,7 +332,18 @@ model Product {
   distributorStock DistributorStock[]
   restockItems     RestockItem[]
 
+  // Universal marketplace (phase 1). Offer supersedes Inventory and
+  // DistributorStock; all three coexist until phase 8 contracts the old ones.
+  offers     Offer[]
+
+  // Phase 2 bridge: generic identity. `brand`/`sizeKg`/`type` above are dual-read
+  // until phase 8 drops them; `attributes` is the new home for both.
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id])
+  attributes Json?
+
   @@index([brand, type])
+  @@index([categoryId])
 }
 
 model Inventory {
@@ -600,6 +626,10 @@ model DistributorProfile {
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
 
+  // Phase 2 bridge: this depot as a trading Organization (WHOLESALER).
+  orgId         String?            @unique
+  org           Organization?      @relation(fields: [orgId], references: [id])
+
   user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   stock         DistributorStock[]
   restockOrders RestockOrder[]
@@ -799,4 +829,241 @@ model PushSubscription {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// UNIVERSAL MARKETPLACE — phase 1 (expand)
+//
+// Additive only. Nothing reads these yet; the gas flow is untouched and every
+// table above keeps its current shape. Back-relations added to User and Product
+// are virtual (the foreign keys live on the new tables) so no existing column
+// changes. See docs/refactor/UNIVERSAL-MARKETPLACE.md.
+//
+// Money on new tables is INTEGER MINOR UNITS + an explicit ISO-4217 currency —
+// never Float. The legacy Float columns migrate in phase 3.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// What a trading party is. A party may both buy and sell — a shop buys from a
+/// wholesaler and sells to consumers — which a single Role enum cannot express.
+enum OrgKind {
+  INDIVIDUAL    // a private consumer
+  RETAILER      // shop / vendor (today's SupplierProfile)
+  WHOLESALER    // distributor / depot (today's DistributorProfile)
+  MANUFACTURER  // producer at the top of the chain
+  CARRIER       // transport company / owner-driver
+  PLATFORM      // the operator itself
+}
+
+enum MemberRole {
+  OWNER
+  MANAGER
+  STAFF
+  DRIVER
+}
+
+/// The trading entity. Orders link org→org, so consumers get an auto-created
+/// INDIVIDUAL org and the order code needs no special case for private buyers.
+model Organization {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  kind        OrgKind  @default(INDIVIDUAL)
+
+  // Capabilities rather than a role: set independently of kind so an unusual
+  // party (a manufacturer that also runs its own trucks) is representable.
+  canBuy      Boolean  @default(true)
+  canSell     Boolean  @default(false)
+  canCarry    Boolean  @default(false)
+
+  // Market configuration — this is what replaces tenancy. One marketplace,
+  // many markets.
+  countryCode String   @default("TZ")   // ISO-3166-1 alpha-2
+  currency    String   @default("TZS")  // ISO-4217
+  locale      String   @default("en")
+  timezone    String   @default("Africa/Dar_es_Salaam")
+
+  isVerified  Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  rating      Float    @default(0)
+  ratingCount Int      @default(0)
+
+  // Storefront (see §4) — a seller is a browsable shop, not just a map pin.
+  logoUrl     String?  @db.Text
+  description String?  @db.Text
+  lat         Float?
+  lng         Float?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  memberships        Membership[]
+  offers             Offer[]
+  shipmentsAsShipper Shipment[]   @relation("ShipperOrg")
+  shipmentsAsCarrier Shipment[]   @relation("CarrierOrg")
+
+  // Phase 2 bridges back to the legacy profiles (1:1 while both coexist).
+  primaryForUsers    User[]              @relation("PrimaryOrg")
+  supplierProfile    SupplierProfile?
+  distributorProfile DistributorProfile?
+
+  @@index([kind, isActive])
+  @@index([countryCode, kind])
+  @@index([canSell, isActive])
+}
+
+/// Which humans may act for which organization. Replaces User.role for
+/// authorization; User.role survives only as a default UI hint.
+model Membership {
+  id        String     @id @default(cuid())
+  userId    String
+  orgId     String
+  role      MemberRole @default(OWNER)
+  createdAt DateTime   @default(now())
+
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  org  Organization @relation(fields: [orgId],  references: [id], onDelete: Cascade)
+
+  @@unique([userId, orgId])
+  @@index([orgId])
+}
+
+/// Product taxonomy. `attributeSchema` is a JSON-Schema describing the fields a
+/// product in this category carries, so a new vertical (water, agro, pharmacy)
+/// is configuration rather than a migration.
+model Category {
+  id              String   @id @default(cuid())
+  parentId        String?
+  key             String   @unique   // "lpg_refill", "cement_50kg"
+  name            String
+  unitType        String   @default("piece") // piece | kg | litre | m3 | pack
+  attributeSchema Json     @default("{}")
+  imageUrl        String?  @db.Text
+  isActive        Boolean  @default(true)
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryTree")
+  products Product[]
+
+  @@index([parentId, isActive])
+}
+
+/// Who sells a product, at what price. Replaces Inventory (retail) and
+/// DistributorStock (wholesale) — the same relation at different tiers.
+///
+/// Splitting Offer from Product is what lets one product page list many
+/// competing sellers, which is the core marketplace dynamic (§4).
+model Offer {
+  id          String   @id @default(cuid())
+  productId   String
+  sellerOrgId String
+
+  priceMinor  Int                        // integer minor units, never Float
+  currency    String   @default("TZS")
+  stock       Int      @default(0)
+  moq         Int      @default(1)       // minimum order qty — wholesale tiers
+  isAvailable Boolean  @default(true)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  product Product      @relation(fields: [productId],   references: [id], onDelete: Cascade)
+  seller  Organization @relation(fields: [sellerOrgId], references: [id], onDelete: Cascade)
+
+  @@unique([sellerOrgId, productId])
+  @@index([productId, isAvailable])
+  @@index([sellerOrgId, isAvailable])
+}
+
+enum ShipmentStatus {
+  DRAFT
+  PLANNED
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+}
+
+enum LegStatus {
+  PENDING
+  ASSIGNED
+  IN_TRANSIT
+  ARRIVED
+  COMPLETED
+  FAILED
+}
+
+/// A physical movement of goods. `orderId` is nullable because a freight job
+/// from the load board has no product order behind it.
+model Shipment {
+  id           String         @id @default(cuid())
+  orderId      String?                    // FK added in phase 4, when Order moves
+  shipperOrgId String
+  carrierOrgId String?
+  status       ShipmentStatus @default(DRAFT)
+
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  shipper Organization  @relation("ShipperOrg", fields: [shipperOrgId], references: [id])
+  carrier Organization? @relation("CarrierOrg", fields: [carrierOrgId], references: [id])
+  legs    ShipmentLeg[]
+
+  @@index([shipperOrgId, status])
+  @@index([carrierOrgId, status])
+  @@index([orderId])
+}
+
+/// One hop. A consumer delivery is a single leg; a full chain
+/// (manufacturer→wholesaler→shop→consumer) is several, which is what the map
+/// renders end to end (§7).
+model ShipmentLeg {
+  id           String    @id @default(cuid())
+  shipmentId   String
+  seq          Int                        // 0,1,2… order along the chain
+
+  originLat    Float
+  originLng    Float
+  destLat      Float
+  destLng      Float
+  originLabel  String?
+  destLabel    String?
+
+  vehicleId    String?                    // FK added with Vehicle in phase 6
+  driverUserId String?
+  status       LegStatus @default(PENDING)
+
+  /// Encoded polyline from the routing provider, computed server-side ONCE per
+  /// leg. Today the browser re-fetches a route every time the rider moves.
+  plannedRoute String?   @db.Text
+  distanceM    Int?
+  durationS    Int?
+
+  startedAt    DateTime?
+  completedAt  DateTime?
+  createdAt    DateTime  @default(now())
+
+  shipment Shipment       @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  driver   User?          @relation("DriverLegs", fields: [driverUserId], references: [id])
+  pings    TrackingPing[]
+
+  @@unique([shipmentId, seq])
+  @@index([driverUserId, status])
+  @@index([status])
+}
+
+/// Location history for a leg. Written throttled (the socket layer already rate
+/// limits writes); the live relay stays in-memory.
+model TrackingPing {
+  id      String   @id @default(cuid())
+  legId   String
+  lat     Float
+  lng     Float
+  speed   Float?
+  heading Float?
+  at      DateTime @default(now())
+
+  leg ShipmentLeg @relation(fields: [legId], references: [id], onDelete: Cascade)
+
+  @@index([legId, at])
 }

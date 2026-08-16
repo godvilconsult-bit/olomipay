@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { getAccessToken } from './api';
 
 // Singleton socket — survives component unmounts
 let _socket: Socket | null = null;
@@ -16,7 +17,11 @@ export function useSocket(token: string | null) {
     if (_socket) { socketRef.current = _socket; return; }
 
     _socket = io(process.env.NEXT_PUBLIC_API_URL!, {
-      auth:                  { token },
+      // Provide the token via a callback so EVERY (re)connect uses the freshest
+      // token from storage. A static value would keep retrying with a token that
+      // may have been rotated/refreshed — so after a drop (common on Android when
+      // backgrounded or switching networks) the socket would never re-authenticate.
+      auth:                  (cb: (d: { token: string | null }) => void) => cb({ token: getAccessToken() ?? token }),
       // Start with HTTP long-polling (works through every proxy / Android
       // WebView / restrictive mobile network) then transparently UPGRADE to
       // WebSocket. websocket-first would silently fail to connect on networks

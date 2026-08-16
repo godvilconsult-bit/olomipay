@@ -139,9 +139,75 @@ export const vendors = {
   favorites: () => apiFetch<{ vendors: any[] }>('/api/vendors/favorites'),
 };
 
+// ── Public storefront (no auth) ───────────────────────────────────────────────
+// Money arrives as { priceMinor, currency, price }. Prefer `price` for display
+// via formatMoney(); priceMinor is the authoritative integer.
+export interface CatalogMoney { priceMinor: number; currency: string; price: number }
+export interface CatalogSeller {
+  id: string; name: string; slug: string; kind: string;
+  isVerified: boolean; rating: number; ratingCount: number;
+  countryCode?: string; logoUrl?: string | null; lat?: number | null; lng?: number | null;
+}
+export interface CatalogOffer extends CatalogMoney {
+  id: string; stock: number; moq: number; inStock: boolean; seller?: CatalogSeller;
+}
+export interface CatalogProduct {
+  id: string; name: string; imageUrl?: string | null;
+  attributes: Record<string, any> | null;
+  category?: { id: string; key: string; name: string; unitType: string } | null;
+  sellerCount: number; from: CatalogMoney | null; bestOffer: CatalogOffer | null;
+}
+export interface CatalogCategory {
+  id: string; key: string; name: string; parentId: string | null;
+  unitType: string; imageUrl?: string | null; productCount: number;
+  attributeSchema?: any; children?: CatalogCategory[];
+}
+
+export interface CatalogQuery {
+  q?: string; category?: string; brand?: string; seller?: string;
+  min?: number; max?: number; currency?: string;
+  sort?: 'price_asc' | 'price_desc' | 'newest' | 'name';
+  page?: number; limit?: number; inStock?: boolean;
+}
+
+export const catalog = {
+  categories: () => apiFetch<{ categories: CatalogCategory[]; flat: CatalogCategory[] }>(
+    '/api/catalog/categories', { skipAuth: true }),
+
+  products: (q: CatalogQuery = {}) => {
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries(q)) if (v != null && v !== '') params.set(k, String(v));
+    return apiFetch<{
+      products: CatalogProduct[]; total: number; page: number; limit: number;
+      facets: { brands: { name: string; count: number }[] };
+    }>(`/api/catalog/products?${params.toString()}`, { skipAuth: true });
+  },
+
+  product: (id: string) => apiFetch<{
+    product: CatalogProduct & { offers: CatalogOffer[]; category: any };
+  }>(`/api/catalog/products/${id}`, { skipAuth: true }),
+
+  seller: (slug: string, page = 1) => apiFetch<{
+    seller: CatalogSeller & { description?: string | null; canSell: boolean; canCarry: boolean; currency: string };
+    listings: { offer: CatalogOffer; product: CatalogProduct }[];
+    total: number; page: number; limit: number;
+  }>(`/api/catalog/sellers/${slug}?page=${page}`, { skipAuth: true }),
+
+  sellers: (q: { kind?: string; country?: string; q?: string; page?: number } = {}) => {
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries(q)) if (v != null && v !== '') params.set(k, String(v));
+    return apiFetch<{ sellers: (CatalogSeller & { listingCount: number })[]; total: number }>(
+      `/api/catalog/sellers?${params.toString()}`, { skipAuth: true });
+  },
+};
+
 export const orders = {
   place:   (body: { supplierId: string; addressId: string; items: { inventoryId: string; qty: number }[]; note?: string }) =>
     apiFetch('/api/orders', { method: 'POST', body: JSON.stringify(body) }),
+  // Storefront checkout. All items must come from one seller; the API rejects a
+  // mixed basket rather than silently splitting it into several orders.
+  fromOffers: (body: { items: { offerId: string; qty: number }[]; addressId?: string; note?: string }) =>
+    apiFetch('/api/orders/from-offers', { method: 'POST', body: JSON.stringify(body) }),
   list:    () => apiFetch('/api/orders'),
   get:     (id: string) => apiFetch(`/api/orders/${id}`),
   reorder: (id: string) => apiFetch(`/api/orders/${id}/reorder`, { method: 'POST' }),

@@ -8,7 +8,12 @@ const PUBLIC_PATHS = [
 ];
 
 // Prefixes that are always public
-const PUBLIC_PREFIXES = ['/auth/', '/_next/', '/api/', '/icon', '/logo', '/manifest', '/sw.js'];
+//
+// /shop is the catalog-first storefront. It MUST stay unauthenticated: a
+// login-gated catalog cannot be indexed by search engines and cannot be shared
+// as a link, which removes the cheapest acquisition channel a marketplace has.
+// Browsing is public; checking out still requires an account.
+const PUBLIC_PREFIXES = ['/auth/', '/_next/', '/api/', '/shop', '/icon', '/logo', '/manifest', '/sw.js'];
 
 function isPublic(pathname: string): boolean {
   if (PUBLIC_PATHS.includes(pathname)) return true;
