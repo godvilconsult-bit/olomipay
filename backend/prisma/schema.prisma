@@ -348,8 +348,21 @@ model Product {
   category   Category? @relation(fields: [categoryId], references: [id])
   attributes Json?
 
+  /// Who introduced this catalog entry. Null for the seeded shared catalog.
+  /// A product is shared across sellers — Offer is what is per-seller — so this
+  /// records provenance, not ownership of the listing.
+  ownerOrgId String?
+  ownerOrg   Organization? @relation("OwnedProducts", fields: [ownerOrgId], references: [id])
+
+  /// Barcode. The key to one global catalog: two sellers scanning the same item
+  /// attach to one product rather than forking it, so the product page can
+  /// compare them.
+  gtin       String?
+
   @@index([brand, type])
   @@index([categoryId])
+  @@index([gtin])
+  @@index([ownerOrgId])
 }
 
 model Inventory {
@@ -911,6 +924,8 @@ model Organization {
   primaryForUsers    User[]              @relation("PrimaryOrg")
   supplierProfile    SupplierProfile?
   distributorProfile DistributorProfile?
+
+  ownedProducts      Product[]      @relation("OwnedProducts")
 
   // Freight marketplace (phase 6).
   loads              Load[]         @relation("ShipperLoads")

@@ -16,47 +16,17 @@
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { toMinor } from '../lib/money';
+import { seedCategories, BASE_CATEGORIES } from './categories';
 
 const DEFAULT_COUNTRY  = 'TZ';
 const DEFAULT_CURRENCY = 'TZS';
 const DEFAULT_LOCALE   = 'en';
 const DEFAULT_TZ       = 'Africa/Dar_es_Salaam';
 
-/** Today's ProductType enum, expressed as categories with an attribute schema. */
-const GAS_CATEGORIES: {
-  key: string; name: string; unitType: string; sortOrder: number; attributeSchema: Prisma.InputJsonObject;
-}[] = [
-  {
-    key: 'lpg_refill', name: 'LPG Gas Refill', unitType: 'piece', sortOrder: 1,
-    attributeSchema: {
-      type: 'object',
-      required: ['brand', 'sizeKg'],
-      properties: {
-        brand:  { type: 'string', title: 'Brand' },
-        sizeKg: { type: 'number', title: 'Cylinder size (kg)', enum: [6, 15, 38, 45] },
-      },
-    },
-  },
-  {
-    key: 'lpg_cylinder', name: 'LPG Cylinder (new)', unitType: 'piece', sortOrder: 2,
-    attributeSchema: {
-      type: 'object',
-      required: ['brand', 'sizeKg'],
-      properties: {
-        brand:  { type: 'string', title: 'Brand' },
-        sizeKg: { type: 'number', title: 'Cylinder size (kg)', enum: [6, 15, 38, 45] },
-      },
-    },
-  },
-  {
-    key: 'lpg_accessory', name: 'Gas Accessories', unitType: 'piece', sortOrder: 3,
-    attributeSchema: {
-      type: 'object',
-      required: ['brand'],
-      properties: { brand: { type: 'string', title: 'Brand' } },
-    },
-  },
-];
+/** Total nodes in the seed tree, for the dry-run count. */
+function countCategorySeeds(nodes = BASE_CATEGORIES): number {
+  return nodes.reduce((n, c) => n + 1 + countCategorySeeds(c.children ?? []), 0);
+}
 
 const CATEGORY_FOR_TYPE: Record<string, string> = {
   REFILL:    'lpg_refill',
@@ -107,7 +77,7 @@ export async function backfillMarketplace(
 
   if (opts.dryRun) {
     log('[backfill] DRY RUN — counting only, nothing will be written');
-    stats.categories     = GAS_CATEGORIES.length;
+    stats.categories     = countCategorySeeds();
     stats.products       = await prisma.product.count({ where: { categoryId: null } });
     stats.retailerOrgs   = await prisma.supplierProfile.count({ where: { orgId: null } });
     stats.wholesalerOrgs = await prisma.distributorProfile.count({ where: { orgId: null } });
@@ -116,17 +86,11 @@ export async function backfillMarketplace(
   }
 
   // ── 1. Categories ────────────────────────────────────────────────────────────
-  const categoryIdByKey = new Map<string, string>();
-  for (const c of GAS_CATEGORIES) {
-    const row = await prisma.category.upsert({
-      where:  { key: c.key },
-      update: { name: c.name, unitType: c.unitType, attributeSchema: c.attributeSchema, sortOrder: c.sortOrder },
-      create: { key: c.key, name: c.name, unitType: c.unitType, attributeSchema: c.attributeSchema, sortOrder: c.sortOrder },
-    });
-    categoryIdByKey.set(c.key, row.id);
-    stats.categories++;
-  }
-  log(`[backfill] categories ready: ${stats.categories}`);
+  // Seeds the whole marketplace tree, of which the gas categories are one
+  // branch. Without this the catalog can only ever hold LPG.
+  stats.categories = await seedCategories(log);
+  const allCats = await prisma.category.findMany({ select: { id: true, key: true } });
+  const categoryIdByKey = new Map(allCats.map(c => [c.key, c.id]));
 
   // ── 2. Products → category + attributes ──────────────────────────────────────
   const products = await prisma.product.findMany({ where: { categoryId: null } });

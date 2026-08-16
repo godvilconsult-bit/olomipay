@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 // ── Public routes — accessible WITHOUT authentication ─────────────────────────
 const PUBLIC_PATHS = [
   '/',
+  '/welcome',
   '/auth/login',
   '/auth/register',
 ];

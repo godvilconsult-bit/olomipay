@@ -58,12 +58,16 @@ export default function RegisterPage() {
     : role === 'RIDER' ? t('Share your current location', 'Shiriki eneo lako sasa')
     : t('Pin your delivery location', 'Weka eneo la kupokelea');
 
+  // Marketplace roles, not gas roles. The underlying Role enum is unchanged so
+  // no existing account or permission check breaks; only what a person is
+  // asked to identify as has changed. A seller here lists any category, and a
+  // wholesaler is simply a seller whose offers carry a minimum order quantity.
   const ROLES: { value: Role; label: string; sub: string; icon: any }[] = [
-    { value: 'HOUSEHOLD',   label: t('Household', 'Kaya'),       sub: t('Order gas', 'Agiza gesi'),        icon: Home },
-    { value: 'SUPPLIER',    label: t('Gas shop', 'Duka'),        sub: t('Sell to homes', 'Uza kwa kaya'),  icon: Store },
-    { value: 'RIDER',       label: t('Rider', 'Dereva'),         sub: t('Deliver gas', 'Sambaza'),         icon: Bike },
-    { value: 'DISTRIBUTOR', label: t('Distributor', 'Msambazaji'), sub: t('Supply shops', 'Sambazia maduka'), icon: Warehouse },
-    { value: 'BRAND',       label: t('Brand', 'Kampuni'),          sub: t('Advertise & leads', 'Tangaza'),    icon: Megaphone },
+    { value: 'HOUSEHOLD',   label: t('Buyer', 'Mnunuzi'),          sub: t('Buy anything', 'Nunua chochote'),        icon: Home },
+    { value: 'SUPPLIER',    label: t('Seller', 'Muuzaji'),         sub: t('Sell your products', 'Uza bidhaa zako'), icon: Store },
+    { value: 'RIDER',       label: t('Transporter', 'Msafirishaji'), sub: t('Deliver & haul', 'Sambaza & safirisha'), icon: Bike },
+    { value: 'DISTRIBUTOR', label: t('Wholesaler', 'Mfanyabiashara wa jumla'), sub: t('Supply in bulk', 'Uza kwa jumla'), icon: Warehouse },
+    { value: 'BRAND',       label: t('Brand', 'Kampuni'),          sub: t('Advertise & leads', 'Tangaza'),          icon: Megaphone },
   ];
 
   async function submit(e: React.FormEvent) {
@@ -81,7 +85,9 @@ export default function RegisterPage() {
       } as any);
       setTokens(res.accessToken, res.refreshToken);
       toast.success(t('Account created!', 'Akaunti imefunguliwa!'));
-      router.replace('/dashboard');
+      // Buyers land in the marketplace; sellers and transporters need their
+      // dashboard to finish setting up shop or vehicle details first.
+      router.replace(role === 'HOUSEHOLD' ? '/shop' : '/dashboard');
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : t('Sign up failed', 'Usajili umeshindikana'));
     } finally { setLoading(false); }
@@ -99,7 +105,7 @@ export default function RegisterPage() {
         </div>
 
         <h1 className="mt-6 text-2xl font-extrabold">{t('Create account', 'Fungua akaunti')}</h1>
-        <p className="mt-1 text-sm text-ink/60">{t('Who are you on the network?', 'Wewe ni nani kwenye mtandao?')}</p>
+        <p className="mt-1 text-sm text-ink/60">{t('How will you use the marketplace?', 'Utatumiaje soko hili?')}</p>
 
         <div className="mt-4 grid grid-cols-2 gap-2.5">
           {ROLES.map((r) => {
@@ -125,7 +131,7 @@ export default function RegisterPage() {
             </select>
           </label>
 
-          {(role === 'SUPPLIER' || role === 'DISTRIBUTOR' || role === 'BRAND') && <Field label={role === 'BRAND' ? t('Brand name', 'Jina la kampuni') : t('Business name', 'Jina la biashara')} placeholder={role === 'BRAND' ? t('e.g. Oryx Gas', 'mfano: Oryx Gas') : role === 'DISTRIBUTOR' ? t('e.g. Oryx Depot Mwanza', 'mfano: Oryx Depot Mwanza') : t('e.g. Mwenge Gas Centre', 'mfano: Mwenge Gas Centre')} value={form.businessName} onChange={set('businessName')} />}
+          {(role === 'SUPPLIER' || role === 'DISTRIBUTOR' || role === 'BRAND') && <Field label={role === 'BRAND' ? t('Brand name', 'Jina la kampuni') : t('Business name', 'Jina la biashara')} placeholder={role === 'BRAND' ? t('Your company name', 'Jina la kampuni yako') : role === 'DISTRIBUTOR' ? t('Your wholesale business', 'Biashara yako ya jumla') : t('Your shop name', 'Jina la duka lako')} value={form.businessName} onChange={set('businessName')} />}
           {role === 'RIDER' && (
             <label className="block">
               <span className="mb-1.5 block text-sm font-medium text-ink/70">{t('Vehicle', 'Chombo')}</span>

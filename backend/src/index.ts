@@ -45,6 +45,7 @@ async function loadRoutes() {
     ['/api/catalog',   () => import('./routes/catalog'),   'catalogRouter'],
     ['/api/auth',      () => import('./routes/auth'),      'authRouter'],
     ['/api/freight',   () => import('./routes/freight'),   'freightRouter'],
+    ['/api/listings',  () => import('./routes/listings'),  'listingsRouter'],
     ['/api/vendors',   () => import('./routes/vendors'),   'vendorsRouter'],
     ['/api/orders',    () => import('./routes/orders'),    'ordersRouter'],
     ['/api/jobs',      () => import('./routes/jobs'),      'jobsRouter'],

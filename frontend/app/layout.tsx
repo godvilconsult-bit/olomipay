@@ -5,12 +5,12 @@ import { LanguageProvider } from '../lib/i18n';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title:       'JIKO CONNECT — Gesi yako, popote ulipo',
-  description: 'JIKO CONNECT — order LPG cooking gas from nearby vendors, delivered by riders across Tanzania. Tafuta, agiza, pokea.',
+  title:       'JIKO CONNECT — Buy anything, delivered',
+  description: 'JIKO CONNECT — an open marketplace: browse products from shops, wholesalers and manufacturers, compare sellers, order, and track delivery to your door.',
   manifest:    '/manifest.json',
   appleWebApp: { capable: true, statusBarStyle: 'default', title: 'JIKO CONNECT' },
   icons:       { icon: '/icon-192.svg', apple: '/icon-192.svg' },
-  openGraph:   { type: 'website', title: 'JIKO CONNECT', description: 'LPG gas delivery for Tanzania — households, suppliers, riders.', siteName: 'JIKO CONNECT' },
+  openGraph:   { type: 'website', title: 'JIKO CONNECT', description: 'An open marketplace — buyers, sellers, wholesalers and transporters.', siteName: 'JIKO CONNECT' },
 };
 
 export const viewport: Viewport = {
