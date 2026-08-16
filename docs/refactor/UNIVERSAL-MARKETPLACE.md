@@ -1,11 +1,13 @@
 # Universal Marketplace — Target Architecture
 
 > Turning Jiko Connect from an LPG-only, Tanzania-only, single-hop delivery app into a
-> **global marketplace for any product**, with a **multi-tier supply chain**
-> (manufacturer → wholesaler → shop → consumer), **end-to-end live tracking**, and a
-> **freight marketplace** where shippers find transporters and transporters find loads.
+> **global marketplace for any product** — an Alibaba for Africa — with a **multi-tier
+> supply chain** (manufacturer → wholesaler → shop → consumer), **end-to-end live
+> tracking**, and a **freight marketplace** where shippers find transporters and
+> transporters find loads.
 
-**Status:** design, for sign-off. No schema or behaviour changes yet.
+**Status:** design, for sign-off. Phase 0 (characterization tests) is done; no schema
+changes yet.
 **Supersedes:** parts of [`PHASE1-AUDIT.md`](./PHASE1-AUDIT.md) — see §0.
 
 ---
@@ -24,7 +26,7 @@ Everything else in the audit still stands, in particular: attributes as JSON on 
 category-owned schema, money as integer minor units, and expand/contract migration.
 
 **Decisions taken (2026-08-16):** one global marketplace · generic catalog + order core
-first · full freight marketplace with quoting.
+first · full freight marketplace with quoting · catalog-first public storefront.
 
 ---
 
@@ -136,9 +138,73 @@ The existing gas catalog becomes categories `lpg_refill` / `lpg_cylinder` /
 `lpg_accessory` whose `attributeSchema` declares `brand` and `sizeKg` — reproducing
 today's behaviour exactly, with zero gas-specific code left in the engine.
 
+Separating `Product` (what a thing *is*) from `Offer` (who sells it, at what price) is what
+makes §4 possible: one product page can list many competing sellers.
+
 ---
 
-## 4. Orders: one model, any tier
+## 4. Discovery: the public storefront
+
+**This is the biggest behavioural change, and it is easy to underestimate.** Today's
+discovery is *geo-bound*: the household home screen asks "which vendors near me have stock",
+and a product has no existence independent of a nearby vendor who happens to carry it.
+An Alibaba-style marketplace inverts that — **the catalog is the front door**, browsable by
+anyone, and fulfilment is resolved afterwards.
+
+| Today | Target |
+|---|---|
+| Search vendors within a radius | Browse/search a global catalog by category, attribute, price |
+| Product exists only as a vendor's inventory row | Product has its own page, with many sellers' offers |
+| Must be logged in and located | Public, indexable, shareable — no login to browse |
+| Vendor = a pin on a map | Vendor = a **storefront** with catalog, ratings, verification |
+
+New surface required:
+
+- **Category tree browse** and faceted search over `Product.attributes` (brand, size,
+  material…). Postgres full-text plus a GIN index on the JSONB gets a long way before any
+  external search engine is warranted.
+- **Product detail page** — the offer list is the interesting part: same product, many
+  sellers, sorted by delivered price (item + computed delivery to the viewer), stock, seller
+  rating, distance. This is the competitive dynamic that makes a marketplace work.
+- **Seller storefront** — `/s/{org-slug}`: their catalog, verification badges, trade history,
+  response rate.
+- **Public + SEO** — product and storefront pages must render server-side and be indexable.
+  Organic search is the cheapest acquisition channel a marketplace has, and it is
+  unavailable to a login-gated app.
+
+### RFQ — and why it is the same model as freight
+
+Alibaba's other half is **request for quotation**: a buyer describes what they want, and
+sellers bid. That is structurally identical to the freight load board in §8 — one side
+posts a need, the other side quotes, the poster accepts one.
+
+```prisma
+model Rfq {
+  id           String  @id
+  buyerOrgId   String
+  categoryId   String?
+  title        String
+  spec         Json                       // free-form + category attributes
+  qty          Int
+  currency     String
+  deliverToId  String?                    // address
+  closesAt     DateTime
+  status       RfqStatus                  // OPEN QUOTED AWARDED CLOSED CANCELLED
+}
+```
+
+`Quote` (§8) is deliberately written to carry either a `loadId` **or** an `rfqId`, so
+quoting, notification, acceptance and the audit trail are implemented once. Awarding an RFQ
+creates an ordinary `Order`; awarding a `Load` creates a `Shipment`.
+
+**Trust is the hard part, not the software.** Cross-border B2B trade fails on
+counterparty risk, and the existing flow already holds payment until delivery is confirmed
+— that is escrow in all but name, and it should be made explicit and prominent
+(verified-seller badges, held funds, dispute window) rather than left implicit.
+
+---
+
+## 5. Orders: one model, any tier
 
 ```prisma
 model Order {
@@ -169,11 +235,11 @@ it**. Walking `parentOrderId` yields the full provenance:
 consumer order  ←  shop's restock from wholesaler  ←  wholesaler's order from manufacturer
 ```
 
-That chain is exactly what §6 renders on the map.
+That chain is exactly what §7 renders on the map.
 
 ---
 
-## 5. Logistics: shipments with legs
+## 6. Logistics: shipments with legs
 
 Today `Delivery` is one rider, one hop, one order. A chain needs many hops, and freight
 needs hops with no product order behind them at all.
@@ -221,7 +287,7 @@ with `deliveryId` swapped for `legId`.
 
 ---
 
-## 6. The map: from one pin to the whole chain
+## 7. The map: from one pin to the whole chain
 
 Current state is thinner than the audit suggests. OSRM routing exists **only** inside
 [`LeafletMap.tsx`](../../frontend/components/LeafletMap.tsx) — client-side, against the
@@ -247,7 +313,7 @@ distribution of the product" ask, made literal.
 
 ---
 
-## 7. Freight marketplace
+## 8. Freight marketplace
 
 Two-sided, and it must work from **both** directions.
 
@@ -269,16 +335,18 @@ model Load {                              // a shipper posting cargo
   shipmentId     String?                  // created on award
 }
 
-model Quote {                             // a transporter bidding
+model Quote {                             // a bid — on a Load or an Rfq (§4)
   id             String  @id
-  loadId         String
-  carrierOrgId   String
+  loadId         String?
+  rfqId          String?
+  bidderOrgId    String
   amountMinor    Int
   currency       String
-  etaPickup      DateTime
-  etaDrop        DateTime
+  etaPickup      DateTime?
+  etaDrop        DateTime?
   status         QuoteStatus              // PENDING ACCEPTED REJECTED WITHDRAWN
-  @@unique([loadId, carrierOrgId])
+  @@unique([loadId, bidderOrgId])
+  @@unique([rfqId, bidderOrgId])
 }
 
 model Vehicle {
@@ -316,7 +384,7 @@ pool becomes a `Load` automatically, so the two sides feed each other.
 
 ---
 
-## 8. Going global
+## 9. Going global
 
 | Concern | Today | Target |
 |---|---|---|
@@ -331,11 +399,12 @@ pool becomes a `Load` automatically, so the two sides feed each other.
 
 **Money is the one I would not defer.** `Float` for money is already a rounding bug; with
 FX across markets it becomes a reconciliation problem. It is far cheaper to fix while the
-money rows are being migrated anyway.
+money rows are being migrated anyway. The conservation invariant pinned in
+`src/test/integration/placeOrder.test.ts` is the guard for that migration.
 
 ---
 
-## 9. Migration — expand / contract
+## 10. Migration — expand / contract
 
 Each step is independently deployable and reversible. **The gas flow is the regression
 baseline at every step**: if a household in Dar can still order a 15 kg Oryx refill and
@@ -343,19 +412,21 @@ watch the rider arrive, the step is green.
 
 | Phase | Work | Risk |
 |---|---|---|
+| **0. Baseline** ✅ | Characterization tests over the live order flow on a real Postgres | none |
 | **1. Expand** | Add `Organization`, `Membership`, `Category`, `Offer`, `Shipment`, `ShipmentLeg` alongside existing tables. Nothing reads them yet | none — additive |
 | **2. Backfill** | Auto-create an org per user; map `SupplierProfile`→RETAILER, `DistributorProfile`→WHOLESALER; `Inventory`+`DistributorStock`→`Offer`; gas products → categories + attributes | reversible |
 | **3. Dual-read** | Order/catalog code reads new models, writes both. Money migrates to minor units behind helpers | medium — full test pass |
 | **4. Cut over** | `Order` becomes party-to-party; `RestockOrder` folds in with `parentOrderId`; `Delivery`→single-leg `Shipment` | highest — feature-flagged |
-| **5. Freight** | `Load`, `Quote`, `Vehicle`, `CarrierRoute` + matcher + screens | additive, new surface |
-| **6. Map** | `RoutingProvider`, server-side route caching, multi-leg chain rendering on both engines | additive |
-| **7. Contract** | Drop `brand`/`sizeKg`/`ProductType`/`Cylinder`/`PriceCap`/restock tables | cleanup |
+| **5. Storefront** | Public catalog browse, product pages with multi-seller offers, seller storefronts, SEO | additive, new surface |
+| **6. Freight** | `Load`, `Quote`, `Vehicle`, `CarrierRoute` + matcher + screens | additive, new surface |
+| **7. Map** | `RoutingProvider`, server-side route caching, multi-leg chain rendering on both engines | additive |
+| **8. Contract** | Drop `brand`/`sizeKg`/`ProductType`/`Cylinder`/`PriceCap`/restock tables | cleanup |
 
-Phases 5 and 6 are independent of each other and can run in parallel once 4 lands.
+Phases 5, 6 and 7 are independent of each other and can run in parallel once 4 lands.
 
 ---
 
-## 10. Explicitly not in scope
+## 11. Explicitly not in scope
 
 Cylinder deposit tracking stays as a gas-category plugin rather than core (`Cylinder` is a
 returnable-container concept — worth generalizing later as `ReturnableAsset`, not now).
@@ -365,13 +436,15 @@ phases — international *listing* is supported, international *clearing* is not
 
 ---
 
-## 11. Sign-off needed
+## 12. Sign-off needed
 
 1. **`Organization` as the trading party** — bigger than the audit's plan, but without it
    "a shop that buys and sells" has no clean representation. Confirm.
 2. **Money → integer minor units in phase 3.** Touches every money path and its tests.
 3. **Routing provider** — self-hosted OSRM (free, ops burden) vs. Mapbox/Google (paid, no
-   ops). Needed before phase 6; affects cost model.
+   ops). Needed before phase 7; affects cost model.
 4. **Consumer-visible provenance** — should a consumer see the *upstream* legs of their
    product's chain, or only their own delivery leg? Full visibility is the headline feature
    but exposes supplier relationships between businesses.
+5. **Public browsing without login** (§4) — required for SEO and for the marketplace to feel
+   like a marketplace, but it exposes seller pricing to competitors and scrapers.
