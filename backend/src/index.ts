@@ -20,6 +20,12 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
 }));
 app.options('*', cors());
+// Product galleries allow up to 4 images totalling 50 MB, so listing uploads
+// need their own ceiling. Scoped to that one path rather than raised globally:
+// every other endpoint keeps the 5 MB limit, so a large body cannot be used to
+// exhaust memory against the whole API. body-parser marks the request parsed,
+// so the general parser below is a no-op for these.
+app.use('/api/listings', express.json({ limit: '55mb' }));
 app.use(express.json({ limit: '5mb' }));
 app.use(rateLimit({ windowMs: 60_000, max: 300, standardHeaders: true, legacyHeaders: false }));
 
@@ -46,6 +52,8 @@ async function loadRoutes() {
     ['/api/auth',      () => import('./routes/auth'),      'authRouter'],
     ['/api/freight',   () => import('./routes/freight'),   'freightRouter'],
     ['/api/listings',  () => import('./routes/listings'),  'listingsRouter'],
+    ['/api/messaging/conversations', () => import('./routes/messaging'), 'conversationsRouter'],
+    ['/api/invoices',  () => import('./routes/messaging'), 'invoicesRouter'],
     ['/api/vendors',   () => import('./routes/vendors'),   'vendorsRouter'],
     ['/api/orders',    () => import('./routes/orders'),    'ordersRouter'],
     ['/api/jobs',      () => import('./routes/jobs'),      'jobsRouter'],

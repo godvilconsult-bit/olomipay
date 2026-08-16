@@ -200,6 +200,12 @@ router.get('/products/:id', async (req, res) => {
   res.json({
     product: {
       id: product.id, name: product.name, imageUrl: product.imageUrl,
+      description: product.description,
+      // Always an array so the gallery has one shape; falls back to the single
+      // legacy imageUrl for products created before galleries existed.
+      images: Array.isArray(product.images) && product.images.length
+        ? product.images
+        : (product.imageUrl ? [product.imageUrl] : []),
       attributes: product.attributes,
       category: product.category && {
         id: product.category.id, key: product.category.key,
