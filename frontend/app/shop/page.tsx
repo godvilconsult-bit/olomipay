@@ -10,7 +10,7 @@
  */
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { Search, Store, PackageSearch, SlidersHorizontal, BadgeCheck, Package } from 'lucide-react';
+import { Search, Store, PackageSearch, SlidersHorizontal, BadgeCheck, Package, Truck, ShieldCheck } from 'lucide-react';
 import { catalog, getAccessToken, type CatalogProduct, type CatalogCategory } from '../../lib/api';
 import { formatCatalogMoney } from '../../lib/money';
 import { Card, Pill, Spinner, EmptyState, Button, cn } from '../../components/ui';
@@ -89,32 +89,93 @@ export default function ShopPage() {
     <>
       <MarketplaceHeader />
       <div className="mx-auto w-full max-w-7xl px-4 pb-16 pt-5 lg:px-6">
-      {/* Hero — the first thing a visitor sees, so it states what this is and
-          gives one honest number rather than a marketing claim. */}
-      <div className="mb-5">
-        <h1 className="text-[28px] font-extrabold leading-tight tracking-tight text-ink dark:text-sand sm:text-4xl">
-          {t('Buy anything,', 'Nunua chochote,')}{' '}
-          <span className="bg-grad-brand bg-clip-text text-transparent">
-            {t('delivered', 'kiletwe')}
-          </span>
-        </h1>
-        <p className="mt-2 max-w-md text-sm leading-relaxed text-ink/60 dark:text-sand/60">
-          {t('Compare sellers, order, and track it to your door. No account needed to browse.',
-             'Linganisha wauzaji, agiza, na fuatilia hadi mlangoni. Hakuna akaunti inahitajika kuvinjari.')}
-        </p>
-        {total > 0 && (
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-leaf/10 px-2.5 py-1 font-semibold text-leaf-dark">
-              <span className="h-1.5 w-1.5 rounded-full bg-leaf" />
-              {total} {t(total === 1 ? 'product on sale' : 'products on sale', 'bidhaa zinapatikana')}
+      {/* Hero band — scope tabs above a single dominant search, the shape large
+          trading marketplaces converge on. The soft wash lifts it off the page
+          without a stock photo behind it. */}
+      <div className="-mx-4 mb-6 bg-gradient-to-b from-flame/[0.07] via-amber-400/[0.04] to-transparent px-4 pb-6 pt-5 lg:-mx-6 lg:px-6 lg:pb-8 lg:pt-7">
+        <div className="mx-auto max-w-3xl text-center">
+          <h1 className="text-[26px] font-extrabold leading-tight tracking-tight text-ink dark:text-sand sm:text-[34px]">
+            {t('Buy anything,', 'Nunua chochote,')}{' '}
+            <span className="bg-grad-brand bg-clip-text text-transparent">
+              {t('delivered', 'kiletwe')}
             </span>
-            {categories.length > 0 && (
-              <span className="rounded-full bg-black/5 px-2.5 py-1 font-medium text-ink/60 dark:bg-white/10 dark:text-sand/60">
-                {categories.length} {t('categories', 'makundi')}
-              </span>
-            )}
+          </h1>
+          <p className="mx-auto mt-1.5 max-w-lg text-sm text-ink/60 dark:text-sand/60">
+            {t('Compare sellers across Africa, order, and track it to your door.',
+               'Linganisha wauzaji kote Afrika, agiza, na fuatilia hadi mlangoni.')}
+          </p>
+
+          {/* Scope tabs. Products searches here; the others are separate
+              surfaces, so they navigate rather than pretending to filter. */}
+          <div className="mt-4 flex items-center justify-center gap-5 text-[15px] font-bold">
+            <span className="relative text-flame">
+              {t('Products', 'Bidhaa')}
+              <span className="absolute -bottom-1.5 left-0 h-[3px] w-full rounded-full bg-flame" />
+            </span>
+            <Link href="/shop?verified=1" className="text-ink/45 transition hover:text-ink/70 dark:text-sand/45">
+              {t('Sellers', 'Wauzaji')}
+            </Link>
+            <Link href="/freight" className="text-ink/45 transition hover:text-ink/70 dark:text-sand/45">
+              {t('Freight', 'Usafirishaji')}
+            </Link>
           </div>
-        )}
+
+          <div className="mt-4">
+            <div className="flex items-center gap-1.5 rounded-full border-2 border-flame/70 bg-white p-1.5 shadow-lg focus-within:border-flame dark:bg-ink-2">
+              <Search className="ml-2.5 shrink-0 text-ink/35" size={19} />
+              <input
+                value={q}
+                onChange={e => setQ(e.target.value)}
+                placeholder={t('Search products, brands, categories…', 'Tafuta bidhaa, chapa, makundi…')}
+                aria-label={t('Search products', 'Tafuta bidhaa')}
+                className="min-w-0 flex-1 bg-transparent py-2 text-[15px] text-ink outline-none placeholder:text-ink/35 dark:text-sand"
+              />
+              <button
+                type="button"
+                onClick={() => { setSearch(q); setPage(1); }}
+                className="shrink-0 rounded-full bg-grad-brand px-6 py-2.5 text-sm font-bold text-white shadow-ds-btn active:scale-[0.98]"
+              >
+                {t('Search', 'Tafuta')}
+              </button>
+            </div>
+          </div>
+
+          {/* Honest counts, not marketing claims. */}
+          {total > 0 && (
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-2 text-xs">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-leaf/10 px-2.5 py-1 font-semibold text-leaf-dark">
+                <span className="h-1.5 w-1.5 rounded-full bg-leaf" />
+                {total} {t(total === 1 ? 'product on sale' : 'products on sale', 'bidhaa zinapatikana')}
+              </span>
+              {categories.length > 0 && (
+                <span className="rounded-full bg-black/5 px-2.5 py-1 font-medium text-ink/60 dark:bg-white/10 dark:text-sand/60">
+                  {categories.length} {t('categories', 'makundi')}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Trust rail — the reassurances a first-time buyer looks for, and each
+            one is true of this platform rather than aspirational. */}
+        <div className="mx-auto mt-6 grid max-w-4xl grid-cols-3 gap-3">
+          {[
+            { icon: BadgeCheck, title: t('Verified sellers', 'Wauzaji halali'), sub: t('Identity checked', 'Utambulisho umethibitishwa') },
+            { icon: Truck,      title: t('Live tracking', 'Ufuatiliaji'),       sub: t('Watch it to your door', 'Fuatilia hadi mlangoni') },
+            { icon: ShieldCheck,title: t('Pay on delivery', 'Lipa ukipokea'),   sub: t('Confirm before you pay', 'Thibitisha kabla ya kulipa') },
+          ].map(x => {
+            const Icon = x.icon;
+            return (
+              <div key={x.title} className="flex items-center gap-2.5 rounded-ds-xl bg-white/70 px-3 py-2.5 shadow-ds-card dark:bg-ink-2/70">
+                <Icon size={20} className="shrink-0 text-flame" />
+                <div className="min-w-0">
+                  <div className="truncate text-[12px] font-bold text-ink dark:text-sand">{x.title}</div>
+                  <div className="truncate text-[10px] text-ink/50 dark:text-sand/50">{x.sub}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       <SellerCallout />
@@ -129,22 +190,20 @@ export default function ShopPage() {
       )}
 
       {/* Search */}
-      <div className="sticky top-[53px] z-10 -mx-4 mb-3 bg-sand/80 px-4 py-2 backdrop-blur dark:bg-ink/80">
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink/40" size={18} />
-            <input
-              value={q}
-              onChange={e => setQ(e.target.value)}
-              placeholder="Search products…"
-              aria-label="Search products"
-              className="min-h-touch w-full rounded-2xl border border-black/10 bg-white pl-10 pr-4 text-ink outline-none focus:border-flame focus:ring-2 focus:ring-flame/20 dark:border-white/10 dark:bg-ink-2 dark:text-sand"
-            />
-          </div>
-          <Button variant="ghost" onClick={() => setShowFilters(v => !v)} aria-expanded={showFilters}>
-            <SlidersHorizontal size={16} />
-          </Button>
-        </div>
+      {/* The search input lives in the hero now; this row is filters only, and
+          shows what is currently narrowing the results so it can be cleared. */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <Button variant="ghost" onClick={() => setShowFilters(v => !v)} aria-expanded={showFilters}>
+          <SlidersHorizontal size={16} /> {t('Filters', 'Vichujio')}
+        </Button>
+        {(search || category || brand) && (
+          <button
+            onClick={() => { setQ(''); setSearch(''); setCategory(''); setBrand(''); setPage(1); }}
+            className="inline-flex items-center gap-1 rounded-full bg-flame/10 px-3 py-1.5 text-xs font-semibold text-flame"
+          >
+            {t('Clear filters', 'Ondoa vichujio')} ×
+          </button>
+        )}
       </div>
 
       {/* Categories */}
