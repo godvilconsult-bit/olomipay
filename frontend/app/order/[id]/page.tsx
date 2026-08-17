@@ -5,7 +5,8 @@ import { useRouter, useParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import toast from 'react-hot-toast';
 import { ArrowLeft, Check, Bike, Phone, ShieldCheck, Star, Smartphone, Banknote, HandCoins, RefreshCw, MessageCircle, Flag } from 'lucide-react';
-import { orders, subscriptions, support, getAccessToken } from '../../../lib/api';
+// Aliased: this file already has a local `tracking` boolean for the live phase.
+import { orders, subscriptions, support, getAccessToken, tracking as trackingApi, type Journey } from '../../../lib/api';
 import { useSocket } from '../../../lib/useSocket';
 import { useT } from '../../../lib/i18n';
 import { localPhone } from '../../../lib/utils';
@@ -40,11 +41,24 @@ export default function OrderPage() {
   const [subBusy, setSubBusy] = useState(false);
   const [reporting, setReporting] = useState(false);
   const [riderPos, setRiderPos] = useState<{ lat: number; lng: number } | null>(null);
+  const [journey, setJourney]   = useState<Journey | null>(null);
 
   const STEPS = [t('Placed', 'Imetumwa'), t('Confirmed', 'Imethibitishwa'), t('Rider found', 'Dereva amepatikana'), t('Fee confirmed', 'Ada imethibitishwa'), t('On the way', 'Njiani'), t('Arrived', 'Imefika')];
 
   const load = useCallback(async () => { try { const r = await orders.get(id); setOrder(r.order); } catch {} }, [id]);
   useEffect(() => { load(); }, [load]);
+
+  /**
+   * Road-snapped journey from the server. Cached there, so refetching on each
+   * status change is cheap — and it must refetch, because a leg's status
+   * (pending → active → done) changes as the order progresses.
+   *
+   * Failure is silent on purpose: the map still shows markers, just no lines.
+   */
+  useEffect(() => {
+    if (!order?.status) return;
+    trackingApi.order(id).then(setJourney).catch(() => {});
+  }, [id, order?.status]);
 
   useEffect(() => {
     const evs = ['order:confirmed', 'order:fee', 'order:picked', 'order:delivered', 'order:rejected', 'payment:paid'];
@@ -151,14 +165,50 @@ export default function OrderPage() {
           </Card>
         )}
 
-        {/* LIVE MAP — watch the rider move in real time */}
+        {/* LIVE MAP — watch the rider move in real time, along the real road */}
         {tracking && markers.length > 0 && (
           <div>
             <div className="mb-1.5 flex items-center gap-1.5 text-sm font-bold">
               <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-flame opacity-60" /><span className="relative inline-flex h-2 w-2 rounded-full bg-flame" /></span>
               {t('Live tracking', 'Ufuatiliaji wa moja kwa moja')}
+              {journey?.etaMinutes != null && (
+                <span className="ml-auto rounded-full bg-flame/10 px-2 py-0.5 text-xs font-bold text-flame">
+                  {t('arrives in', 'inafika baada ya')} ~{journey.etaMinutes} {t('min', 'dakika')}
+                </span>
+              )}
             </div>
-            <Card className="!p-1.5"><Map markers={markers} height={300} /></Card>
+            {/* routes are the server-computed legs; absent, the map still draws pins */}
+            <Card className="!p-1.5"><Map markers={markers} height={300} routes={journey?.legs} /></Card>
+
+            {/* Provenance: only worth showing when there is more than one hop. */}
+            {journey && journey.chainLength > 1 && (
+              <Card className="mt-2">
+                <div className="mb-1.5 text-xs font-bold uppercase tracking-wide text-ink/50">
+                  {t('Where this came from', 'Ilikotoka')}
+                </div>
+                <ol className="space-y-1.5">
+                  {journey.legs.map(leg => (
+                    <li key={leg.seq} className="flex items-center gap-2 text-sm">
+                      <span className={cn(
+                        'h-2 w-2 shrink-0 rounded-full',
+                        leg.status === 'DONE' ? 'bg-ink/30' : leg.status === 'ACTIVE' ? 'bg-flame' : 'bg-flame/30',
+                      )} />
+                      <span className={cn('min-w-0 truncate', leg.status === 'DONE' ? 'text-ink/50' : 'text-ink dark:text-sand')}>
+                        {leg.label}
+                      </span>
+                      <span className="ml-auto shrink-0 text-xs tabular-nums text-ink/40">
+                        {(leg.distanceM / 1000).toFixed(1)} km
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+                {journey.routeQuality === 'approximate' && (
+                  <p className="mt-2 text-[11px] text-ink/40">
+                    {t('Distances are approximate.', 'Umbali ni wa kukadiria.')}
+                  </p>
+                )}
+              </Card>
+            )}
           </div>
         )}
 

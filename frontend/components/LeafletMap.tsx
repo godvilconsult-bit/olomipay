@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import { Maximize2, Minimize2, LocateFixed } from 'lucide-react';
 import { markerSvg, markerSize, infoHtml, hasInfo } from './mapIcons';
-import type { MapMarker } from './Map';
+import type { MapMarker, MapProps } from './Map';
+import { decodePolyline } from '../lib/polyline';
 
 function makeIcon(m: MapMarker) {
   const { w, h, anchorX, anchorY } = markerSize(m.kind);
@@ -18,12 +19,20 @@ function makeIcon(m: MapMarker) {
 
 const easeInOut = (k: number) => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2);
 
-export default function LeafletMap({ markers, height = 200, onMarkerClick }: { markers: MapMarker[]; height?: number; onMarkerClick?: (id: string) => void }) {
+/** Colour a leg by progress: finished, in motion, or still to come. */
+const LEG_STYLE: Record<string, L.PolylineOptions> = {
+  DONE:    { color: '#8A8580', weight: 4, opacity: 0.55, lineCap: 'round' },
+  ACTIVE:  { color: '#F15A24', weight: 6, opacity: 0.95, lineCap: 'round' },
+  PENDING: { color: '#F15A24', weight: 4, opacity: 0.40, dashArray: '6 8', lineCap: 'round' },
+};
+
+export default function LeafletMap({ markers, height = 200, onMarkerClick, routes }: MapProps) {
   const elRef    = useRef<HTMLDivElement>(null);
   const mapRef   = useRef<L.Map | null>(null);
   const layerRef = useRef<L.LayerGroup | null>(null);   // static markers (dest/vendor/me)
   const riderRef = useRef<L.Marker | null>(null);       // persistent, smoothly animated
   const routeRef = useRef<L.Polyline | null>(null);
+  const legsRef  = useRef<L.LayerGroup | null>(null);   // server-supplied journey legs
   const routeAnchorRef = useRef<{ lat: number; lng: number } | null>(null);
   const animRef  = useRef<number | null>(null);
   const followRef = useRef(true);                        // camera follows the rider (Uber-style)
@@ -37,6 +46,7 @@ export default function LeafletMap({ markers, height = 200, onMarkerClick }: { m
     // Carto Voyager — clean, muted, "premium" basemap (vs raw OSM clutter).
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 20, subdomains: 'abcd' }).addTo(map);
     layerRef.current = L.layerGroup().addTo(map);
+    legsRef.current  = L.layerGroup().addTo(map);
     mapRef.current = map;
     map.setView([-6.7924, 39.2083], 14);
     map.on('dragstart', () => { followRef.current = false; setOffCenter(true); });
@@ -45,6 +55,33 @@ export default function LeafletMap({ markers, height = 200, onMarkerClick }: { m
 
   // fullscreen → the container resized, tell Leaflet to recompute.
   useEffect(() => { const m = mapRef.current; if (m) setTimeout(() => m.invalidateSize(), 180); }, [full]);
+
+  /**
+   * Draw the journey the server sent: one line per leg, coloured by progress,
+   * so a buyer sees the whole chain rather than only the last mile.
+   */
+  useEffect(() => {
+    const map = mapRef.current, group = legsRef.current;
+    if (!map || !group) return;
+    group.clearLayers();
+    if (!routes?.length) return;
+
+    const all: [number, number][] = [];
+    for (const leg of routes) {
+      const pts = decodePolyline(leg.polyline).map(p => [p.lat, p.lng] as [number, number]);
+      if (pts.length < 2) continue;
+      const line = L.polyline(pts, LEG_STYLE[leg.status ?? 'PENDING'] ?? LEG_STYLE.PENDING).addTo(group);
+      if (leg.label) line.bindTooltip(leg.label, { sticky: true });
+      all.push(...pts);
+    }
+
+    // Frame the whole journey once. Skipped while a rider is being followed, so
+    // the camera does not fight the follow behaviour below.
+    if (all.length > 1 && !markers.some(m => m.kind === 'rider')) {
+      map.fitBounds(L.latLngBounds(all).pad(0.2));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routes]);
 
   // Road-snapped route via OSRM (free, no key). Falls back to the straight line.
   async function fetchRoute(from: { lat: number; lng: number }, to: { lat: number; lng: number }) {
@@ -98,9 +135,10 @@ export default function LeafletMap({ markers, height = 200, onMarkerClick }: { m
         riderRef.current.setIcon(makeIcon(rider));
         animateRider(target);
       }
-      // Route rider → destination: instant straight line, then road-snapped via
-      // OSRM (re-fetched only when the rider has moved ~150m, to spare the API).
-      if (dest) {
+      // Legacy path only. When `routes` is supplied the server has already done
+      // this — properly, once per leg, cached — so hitting OSRM from the browser
+      // here would duplicate the work against a demo server that forbids it.
+      if (dest && !routes?.length) {
         const straight: [number, number][] = [[rider.lat, rider.lng], [dest.lat, dest.lng]];
         if (!routeRef.current) routeRef.current = L.polyline(straight, { color: '#F15A24', weight: 5, opacity: 0.85, lineCap: 'round', lineJoin: 'round' }).addTo(map);
         const a = routeAnchorRef.current;
@@ -121,7 +159,7 @@ export default function LeafletMap({ markers, height = 200, onMarkerClick }: { m
       if (pts.length === 1) map.setView(pts[0], 15);
       else if (pts.length > 1) map.fitBounds(L.latLngBounds(pts).pad(0.4));
     }
-  }, [markers, onMarkerClick]);
+  }, [markers, onMarkerClick, routes]);
 
   function recenter() {
     followRef.current = true; fittedRef.current = false; setOffCenter(false);

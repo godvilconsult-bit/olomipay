@@ -227,9 +227,16 @@ export interface MyListing {
 export const listings = {
   categories: () => apiFetch<{ categories: ListingCategory[] }>('/api/listings/categories'),
 
-  createProduct: (body: { categoryId: string; name: string; attributes: Record<string, any>; imageUrl?: string; gtin?: string }) =>
+  createProduct: (body: {
+    categoryId: string; name: string; attributes: Record<string, any>;
+    description?: string; images?: string[]; gtin?: string;
+  }) =>
     apiFetch<{ product: { id: string; name: string }; reused?: boolean }>(
       '/api/listings/products', { method: 'POST', body: JSON.stringify(body) }),
+
+  store:     () => apiFetch<{ store: any }>('/api/listings/store'),
+  saveStore: (body: Record<string, any>) =>
+    apiFetch<{ store: any }>('/api/listings/store', { method: 'PUT', body: JSON.stringify(body) }),
 
   createOffer: (body: { productId: string; price: number; currency?: string; stock: number; moq?: number; isAvailable?: boolean }) =>
     apiFetch<{ offer: MyListing }>('/api/listings/offers', { method: 'POST', body: JSON.stringify(body) }),
@@ -237,6 +244,150 @@ export const listings = {
   mine: () => apiFetch<{ sellerSlug: string; listings: MyListing[] }>('/api/listings/mine'),
 
   remove: (offerId: string) => apiFetch<{ ok: boolean }>(`/api/listings/offers/${offerId}`, { method: 'DELETE' }),
+};
+
+// ── Buyer ↔ seller conversations + invoices ───────────────────────────────────
+export interface ConversationSummary {
+  id: string; status: 'OPEN' | 'AGREED' | 'CLOSED'; subject?: string | null;
+  lastMessageAt: string;
+  counterparty: { id: string; name: string; slug: string };
+  iAmSeller: boolean;
+  product?: { id: string; name: string; imageUrl?: string | null } | null;
+  lastMessage?: { id: string; body: string; createdAt: string; senderUserId: string } | null;
+  invoiceCount: number;
+  unread?: boolean;
+}
+export interface ChatMsg {
+  id: string; conversationId: string; senderUserId: string;
+  body: string; createdAt: string; readAt?: string | null;
+}
+export interface InvoiceLine { description: string; qty: number; unitPriceMinor: number; lineTotalMinor: number }
+export interface Invoice {
+  id: string; number: string; currency: string;
+  lines: InvoiceLine[];
+  subtotalMinor: number; deliveryMinor: number; taxMinor: number; totalMinor: number;
+  total: number;
+  status: 'DRAFT' | 'SENT' | 'PAID' | 'VOID';
+  payTo?: { provider?: string | null; number?: string | null; name?: string | null } | null;
+  notes?: string | null; issuedAt: string; paidAt?: string | null; paymentRef?: string | null;
+  conversationId?: string | null;
+  isPaid?: boolean; iAmSeller?: boolean;
+  seller?: { id: string; name: string; slug: string };
+  buyer?:  { id: string; name: string; slug: string };
+}
+
+export const messaging = {
+  start: (body: { sellerOrgId?: string; productId?: string; subject?: string; body: string }) =>
+    apiFetch<{ conversation: { id: string }; message: ChatMsg }>(
+      '/api/messaging/conversations', { method: 'POST', body: JSON.stringify(body) }),
+
+  list: () => apiFetch<{ orgId: string; conversations: ConversationSummary[] }>('/api/messaging/conversations'),
+
+  thread: (id: string) => apiFetch<{
+    conversation: { id: string; status: string; subject?: string | null; product?: any; counterparty: any; iAmSeller: boolean };
+    me: string; orgId: string; messages: ChatMsg[]; invoices: Invoice[];
+  }>(`/api/messaging/conversations/${id}`),
+
+  send: (id: string, body: string) =>
+    apiFetch<{ message: ChatMsg }>(`/api/messaging/conversations/${id}/messages`, { method: 'POST', body: JSON.stringify({ body }) }),
+
+  agree: (id: string) =>
+    apiFetch<{ conversation: any }>(`/api/messaging/conversations/${id}/agree`, { method: 'POST' }),
+};
+
+export const invoicesApi = {
+  create: (body: {
+    conversationId: string;
+    lines: { description: string; qty: number; unitPrice: number }[];
+    deliveryFee?: number; tax?: number; notes?: string; dueAt?: string;
+  }) => apiFetch<{ invoice: Invoice }>('/api/invoices', { method: 'POST', body: JSON.stringify(body) }),
+
+  list: (q: { role?: 'seller' | 'buyer' | 'any'; status?: string } = {}) => {
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries(q)) if (v) params.set(k, String(v));
+    return apiFetch<{ orgId: string; invoices: Invoice[]; unpaidTotalMinor: number }>(`/api/invoices?${params}`);
+  },
+
+  markPaid: (id: string, paymentRef?: string) =>
+    apiFetch<{ invoice: Invoice }>(`/api/invoices/${id}/paid`, { method: 'POST', body: JSON.stringify({ paymentRef }) }),
+};
+
+// ── Freight: the two-sided load board ─────────────────────────────────────────
+export interface Load {
+  id: string; reference: string; status: string;
+  originLat: number; originLng: number; destLat: number; destLng: number;
+  originLabel?: string | null; destLabel?: string | null;
+  pickupFrom: string; pickupTo: string;
+  weightKg: number; volumeM3?: number | null; cargoType: string;
+  isHazmat: boolean; needsRefrigeration: boolean;
+  budgetMinor?: number | null; currency: string; notes?: string | null;
+  shipper?: { id: string; name: string; slug: string; isVerified: boolean };
+  quotes?: FreightQuote[];
+  _count?: { quotes: number };
+}
+export interface FreightQuote {
+  id: string; loadId: string; bidderOrgId: string;
+  amountMinor: number; currency: string; status: string; message?: string | null;
+  etaPickup?: string | null; etaDrop?: string | null;
+  bidder?: { id: string; name: string; slug: string; isVerified: boolean; rating: number };
+}
+export interface CarrierLane {
+  id: string; originLat: number; originLng: number; destLat: number; destLng: number;
+  originLabel?: string | null; destLabel?: string | null;
+  corridorKm: number; departsAt: string; capacityKgFree: number; isActive: boolean;
+}
+
+export const freight = {
+  postLoad: (body: Record<string, any>) =>
+    apiFetch<{ load: Load }>('/api/freight/loads', { method: 'POST', body: JSON.stringify(body) }),
+
+  loads: (q: { mine?: boolean; status?: string; maxWeight?: number } = {}) => {
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries(q)) if (v != null && v !== '') params.set(k, String(v));
+    return apiFetch<{ loads: Load[]; total: number }>(`/api/freight/loads?${params}`);
+  },
+
+  load: (id: string) => apiFetch<{ load: Load; isShipper: boolean; quoteCount: number }>(`/api/freight/loads/${id}`),
+
+  quote: (loadId: string, body: { amountMinor: number; message?: string; etaPickup?: string; etaDrop?: string }) =>
+    apiFetch<{ quote: FreightQuote }>(`/api/freight/loads/${loadId}/quotes`, { method: 'POST', body: JSON.stringify(body) }),
+
+  acceptQuote: (quoteId: string) =>
+    apiFetch<{ load: Load; shipment: any }>(`/api/freight/quotes/${quoteId}/accept`, { method: 'POST' }),
+
+  postRoute: (body: Record<string, any>) =>
+    apiFetch<{ route: CarrierLane }>('/api/freight/routes', { method: 'POST', body: JSON.stringify(body) }),
+
+  matches: (routeId: string) =>
+    apiFetch<{ matches: { load: Load; detourKm: number; pickupOffsetKm: number; dropOffsetKm: number }[] }>(
+      `/api/freight/routes/${routeId}/matches`),
+
+  carriersFor: (loadId: string) =>
+    apiFetch<{ carriers: { route: any; detourKm: number }[] }>(`/api/freight/loads/${loadId}/carriers`),
+};
+
+// ── Journey tracking ──────────────────────────────────────────────────────────
+// Routes arrive as encoded polylines computed and cached server-side, so the
+// browser never queries a routing service itself.
+export interface JourneyLeg {
+  seq: number; label: string;
+  from: { lat: number; lng: number; label?: string | null };
+  to:   { lat: number; lng: number; label?: string | null };
+  status: 'DONE' | 'ACTIVE' | 'PENDING';
+  polyline: string; distanceM: number; durationS: number; snapped: boolean;
+}
+export interface Journey {
+  orderNo: string; status: string;
+  legs: JourneyLeg[];
+  rider: { lat: number; lng: number; at?: string | null } | null;
+  etaMinutes: number | null;
+  chainLength: number;
+  routeQuality: 'road' | 'approximate';
+  warning?: string;
+}
+
+export const tracking = {
+  order: (orderId: string) => apiFetch<Journey>(`/api/tracking/orders/${orderId}`),
 };
 
 export const orders = {

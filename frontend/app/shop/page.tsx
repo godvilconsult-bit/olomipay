@@ -11,13 +11,16 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { Search, Store, PackageSearch, SlidersHorizontal, BadgeCheck } from 'lucide-react';
-import { catalog, type CatalogProduct, type CatalogCategory } from '../../lib/api';
+import { catalog, getAccessToken, type CatalogProduct, type CatalogCategory } from '../../lib/api';
 import { formatCatalogMoney } from '../../lib/money';
 import { Card, Pill, Spinner, EmptyState, Button, cn } from '../../components/ui';
+import StoreHeader from '../../components/StoreHeader';
+import { useT } from '../../lib/i18n';
 
 type Sort = 'price_asc' | 'price_desc' | 'newest' | 'name';
 
 export default function ShopPage() {
+  const { t } = useT();
   const [categories, setCategories] = useState<CatalogCategory[]>([]);
   const [products,   setProducts]   = useState<CatalogProduct[]>([]);
   const [brands,     setBrands]     = useState<{ name: string; count: number }[]>([]);
@@ -70,17 +73,41 @@ export default function ShopPage() {
   const pages = Math.max(1, Math.ceil(total / LIMIT));
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-4">
-      {/* Header */}
-      <div className="mb-4">
-        <h1 className="text-2xl font-extrabold text-ink dark:text-sand">Marketplace</h1>
-        <p className="mt-1 text-sm text-ink/60 dark:text-sand/60">
-          Browse everything on sale — no account needed.
+    <>
+      <StoreHeader />
+      <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-4">
+      {/* Hero — the first thing a visitor sees, so it states what this is and
+          gives one honest number rather than a marketing claim. */}
+      <div className="mb-5">
+        <h1 className="text-[28px] font-extrabold leading-tight tracking-tight text-ink dark:text-sand sm:text-4xl">
+          {t('Buy anything,', 'Nunua chochote,')}{' '}
+          <span className="bg-grad-brand bg-clip-text text-transparent">
+            {t('delivered', 'kiletwe')}
+          </span>
+        </h1>
+        <p className="mt-2 max-w-md text-sm leading-relaxed text-ink/60 dark:text-sand/60">
+          {t('Compare sellers, order, and track it to your door. No account needed to browse.',
+             'Linganisha wauzaji, agiza, na fuatilia hadi mlangoni. Hakuna akaunti inahitajika kuvinjari.')}
         </p>
+        {total > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-leaf/10 px-2.5 py-1 font-semibold text-leaf-dark">
+              <span className="h-1.5 w-1.5 rounded-full bg-leaf" />
+              {total} {t(total === 1 ? 'product on sale' : 'products on sale', 'bidhaa zinapatikana')}
+            </span>
+            {categories.length > 0 && (
+              <span className="rounded-full bg-black/5 px-2.5 py-1 font-medium text-ink/60 dark:bg-white/10 dark:text-sand/60">
+                {categories.length} {t('categories', 'makundi')}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
+      <SellerCallout />
+
       {/* Search */}
-      <div className="sticky top-0 z-10 -mx-4 mb-3 bg-sand/80 px-4 py-2 backdrop-blur dark:bg-ink/80">
+      <div className="sticky top-[53px] z-10 -mx-4 mb-3 bg-sand/80 px-4 py-2 backdrop-blur dark:bg-ink/80">
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink/40" size={18} />
@@ -165,42 +192,99 @@ export default function ShopPage() {
           <Button variant="ghost" disabled={page >= pages} onClick={() => setPage(p => Math.min(pages, p + 1))}>Next</Button>
         </div>
       )}
+      </div>
+    </>
+  );
+}
+
+/**
+ * The seller's way in.
+ *
+ * Shown only to signed-out visitors: someone already logged in has Sell in the
+ * header and the nav, so repeating it here would just be clutter.
+ */
+function SellerCallout() {
+  const { t } = useT();
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
+  useEffect(() => { setSignedIn(!!getAccessToken()); }, []);
+
+  if (signedIn !== false) return null;
+
+  return (
+    <div className="mb-4 flex flex-wrap items-center gap-3 rounded-ds-xl border border-flame/20 bg-flame/5 p-3">
+      <Store className="shrink-0 text-flame" size={20} />
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-bold text-ink dark:text-sand">
+          {t('Have something to sell?', 'Una kitu cha kuuza?')}
+        </div>
+        <div className="text-xs text-ink/60 dark:text-sand/60">
+          {t('List your products and reach buyers near and far — free to start.', 'Orodhesha bidhaa zako ufikie wanunuzi — ni bure kuanza.')}
+        </div>
+      </div>
+      <Link
+        href="/auth/register?role=SUPPLIER"
+        className="inline-flex min-h-touch shrink-0 items-center gap-1.5 rounded-2xl bg-grad-brand px-4 text-sm font-semibold text-white shadow-ds-btn"
+      >
+        <Store size={15} /> {t('Start selling', 'Anza kuuza')}
+      </Link>
     </div>
   );
 }
 
 function ProductCard({ product }: { product: CatalogProduct }) {
+  const { t } = useT();
   const attrs = product.attributes ?? {};
-  return (
-    <Link href={`/shop/p/${product.id}`} className="block">
-      <Card className="h-full transition hover:shadow-lg">
-        <div className="mb-2 flex aspect-square items-center justify-center overflow-hidden rounded-ds-xl bg-black/5 dark:bg-white/5">
-          {product.imageUrl
-            ? <img src={product.imageUrl} alt={product.name} className="h-full w-full object-cover" loading="lazy" />
-            : <Store className="text-ink/20" size={32} />}
-        </div>
+  const soldOut = product.bestOffer && !product.bestOffer.inStock;
 
-        <div className="line-clamp-2 text-sm font-semibold text-ink dark:text-sand">{product.name}</div>
+  return (
+    <Link href={`/shop/p/${product.id}`} className="group block">
+      <Card className="flex h-full flex-col transition duration-200 hover:-translate-y-0.5 hover:shadow-xl">
+        <div className="relative mb-2.5 flex aspect-square items-center justify-center overflow-hidden rounded-ds-xl bg-gradient-to-br from-black/[0.04] to-black/[0.08] dark:from-white/5 dark:to-white/10">
+          {product.imageUrl
+            ? <img
+                src={product.imageUrl}
+                alt={product.name}
+                loading="lazy"
+                className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.04]"
+              />
+            : <Store className="text-ink/15" size={34} />}
+
+          {/* Trust and availability read faster as image overlays than as text
+              rows competing with the price. */}
+          {product.bestOffer?.seller?.isVerified && (
+            <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-0.5 rounded-full bg-white/95 px-1.5 py-0.5 text-[9px] font-bold text-leaf-dark shadow-sm">
+              <BadgeCheck size={10} /> {t('VERIFIED', 'IMETHIBITISHWA')}
+            </span>
+          )}
+          {soldOut && (
+            <span className="absolute inset-x-0 bottom-0 bg-ink/70 py-1 text-center text-[10px] font-bold text-white">
+              {t('OUT OF STOCK', 'HAKUNA')}
+            </span>
+          )}
+        </div>
 
         {typeof attrs.brand === 'string' && (
-          <div className="mt-0.5 text-xs text-ink/50">{attrs.brand}</div>
+          <div className="text-[10px] font-bold uppercase tracking-wide text-flame/70">{attrs.brand}</div>
         )}
 
-        <div className="mt-1.5 font-extrabold tabular-nums text-flame">
-          {formatCatalogMoney(product.from)}
+        <div className="line-clamp-2 text-sm font-semibold leading-snug text-ink dark:text-sand">
+          {product.name}
         </div>
 
-        {/* The competing-sellers count is the marketplace signal — it tells the
-            buyer this is a market, not a single shop's shelf. */}
-        <div className="mt-0.5 text-[11px] text-ink/50">
-          {product.sellerCount === 1 ? '1 seller' : `${product.sellerCount} sellers`}
-        </div>
-
-        {product.bestOffer?.seller?.isVerified && (
-          <div className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-leaf-dark">
-            <BadgeCheck size={12} /> Verified seller
+        {/* Price anchored to the bottom so cards with different title lengths
+            still line up across the grid. */}
+        <div className="mt-auto pt-2">
+          <div className="text-[15px] font-extrabold tabular-nums text-flame">
+            {formatCatalogMoney(product.from)}
           </div>
-        )}
+          {/* The competing-sellers count is the marketplace signal — it tells the
+              buyer this is a market, not one shop's shelf. */}
+          <div className="mt-0.5 text-[11px] text-ink/45">
+            {product.sellerCount === 1
+              ? t('1 seller', 'muuzaji 1')
+              : `${product.sellerCount} ${t('sellers', 'wauzaji')}`}
+          </div>
+        </div>
       </Card>
     </Link>
   );

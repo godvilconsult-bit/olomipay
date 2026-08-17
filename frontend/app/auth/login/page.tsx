@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
@@ -9,12 +9,34 @@ import { auth, setTokens, ApiError } from '../../../lib/api';
 import { useT, LangToggle } from '../../../lib/i18n';
 import { Button, Field } from '../../../components/ui';
 
+/**
+ * Only same-origin paths are followed after sign-in.
+ *
+ * `next` arrives from the URL, so anything starting with a scheme or `//`
+ * would be an open redirect — an attacker could send a JIKO sign-in link that
+ * lands the user on their own site. Requiring a single leading slash keeps it
+ * internal.
+ */
+function safeNext(raw: string | null): string {
+  if (!raw) return '/dashboard';
+  if (!raw.startsWith('/') || raw.startsWith('//')) return '/dashboard';
+  return raw;
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const { t } = useT();
   const [phone, setPhone] = useState('');
   const [pin, setPin]     = useState('');
   const [loading, setLoading] = useState(false);
+  const [nextPath, setNextPath] = useState<string | null>(null);
+
+  // Read from window rather than useSearchParams(): the latter forces this
+  // statically prerendered page behind a Suspense boundary, and the register
+  // page already reads its query this way.
+  useEffect(() => {
+    try { setNextPath(new URLSearchParams(window.location.search).get('next')); } catch {}
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -23,7 +45,9 @@ export default function LoginPage() {
       const res = await auth.login(phone, pin);
       setTokens(res.accessToken, res.refreshToken);
       toast.success(`${t('Welcome', 'Karibu')}, ${res.user.name ?? ''}!`);
-      router.replace('/dashboard');
+      // Return them to whatever they were trying to reach — the product they
+      // tapped, or the page the middleware bounced them off.
+      router.replace(safeNext(nextPath));
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : t('Sign in failed', 'Imeshindikana kuingia'));
     } finally { setLoading(false); }

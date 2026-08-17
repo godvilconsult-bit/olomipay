@@ -249,6 +249,11 @@ router.get('/sellers/:slug', async (req, res) => {
       countryCode: org.countryCode, currency: org.currency,
       lat: org.lat, lng: org.lng,
       canSell: org.canSell, canCarry: org.canCarry,
+      // Public store address + contact. A buyer deciding whether to trust a
+      // seller wants to know where they actually are.
+      addressLine1: org.addressLine1, addressLine2: org.addressLine2,
+      city: org.city, state: org.state, postalCode: org.postalCode,
+      contactPhone: org.contactPhone, contactEmail: org.contactEmail,
     },
     total, page, limit,
     listings: offers.map(o => ({

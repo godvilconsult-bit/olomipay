@@ -20,7 +20,9 @@ export default function RegisterPage() {
   const [role, setRole] = useState<Role>('HOUSEHOLD');
   const [form, setForm] = useState({ name: '', phone: '', pin: '', region: 'Dar es Salaam', businessName: '', vehicleType: 'MOTORBIKE', referralCode: '' });
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
-  // Pre-fill from a shared link: ?ref=CODE (invite) and ?role=RIDER (pre-select role).
+  const [nextPath, setNextPath] = useState<string | null>(null);
+  // Pre-fill from a shared link: ?ref=CODE (invite), ?role=SUPPLIER (pre-select
+  // role, used by the "Start selling" links), ?next=/path (return after signup).
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
@@ -28,6 +30,7 @@ export default function RegisterPage() {
       if (ref) setForm((f) => ({ ...f, referralCode: ref.toUpperCase() }));
       const r = params.get('role')?.toUpperCase();
       if (r && ['HOUSEHOLD', 'SUPPLIER', 'RIDER', 'DISTRIBUTOR', 'BRAND'].includes(r)) setRole(r as Role);
+      setNextPath(params.get('next'));
     } catch {}
   }, []);
   const [locating, setLocating] = useState(false);
@@ -85,9 +88,15 @@ export default function RegisterPage() {
       } as any);
       setTokens(res.accessToken, res.refreshToken);
       toast.success(t('Account created!', 'Akaunti imefunguliwa!'));
-      // Buyers land in the marketplace; sellers and transporters need their
-      // dashboard to finish setting up shop or vehicle details first.
-      router.replace(role === 'HOUSEHOLD' ? '/shop' : '/dashboard');
+      // Back to whatever they were looking at, if anything. Otherwise buyers
+      // land in the marketplace, while sellers and transporters go to the
+      // dashboard to finish setting up shop or vehicle details.
+      //
+      // Only same-origin paths are followed: `next` comes from the URL, so a
+      // scheme or protocol-relative value would be an open redirect.
+      const raw = nextPath;
+      const safe = raw && raw.startsWith('/') && !raw.startsWith('//') ? raw : null;
+      router.replace(safe ?? (role === 'HOUSEHOLD' ? '/shop' : '/dashboard'));
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : t('Sign up failed', 'Usajili umeshindikana'));
     } finally { setLoading(false); }

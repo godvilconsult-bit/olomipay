@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import LeafletMap from './LeafletMap';
 import { markerSvg, markerSize, infoHtml, hasInfo } from './mapIcons';
-import type { MapMarker } from './Map';
+import type { MapMarker, MapProps } from './Map';
+import { decodePolyline } from '../lib/polyline';
 
 const KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
@@ -33,11 +34,19 @@ function iconFor(google: any, kind: MapMarker['kind']) {
   };
 }
 
-export default function GoogleMap({ markers, height = 200, onMarkerClick }: { markers: MapMarker[]; height?: number; onMarkerClick?: (id: string) => void }) {
+/** Same progress colours as the Leaflet engine, so the two look alike. */
+const LEG_STYLE: Record<string, { strokeColor: string; strokeWeight: number; strokeOpacity: number }> = {
+  DONE:    { strokeColor: '#8A8580', strokeWeight: 4, strokeOpacity: 0.55 },
+  ACTIVE:  { strokeColor: '#F15A24', strokeWeight: 6, strokeOpacity: 0.95 },
+  PENDING: { strokeColor: '#F15A24', strokeWeight: 4, strokeOpacity: 0.40 },
+};
+
+export default function GoogleMap({ markers, height = 200, onMarkerClick, routes }: MapProps) {
   const elRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const infoRef = useRef<any>(null);
   const markerRefs = useRef<Map<string, any>>(new Map());
+  const legRefs = useRef<any[]>([]);
   const prevKeys = useRef<string>('');
   const [failed, setFailed] = useState(false);
   const [ready, setReady] = useState(false);
@@ -55,6 +64,35 @@ export default function GoogleMap({ markers, height = 200, onMarkerClick }: { ma
     }).catch(() => { if (alive) setFailed(true); });
     return () => { alive = false; };
   }, []);
+
+  /**
+   * Journey legs. This engine previously drew no route at all — only Leaflet
+   * did — so a Google-key deployment showed bare pins with no path between them.
+   */
+  useEffect(() => {
+    const google = (window as any).google;
+    const map = mapRef.current;
+    if (!ready || !google || !map) return;
+
+    legRefs.current.forEach(l => l.setMap(null));
+    legRefs.current = [];
+    if (!routes?.length) return;
+
+    const bounds = new google.maps.LatLngBounds();
+    let any = false;
+    for (const leg of routes) {
+      const path = decodePolyline(leg.polyline);
+      if (path.length < 2) continue;
+      legRefs.current.push(new google.maps.Polyline({
+        path, map, ...(LEG_STYLE[leg.status ?? 'PENDING'] ?? LEG_STYLE.PENDING),
+      }));
+      path.forEach(p => bounds.extend(p));
+      any = true;
+    }
+    // Let the marker effect own the camera when a rider is being followed.
+    if (any && !markers.some(m => m.kind === 'rider')) map.fitBounds(bounds, 40);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routes, ready]);
 
   useEffect(() => {
     const google = (window as any).google;
@@ -88,6 +126,8 @@ export default function GoogleMap({ markers, height = 200, onMarkerClick }: { ma
     }
   }, [markers, ready, onMarkerClick]);
 
-  if (failed || !KEY) return <LeafletMap markers={markers} height={height} onMarkerClick={onMarkerClick} />;
+  // `routes` must be forwarded: without it a failed Google load would silently
+  // drop the journey lines rather than degrading to the Leaflet rendering.
+  if (failed || !KEY) return <LeafletMap markers={markers} height={height} onMarkerClick={onMarkerClick} routes={routes} />;
   return <div ref={elRef} style={{ height, width: '100%', borderRadius: 16, overflow: 'hidden' }} className="border border-black/10" />;
 }

@@ -15,6 +15,9 @@ import { notFound } from 'next/navigation';
 import { BadgeCheck, Store, Star, ArrowLeft } from 'lucide-react';
 import { getProduct } from '../../../../lib/catalogServer';
 import { formatMoney } from '../../../../lib/money';
+import ContactSellerButton from '../../../../components/ContactSellerButton';
+import BuyCta from '../../../../components/BuyCta';
+import StoreHeader from '../../../../components/StoreHeader';
 
 interface Props { params: { id: string } }
 
@@ -49,18 +52,37 @@ export default async function ProductPage({ params }: Props) {
   const p = data.product;
   const attrs = (p.attributes ?? {}) as Record<string, any>;
   const offers = p.offers ?? [];
+  // The API always returns an array, falling back to the legacy single image.
+  const gallery: string[] = Array.isArray((p as any).images) ? (p as any).images : (p.imageUrl ? [p.imageUrl] : []);
+  const description: string | null = (p as any).description ?? null;
 
   return (
+    <>
+    <StoreHeader compact />
     <div className="mx-auto w-full max-w-4xl px-4 pb-16 pt-4">
       <Link href="/shop" className="mb-3 inline-flex items-center gap-1 text-sm text-ink/60 hover:text-flame">
         <ArrowLeft size={16} /> Back to marketplace
       </Link>
 
       <div className="grid gap-6 sm:grid-cols-2">
-        <div className="flex aspect-square items-center justify-center overflow-hidden rounded-ds-xl bg-black/5 dark:bg-white/5">
-          {p.imageUrl
-            ? <img src={p.imageUrl} alt={p.name} className="h-full w-full object-cover" />
-            : <Store className="text-ink/20" size={64} />}
+        <div>
+          <div className="flex aspect-square items-center justify-center overflow-hidden rounded-ds-xl bg-black/5 dark:bg-white/5">
+            {gallery.length > 0
+              ? <img src={gallery[0]} alt={p.name} className="h-full w-full object-cover" />
+              : <Store className="text-ink/20" size={64} />}
+          </div>
+
+          {/* Remaining shots. Kept static so the page still renders on the
+              server and stays indexable; a lightbox would cost that. */}
+          {gallery.length > 1 && (
+            <div className="mt-2 grid grid-cols-4 gap-2">
+              {gallery.slice(0, 4).map((src, i) => (
+                <div key={i} className="aspect-square overflow-hidden rounded-xl bg-black/5 dark:bg-white/5">
+                  <img src={src} alt={`${p.name} — ${i + 1}`} className="h-full w-full object-cover" loading="lazy" />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div>
@@ -95,6 +117,17 @@ export default async function ProductPage({ params }: Props) {
           )}
         </div>
       </div>
+
+      {description && (
+        <section className="mt-8">
+          <h2 className="mb-2 text-lg font-bold text-ink dark:text-sand">About this product</h2>
+          {/* whitespace-pre-line keeps the seller's own line breaks without
+              rendering their text as HTML. */}
+          <p className="max-w-prose whitespace-pre-line text-sm leading-relaxed text-ink/75 dark:text-sand/75">
+            {description}
+          </p>
+        </section>
+      )}
 
       {/* Competing offers */}
       <section className="mt-8">
@@ -150,10 +183,15 @@ export default async function ProductPage({ params }: Props) {
           </div>
         )}
 
-        <p className="mt-4 text-xs text-ink/50">
-          Sign in to place an order. Browsing is open to everyone.
-        </p>
+        {/* Ask before you buy — the Alibaba pattern. Needs an account, unlike
+            browsing, because a conversation has two identified parties. */}
+        <ContactSellerButton productId={p.id} productName={p.name} />
+
+        {/* Signed-out visitors get the account choice here rather than hitting
+            the requirement only after tapping buy. Renders nothing once in. */}
+        <BuyCta productId={p.id} />
       </section>
     </div>
+    </>
   );
 }
