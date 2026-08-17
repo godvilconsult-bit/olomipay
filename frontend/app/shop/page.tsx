@@ -249,8 +249,22 @@ export default function ShopPage() {
         </Card>
       )}
 
-      {/* Results */}
-      {loading ? <Spinner /> : products.length === 0 ? (
+      {/* Results. Skeletons rather than a spinner: they hold the grid's shape so
+          the page does not jump when results arrive, and they read as "nearly
+          there" instead of "nothing yet". */}
+      {loading ? (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Card key={i} className="animate-pulse">
+              <div className="mb-2.5 aspect-square rounded-ds-xl bg-black/[0.06] dark:bg-white/10" />
+              <div className="mb-1.5 h-2 w-1/3 rounded bg-black/[0.06] dark:bg-white/10" />
+              <div className="mb-1 h-3 w-full rounded bg-black/[0.06] dark:bg-white/10" />
+              <div className="mb-2.5 h-3 w-2/3 rounded bg-black/[0.06] dark:bg-white/10" />
+              <div className="h-4 w-1/2 rounded bg-black/[0.08] dark:bg-white/[0.14]" />
+            </Card>
+          ))}
+        </div>
+      ) : products.length === 0 ? (
         <EmptyState
           icon={<PackageSearch size={40} />}
           title="Nothing matches that yet"
@@ -388,6 +402,7 @@ function ProductCard({ product }: { product: CatalogProduct }) {
   const { t } = useT();
   const attrs = product.attributes ?? {};
   const soldOut = product.bestOffer && !product.bestOffer.inStock;
+  const seller = product.bestOffer?.seller;
 
   return (
     <Link href={`/shop/p/${product.id}`} className="group block">
@@ -427,15 +442,36 @@ function ProductCard({ product }: { product: CatalogProduct }) {
         {/* Price anchored to the bottom so cards with different title lengths
             still line up across the grid. */}
         <div className="mt-auto pt-2">
-          <div className="text-[15px] font-extrabold tabular-nums text-flame">
-            {formatCatalogMoney(product.from)}
+          <div className="flex items-baseline gap-1">
+            <span className="text-[15px] font-extrabold tabular-nums text-flame">
+              {formatCatalogMoney(product.from)}
+            </span>
+            {product.bestOffer?.moq && product.bestOffer.moq > 1 && (
+              <span className="text-[10px] font-medium text-ink/45">
+                {t('min', 'chini')} {product.bestOffer.moq}
+              </span>
+            )}
           </div>
+
+          {/* Who you would be buying from. A buyer decides on the seller as much
+              as the price, and making them open the product to find out costs a
+              click on every comparison. */}
+          {seller && (
+            <div className="mt-1 flex items-center gap-1 text-[11px] text-ink/55 dark:text-sand/55">
+              <span className="truncate">{seller.name}</span>
+              {seller.isVerified && <BadgeCheck size={11} className="shrink-0 text-leaf-dark" />}
+              {seller.ratingCount > 0 && (
+                <span className="shrink-0 tabular-nums text-ink/40">★ {seller.rating.toFixed(1)}</span>
+              )}
+            </div>
+          )}
+
           {/* The competing-sellers count is the marketplace signal — it tells the
               buyer this is a market, not one shop's shelf. */}
-          <div className="mt-0.5 text-[11px] text-ink/45">
+          <div className="mt-0.5 text-[11px] text-ink/40">
             {product.sellerCount === 1
               ? t('1 seller', 'muuzaji 1')
-              : `${product.sellerCount} ${t('sellers', 'wauzaji')}`}
+              : `${product.sellerCount} ${t('sellers', 'wauzaji')} · ${t('compare', 'linganisha')}`}
           </div>
         </div>
       </Card>
