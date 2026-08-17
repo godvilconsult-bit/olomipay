@@ -224,6 +224,75 @@ export async function matchLoadsForRoute(routeId: string, limit = 20): Promise<L
   return matches.slice(0, limit);
 }
 
+export interface NearbyLoad {
+  load: any;
+  /** Straight-line km from the driver to the pickup. */
+  pickupDistanceKm: number;
+  /** Length of the haul itself, pickup → drop. */
+  haulKm: number;
+}
+
+/**
+ * Loads whose pickup sits within `radiusKm` of where the driver is standing.
+ *
+ * This is the opportunistic case: a driver opens the map and takes whatever is
+ * near them, as opposed to matchLoadsForRoute, which fills a trip they have
+ * already committed to. Both are needed — a boda rider works the first way, a
+ * long-haul truck the second.
+ *
+ * A bounding box on the indexed origin columns does the coarse filter, then
+ * haversine trims the corners: a box's diagonal is ~41% longer than its
+ * half-width, so skipping the exact pass would return loads well outside the
+ * radius the driver asked for.
+ */
+export async function nearbyLoads(params: {
+  lat: number; lng: number;
+  radiusKm?: number;
+  maxWeightKg?: number;
+  excludeOrgId?: string;
+  limit?: number;
+}): Promise<NearbyLoad[]> {
+  const radiusKm = Math.min(params.radiusKm ?? 25, 500);
+  const limit    = Math.min(params.limit ?? 50, 200);
+
+  const latDelta = radiusKm / 110.574;
+  const cos      = Math.cos((params.lat * Math.PI) / 180);
+  // Guard the poles, where cos approaches zero and the delta explodes.
+  const lngDelta = radiusKm / (111.320 * Math.max(0.01, Math.abs(cos)));
+
+  const where: any = {
+    status:    { in: ['OPEN', 'QUOTED'] },
+    originLat: { gte: params.lat - latDelta, lte: params.lat + latDelta },
+    originLng: { gte: params.lng - lngDelta, lte: params.lng + lngDelta },
+    // Expired pickup windows are noise on a driver's map.
+    pickupTo:  { gte: new Date() },
+  };
+  if (params.maxWeightKg)  where.weightKg     = { lte: params.maxWeightKg };
+  if (params.excludeOrgId) where.shipperOrgId = { not: params.excludeOrgId };
+
+  const candidates = await prisma.load.findMany({
+    where,
+    take: limit * 4,   // headroom for the corners the box over-returns
+    orderBy: { pickupFrom: 'asc' },
+    include: { shipper: { select: { id: true, name: true, slug: true, isVerified: true } } },
+  });
+
+  const out: NearbyLoad[] = [];
+  for (const load of candidates) {
+    const pickupDistanceKm = haversineKm(params.lat, params.lng, load.originLat, load.originLng);
+    if (pickupDistanceKm > radiusKm) continue;
+    out.push({
+      load,
+      pickupDistanceKm,
+      haulKm: haversineKm(load.originLat, load.originLng, load.destLat, load.destLng),
+    });
+  }
+
+  // Nearest pickup first: the driver's cost of taking a job is getting to it.
+  out.sort((a, b) => a.pickupDistanceKm - b.pickupDistanceKm);
+  return out.slice(0, limit);
+}
+
 /** The mirror image: carriers already running a lane that suits this load. */
 export async function matchRoutesForLoad(loadId: string, limit = 20) {
   const load = await prisma.load.findUnique({ where: { id: loadId } });

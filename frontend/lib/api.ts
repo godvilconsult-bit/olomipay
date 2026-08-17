@@ -358,6 +358,17 @@ export const freight = {
   postRoute: (body: Record<string, any>) =>
     apiFetch<{ route: CarrierLane }>('/api/freight/routes', { method: 'POST', body: JSON.stringify(body) }),
 
+  /** Opportunistic pickup: loads within radiusKm of where the driver is now. */
+  nearby: (q: { lat: number; lng: number; radiusKm?: number; maxWeight?: number }) => {
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries(q)) if (v != null) params.set(k, String(v));
+    return apiFetch<{
+      centre: { lat: number; lng: number };
+      radiusKm: number; count: number;
+      loads: (Load & { pickupDistanceKm: number; haulKm: number })[];
+    }>(`/api/freight/loads/nearby?${params}`);
+  },
+
   matches: (routeId: string) =>
     apiFetch<{ matches: { load: Load; detourKm: number; pickupOffsetKm: number; dropOffsetKm: number }[] }>(
       `/api/freight/routes/${routeId}/matches`),

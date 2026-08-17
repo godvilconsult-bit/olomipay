@@ -11,6 +11,7 @@
  * loads, everyone else wants their own shipments.
  */
 import { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import toast from 'react-hot-toast';
 import {
   Truck, Package, Route as RouteIcon, Plus, MapPin, Weight,
@@ -25,14 +26,19 @@ import { Button, Card, Field, Spinner, EmptyState, Pill, cn } from '../../compon
 import AppShell from '../../components/AppShell';
 import { useT } from '../../lib/i18n';
 
-type Tab = 'board' | 'mine' | 'lanes';
+// Leaflet touches window at import time, so the map must not be server-rendered.
+const Map = dynamic(() => import('../../components/Map'), { ssr: false });
+
+type Tab = 'near' | 'board' | 'mine' | 'lanes';
 
 const km = (n: number) => `${n.toFixed(n < 10 ? 1 : 0)} km`;
 const day = (iso: string) => new Date(iso).toLocaleDateString([], { day: 'numeric', month: 'short' });
 
 export default function FreightPage() {
   const { t } = useT();
-  const [tab, setTab]     = useState<Tab>('board');
+  // Opens on the map: a driver's first question is "what can I pick up from
+  // here", not "show me every load in the country".
+  const [tab, setTab]     = useState<Tab>('near');
   const [board, setBoard] = useState<Load[]>([]);
   const [mine, setMine]   = useState<Load[]>([]);
   const [lanes, setLanes] = useState<CarrierLane[]>([]);
@@ -64,6 +70,9 @@ export default function FreightPage() {
       </p>
 
       <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+        <Pill active={tab === 'near'} onClick={() => setTab('near')}>
+          {t('Near me', 'Karibu nami')}
+        </Pill>
         <Pill active={tab === 'board'} onClick={() => setTab('board')}>
           {t('Find loads', 'Tafuta mizigo')} ({board.length})
         </Pill>
@@ -74,6 +83,8 @@ export default function FreightPage() {
           {t('My lanes', 'Njia zangu')}
         </Pill>
       </div>
+
+      {tab === 'near' && <NearMe onChanged={refresh} />}
 
       {tab === 'board' && (
         <div className="mt-4">
@@ -132,6 +143,116 @@ export default function FreightPage() {
       )}
     </div>
     </AppShell>
+  );
+}
+
+// ── Near me: the driver's map ─────────────────────────────────────────────────
+
+const RADII = [10, 25, 50, 100];
+
+/**
+ * Loads within reach of where the driver is standing.
+ *
+ * This is the opportunistic case — a boda rider or a truck between jobs opens
+ * the map and takes whatever is close. Distinct from "My lanes", which fills a
+ * trip already committed to.
+ */
+function NearMe({ onChanged }: { onChanged: () => void }) {
+  const { t } = useT();
+  const [pos, setPos]       = useState<{ lat: number; lng: number } | null>(null);
+  const [radius, setRadius] = useState(25);
+  const [rows, setRows]     = useState<(Load & { pickupDistanceKm: number; haulKm: number })[]>([]);
+  const [busy, setBusy]     = useState(false);
+  const [denied, setDenied] = useState(false);
+
+  function locate() {
+    if (!navigator.geolocation) { setDenied(true); return; }
+    setBusy(true);
+    navigator.geolocation.getCurrentPosition(
+      p => setPos({ lat: p.coords.latitude, lng: p.coords.longitude }),
+      () => { setDenied(true); setBusy(false); },
+      { enableHighAccuracy: true, timeout: 10_000 },
+    );
+  }
+
+  useEffect(() => { locate(); }, []);
+
+  useEffect(() => {
+    if (!pos) return;
+    setBusy(true);
+    freight.nearby({ lat: pos.lat, lng: pos.lng, radiusKm: radius })
+      .then(r => setRows(r.loads))
+      .catch(() => setRows([]))
+      .finally(() => setBusy(false));
+  }, [pos, radius]);
+
+  // Pickup pins plus the driver, so distance is visible rather than just stated.
+  const markers = pos
+    ? [
+        { lat: pos.lat, lng: pos.lng, kind: 'me' as const, label: t('You', 'Wewe') },
+        ...rows.map(l => ({
+          lat: l.originLat, lng: l.originLng, kind: 'vendor' as const, id: l.id,
+          label: `${l.originLabel ?? t('Pickup', 'Kuchukua')} · ${l.weightKg.toLocaleString()} kg`,
+        })),
+      ]
+    : [];
+
+  if (denied && !pos) {
+    return (
+      <Card className="mt-4">
+        <p className="py-4 text-center text-sm text-ink/60">
+          {t('Location is needed to find loads near you.', 'Eneo linahitajika kupata mizigo iliyo karibu.')}
+        </p>
+        <Button className="w-full" onClick={locate}>{t('Try again', 'Jaribu tena')}</Button>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="mt-4">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <span className="text-xs font-semibold text-ink/55">{t('Within', 'Ndani ya')}</span>
+        {RADII.map(r => (
+          <Pill key={r} active={radius === r} onClick={() => setRadius(r)}>{r} km</Pill>
+        ))}
+        <button onClick={locate} className="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-flame">
+          <MapPin size={13} /> {t('Update my position', 'Sasisha eneo')}
+        </button>
+      </div>
+
+      {pos && (
+        <Card className="!p-1.5">
+          <Map markers={markers} height={280} />
+        </Card>
+      )}
+
+      <div className="mt-2 text-xs text-ink/50">
+        {busy
+          ? t('Searching…', 'Inatafuta…')
+          : `${rows.length} ${rows.length === 1 ? t('load within', 'mzigo ndani ya') : t('loads within', 'mizigo ndani ya')} ${radius} km`}
+      </div>
+
+      {!busy && rows.length === 0 && pos && (
+        <EmptyState
+          icon={<Package size={40} />}
+          title={t('Nothing to pick up here yet', 'Hakuna mzigo hapa bado')}
+          sub={t('Try a wider radius, or check the full board.', 'Jaribu umbali mkubwa, au ona mizigo yote.')}
+        />
+      )}
+
+      <div className="mt-2 space-y-2">
+        {rows.map(l => (
+          <div key={l.id}>
+            <div className="mb-1 flex items-center gap-1.5 text-[11px] font-bold text-leaf-dark">
+              <MapPin size={11} />
+              {l.pickupDistanceKm} km {t('away', 'kutoka hapa')}
+              <span className="text-ink/40">· {t('haul', 'safari')} {l.haulKm} km</span>
+            </div>
+            <LoadCard load={l} onChanged={onChanged} mode="carrier" />
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
