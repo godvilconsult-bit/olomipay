@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "prisma generate && tsc --skipLibCheck --noEmitOnError false || true",
+    "build": "prisma generate && (tsc --skipLibCheck --noEmitOnError false || true) && node scripts/verify-build.mjs",
     "start": "node dist/index.js",
     "postinstall": "prisma generate",
     "typecheck": "tsc --noEmit --skipLibCheck",
