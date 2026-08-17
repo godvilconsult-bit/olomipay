@@ -13,16 +13,22 @@
 import { prisma } from '../lib/prisma';
 import { projectOntoPath, haversineKm } from '../lib/geo';
 import { makeOrderNo } from '../lib/ids';
+import { ensureOrgForUser } from './orgs';
 
 function fail(message: string, http: number): never {
   throw Object.assign(new Error(message), { http });
 }
 
-/** Resolve the org a user acts as. Set by the phase 2 backfill. */
+/**
+ * The org a user acts as, created on demand.
+ *
+ * This used to fail with 409 when `primaryOrgId` was null, which was every
+ * account registered after the phase 2 backfill — so sellers could not list,
+ * buyers could not message, and nobody could post a load. Creating it here
+ * heals those accounts without a migration.
+ */
 export async function actingOrgId(userId: string): Promise<string> {
-  const u = await prisma.user.findUnique({ where: { id: userId }, select: { primaryOrgId: true } });
-  if (!u?.primaryOrgId) fail('Your account is not linked to an organization yet', 409);
-  return u.primaryOrgId;
+  return ensureOrgForUser(userId);
 }
 
 // ── Shipper side ────────────────────────────────────────────────────────────
@@ -216,6 +222,75 @@ export async function matchLoadsForRoute(routeId: string, limit = 20): Promise<L
   // Least detour first — the whole point is filling a trip already being made.
   matches.sort((a, b) => a.detourKm - b.detourKm);
   return matches.slice(0, limit);
+}
+
+export interface NearbyLoad {
+  load: any;
+  /** Straight-line km from the driver to the pickup. */
+  pickupDistanceKm: number;
+  /** Length of the haul itself, pickup → drop. */
+  haulKm: number;
+}
+
+/**
+ * Loads whose pickup sits within `radiusKm` of where the driver is standing.
+ *
+ * This is the opportunistic case: a driver opens the map and takes whatever is
+ * near them, as opposed to matchLoadsForRoute, which fills a trip they have
+ * already committed to. Both are needed — a boda rider works the first way, a
+ * long-haul truck the second.
+ *
+ * A bounding box on the indexed origin columns does the coarse filter, then
+ * haversine trims the corners: a box's diagonal is ~41% longer than its
+ * half-width, so skipping the exact pass would return loads well outside the
+ * radius the driver asked for.
+ */
+export async function nearbyLoads(params: {
+  lat: number; lng: number;
+  radiusKm?: number;
+  maxWeightKg?: number;
+  excludeOrgId?: string;
+  limit?: number;
+}): Promise<NearbyLoad[]> {
+  const radiusKm = Math.min(params.radiusKm ?? 25, 500);
+  const limit    = Math.min(params.limit ?? 50, 200);
+
+  const latDelta = radiusKm / 110.574;
+  const cos      = Math.cos((params.lat * Math.PI) / 180);
+  // Guard the poles, where cos approaches zero and the delta explodes.
+  const lngDelta = radiusKm / (111.320 * Math.max(0.01, Math.abs(cos)));
+
+  const where: any = {
+    status:    { in: ['OPEN', 'QUOTED'] },
+    originLat: { gte: params.lat - latDelta, lte: params.lat + latDelta },
+    originLng: { gte: params.lng - lngDelta, lte: params.lng + lngDelta },
+    // Expired pickup windows are noise on a driver's map.
+    pickupTo:  { gte: new Date() },
+  };
+  if (params.maxWeightKg)  where.weightKg     = { lte: params.maxWeightKg };
+  if (params.excludeOrgId) where.shipperOrgId = { not: params.excludeOrgId };
+
+  const candidates = await prisma.load.findMany({
+    where,
+    take: limit * 4,   // headroom for the corners the box over-returns
+    orderBy: { pickupFrom: 'asc' },
+    include: { shipper: { select: { id: true, name: true, slug: true, isVerified: true } } },
+  });
+
+  const out: NearbyLoad[] = [];
+  for (const load of candidates) {
+    const pickupDistanceKm = haversineKm(params.lat, params.lng, load.originLat, load.originLng);
+    if (pickupDistanceKm > radiusKm) continue;
+    out.push({
+      load,
+      pickupDistanceKm,
+      haulKm: haversineKm(load.originLat, load.originLng, load.destLat, load.destLng),
+    });
+  }
+
+  // Nearest pickup first: the driver's cost of taking a job is getting to it.
+  out.sort((a, b) => a.pickupDistanceKm - b.pickupDistanceKm);
+  return out.slice(0, limit);
 }
 
 /** The mirror image: carriers already running a lane that suits this load. */

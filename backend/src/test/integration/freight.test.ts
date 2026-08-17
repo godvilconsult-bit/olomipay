@@ -8,7 +8,7 @@
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { prisma } from '../../lib/prisma';
-import { postLoad, quoteOnLoad, acceptQuote, matchLoadsForRoute, matchRoutesForLoad } from '../../services/freight';
+import { postLoad, quoteOnLoad, acceptQuote, matchLoadsForRoute, matchRoutesForLoad, nearbyLoads } from '../../services/freight';
 import { makeHousehold } from './factories';
 
 // Real Tanzanian lane, so the distances are realistic: Dar es Salaam -> Mwanza,
@@ -141,6 +141,78 @@ describe('awarding', () => {
     await acceptQuote(shipper.user.id, quote.id);
     const again = await expectRejection(() => acceptQuote(shipper.user.id, quote.id));
     expect(again.http).toBe(409);
+  });
+});
+
+describe('nearby loads — what can I pick up from here', () => {
+  it('returns loads inside the radius, nearest pickup first', async () => {
+    const shipper = await makeOrg('RETAILER', 'Nearby Shipper');
+    const driver  = await makeOrg('CARRIER',  'Nearby Driver');
+
+    // Dar city centre, and two pickups at increasing distance from it.
+    const close  = await makeLoad(shipper.user.id, { lat: -6.80, lng: 39.22 }, DODOMA, 400);
+    const mid    = await makeLoad(shipper.user.id, { lat: -6.90, lng: 39.30 }, DODOMA, 400);
+    const far    = await makeLoad(shipper.user.id, MTWARA,                     DODOMA, 400);
+
+    const found = await nearbyLoads({ lat: DAR.lat, lng: DAR.lng, radiusKm: 30, excludeOrgId: driver.org.id });
+    const ids = found.map(f => f.load.id);
+
+    expect(ids).toContain(close.id);
+    expect(ids).toContain(mid.id);
+    expect(ids).not.toContain(far.id);          // ~500 km south
+    expect(ids.indexOf(close.id)).toBeLessThan(ids.indexOf(mid.id));
+
+    // The haul length is what tells a driver whether the job is worth taking.
+    const c = found.find(f => f.load.id === close.id)!;
+    expect(c.pickupDistanceKm).toBeLessThan(5);
+    expect(c.haulKm).toBeGreaterThan(300);      // Dar → Dodoma
+  });
+
+  it('trims the bounding box corners to the true radius', async () => {
+    const shipper = await makeOrg('RETAILER', 'Corner Shipper');
+    const driver  = await makeOrg('CARRIER',  'Corner Driver');
+
+    // Diagonally offset so it falls inside a 20 km box but outside a 20 km
+    // circle — a box's corner is ~41% further out than its half-width.
+    const d = 19 / 110.574;
+    const corner = await makeLoad(shipper.user.id, { lat: DAR.lat + d, lng: DAR.lng + d * 1.007 }, DODOMA, 300);
+
+    const found = await nearbyLoads({ lat: DAR.lat, lng: DAR.lng, radiusKm: 20, excludeOrgId: driver.org.id });
+    expect(found.map(f => f.load.id)).not.toContain(corner.id);
+
+    // Widen past the diagonal and it appears.
+    const wider = await nearbyLoads({ lat: DAR.lat, lng: DAR.lng, radiusKm: 40, excludeOrgId: driver.org.id });
+    expect(wider.map(f => f.load.id)).toContain(corner.id);
+  });
+
+  it('never offers a driver their own cargo, and respects a weight ceiling', async () => {
+    const driver = await makeOrg('CARRIER', 'Own Cargo Driver');
+    const own    = await makeLoad(driver.user.id, { lat: -6.80, lng: 39.22 }, DODOMA, 300);
+
+    const shipper = await makeOrg('RETAILER', 'Heavy Shipper');
+    const heavy   = await makeLoad(shipper.user.id, { lat: -6.80, lng: 39.22 }, DODOMA, 9_000);
+
+    const found = await nearbyLoads({
+      lat: DAR.lat, lng: DAR.lng, radiusKm: 30, maxWeightKg: 1_000, excludeOrgId: driver.org.id,
+    });
+    const ids = found.map(f => f.load.id);
+    expect(ids).not.toContain(own.id);
+    expect(ids).not.toContain(heavy.id);
+  });
+
+  it('hides loads whose pickup window has already closed', async () => {
+    const shipper = await makeOrg('RETAILER', 'Expired Shipper');
+    const driver  = await makeOrg('CARRIER',  'Expired Driver');
+
+    const stale = await postLoad(shipper.user.id, {
+      originLat: -6.80, originLng: 39.22, destLat: DODOMA.lat, destLng: DODOMA.lng,
+      pickupFrom: new Date(Date.now() - 5 * 864e5),
+      pickupTo:   new Date(Date.now() - 2 * 864e5),   // closed two days ago
+      weightKg: 300,
+    });
+
+    const found = await nearbyLoads({ lat: DAR.lat, lng: DAR.lng, radiusKm: 30, excludeOrgId: driver.org.id });
+    expect(found.map(f => f.load.id)).not.toContain(stale.id);
   });
 });
 

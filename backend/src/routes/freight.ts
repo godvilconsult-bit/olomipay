@@ -11,7 +11,7 @@ import { prisma } from '../lib/prisma';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 import {
   postLoad, quoteOnLoad, acceptQuote,
-  matchLoadsForRoute, matchRoutesForLoad, actingOrgId,
+  matchLoadsForRoute, matchRoutesForLoad, actingOrgId, nearbyLoads,
   type NewLoad,
 } from '../services/freight';
 
@@ -82,6 +82,41 @@ router.get('/loads', requireAuth, async (req: AuthRequest, res) => {
   ]);
 
   res.json({ total, page, limit, loads });
+});
+
+// ── GET /api/freight/loads/nearby ─ what can I pick up from here? ────────────
+// Declared before /loads/:id, or express would match "nearby" as an id.
+router.get('/loads/nearby', requireAuth, async (req: AuthRequest, res) => {
+  const parse = z.object({
+    lat:       coord,
+    lng:       coord,
+    radiusKm:  z.coerce.number().positive().max(500).default(25),
+    maxWeight: z.coerce.number().positive().optional(),
+    limit:     z.coerce.number().int().min(1).max(200).default(50),
+  }).safeParse(req.query);
+  if (!parse.success) return res.status(400).json({ error: parse.error.errors[0].message });
+  const { lat, lng, radiusKm, maxWeight, limit } = parse.data as {
+    lat: number; lng: number; radiusKm: number; maxWeight?: number; limit: number;
+  };
+
+  try {
+    // Never show a driver their own organization's cargo.
+    const orgId = await actingOrgId(req.userId!).catch(() => undefined);
+    const matches = await nearbyLoads({
+      lat, lng, radiusKm, maxWeightKg: maxWeight, excludeOrgId: orgId, limit,
+    });
+
+    res.json({
+      centre: { lat, lng },
+      radiusKm,
+      count: matches.length,
+      loads: matches.map(m => ({
+        ...m.load,
+        pickupDistanceKm: Math.round(m.pickupDistanceKm * 10) / 10,
+        haulKm:           Math.round(m.haulKm * 10) / 10,
+      })),
+    });
+  } catch (e) { handle(res, e); }
 });
 
 // ── GET /api/freight/loads/:id ───────────────────────────────────────────────

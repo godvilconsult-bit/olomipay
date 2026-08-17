@@ -140,7 +140,7 @@ export function AdminHome({ user }: { user: JikoUser }) {
       <AppHeader title={t('JIKO Admin', 'JIKO Admin')} subtitle={t('Network control', 'Usimamizi wa mtandao')} />
       {zoom && <div onClick={() => setZoom(null)} className="fixed inset-0 z-50 grid place-items-center bg-black/80 p-6"><img src={zoom} alt="" className="max-h-full max-w-full rounded-xl" /></div>}
 
-      <div className="mx-auto max-w-md space-y-4 px-5 pt-4">
+      <div className="mx-auto max-w-md space-y-4 px-5 pt-4 lg:max-w-5xl lg:px-8">
         {/* Tab bar (scrollable) */}
         <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-0.5">
           {TABS.map((x) => (

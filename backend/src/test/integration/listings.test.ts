@@ -27,8 +27,17 @@ function tokenFor(userId: string, role = 'SUPPLIER') {
   return jwt.sign({ userId, role }, process.env.JWT_SECRET!, { expiresIn: '1h' });
 }
 
+/**
+ * `canSell: false` also uses the HOUSEHOLD role, deliberately.
+ *
+ * A SUPPLIER-role user with a non-selling org is a contradiction, and
+ * ensureOrgForUser now heals exactly that (it is what unblocked real sellers).
+ * So a buyer-only fixture has to be a buyer, or the reconciliation grants it
+ * selling rights and the test asserts nothing.
+ */
 async function makeSellerAccount(name: string, canSell = true) {
-  const user = await prisma.user.create({ data: { phone: phone(), pinHash: 'x', role: 'SUPPLIER', name } });
+  const role = canSell ? 'SUPPLIER' : 'HOUSEHOLD';
+  const user = await prisma.user.create({ data: { phone: phone(), pinHash: 'x', role, name } });
   const org  = await prisma.organization.create({
     data: {
       name, slug: `${name.toLowerCase().replace(/\W+/g, '-')}-${seq++}`,

@@ -169,7 +169,7 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
     <div className="min-h-screen pb-28">
       {/* ── Greeting header ───────────────────────────────────────────────── */}
       <header className="sticky top-0 z-30 border-b border-black/5 bg-sand/85 backdrop-blur dark:border-white/5">
-        <div className="mx-auto flex max-w-md items-center justify-between px-5 py-3">
+        <div className="mx-auto flex max-w-md items-center justify-between px-5 py-3 lg:max-w-5xl lg:px-8">
           <div className="min-w-0">
             <div className="truncate text-lg font-extrabold leading-tight">{greet}, {firstName}</div>
             <div className="truncate text-xs text-ink/50">{t('Delivering gas to your location', 'Tunaleta gesi kwenye eneo lako')}</div>
@@ -193,7 +193,9 @@ export function HouseholdHome({ user }: { user: JikoUser }) {
         )}
       </header>
 
-      <div className="mx-auto max-w-md space-y-4 px-5 pt-4">
+      {/* Phone width by default; from lg the sidebar is present and the content
+          uses the remaining space rather than a narrow centred column. */}
+      <div className="mx-auto max-w-md space-y-4 px-5 pt-4 lg:max-w-5xl lg:px-8">
         {/* ── Active order HERO ───────────────────────────────────────────── */}
         {active && (
           <div className="rounded-ds-xl border-2 border-flame/30 bg-white p-4 shadow-ds-card">

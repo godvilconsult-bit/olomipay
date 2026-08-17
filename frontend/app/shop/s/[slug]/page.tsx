@@ -12,7 +12,7 @@ import { notFound } from 'next/navigation';
 import { BadgeCheck, Store, Star, ArrowLeft, MapPin, Phone } from 'lucide-react';
 import { getSeller } from '../../../../lib/catalogServer';
 import { formatMoney } from '../../../../lib/money';
-import StoreHeader from '../../../../components/StoreHeader';
+import MarketplaceHeader from '../../../../components/MarketplaceHeader';
 
 interface Props {
   params: { slug: string };
@@ -58,7 +58,7 @@ export default async function SellerPage({ params, searchParams }: Props) {
 
   return (
     <>
-    <StoreHeader compact />
+    <MarketplaceHeader />
     <div className="mx-auto w-full max-w-5xl px-4 pb-16 pt-4">
       <Link href="/shop" className="mb-3 inline-flex items-center gap-1 text-sm text-ink/60 hover:text-flame">
         <ArrowLeft size={16} /> Back to marketplace

@@ -32,7 +32,9 @@ export function AppHeader({ title, subtitle, right }: { title: string; subtitle?
 
   return (
     <header className="sticky top-0 z-30 border-b border-black/5 bg-sand/85 backdrop-blur dark:border-white/5 dark:bg-background-dark/85">
-      <div className="mx-auto flex max-w-md items-center justify-between px-5 py-3">
+      {/* max-w-md keeps the phone layout; from lg the sidebar is present and the
+          header spans the remaining width instead of sitting in a narrow strip. */}
+      <div className="mx-auto flex max-w-md items-center justify-between px-5 py-3 lg:max-w-5xl lg:px-8">
         <div className="flex min-w-0 items-center gap-2.5">
           <span className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-xl bg-grad-brand text-white"><Flame size={18} /></span>
           <div className="min-w-0">
@@ -49,7 +51,7 @@ export function AppHeader({ title, subtitle, right }: { title: string; subtitle?
       {menu && (
         <>
           <div className="fixed inset-0 z-30" onClick={() => setMenu(false)} />
-          <div className="absolute right-5 top-[60px] z-40 w-56 rounded-2xl border border-black/5 bg-white p-3 shadow-ds-card dark:bg-ink-2">
+          <div className="absolute right-5 top-[60px] z-40 w-56 rounded-2xl border border-black/5 bg-white p-3 shadow-ds-card lg:right-8 dark:bg-ink-2">
             <div className="mb-1.5 flex items-center justify-between"><span className="text-xs font-semibold text-ink/50">{t('Language', 'Lugha')}</span><LangToggle /></div>
             <button onClick={logout} className="flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left text-sm font-medium text-danger hover:bg-danger/5"><LogOut size={16} /> {t('Sign out', 'Toka')}</button>
           </div>
