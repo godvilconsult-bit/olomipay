@@ -53,6 +53,7 @@ async function loadRoutes() {
     ['/api/freight',   () => import('./routes/freight'),   'freightRouter'],
     ['/api/listings',  () => import('./routes/listings'),  'listingsRouter'],
     ['/api/tracking',  () => import('./routes/tracking'),  'trackingRouter'],
+    ['/api/rfq',       () => import('./routes/rfq'),       'rfqRouter'],
     ['/api/messaging/conversations', () => import('./routes/messaging'), 'conversationsRouter'],
     ['/api/invoices',  () => import('./routes/messaging'), 'invoicesRouter'],
     ['/api/vendors',   () => import('./routes/vendors'),   'vendorsRouter'],

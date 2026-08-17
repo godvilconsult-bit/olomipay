@@ -969,6 +969,8 @@ model Organization {
   issuedInvoices      Invoice[]      @relation("IssuedInvoices")
   receivedInvoices    Invoice[]      @relation("ReceivedInvoices")
 
+  rfqs               Rfq[]          @relation("BuyerRfqs")
+
   // Freight marketplace (phase 6).
   loads              Load[]         @relation("ShipperLoads")
   quotes             Quote[]        @relation("CarrierQuotes")
@@ -1014,6 +1016,7 @@ model Category {
   parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
   children Category[] @relation("CategoryTree")
   products Product[]
+  rfqs     Rfq[]
 
   @@index([parentId, isActive])
 }
@@ -1187,11 +1190,60 @@ model Load {
   @@index([status, originLat, originLng])
 }
 
-/// A carrier's bid on a load. `rfqId` is deliberately absent for now: product
-/// RFQs are the same shape and will reuse this model in a later phase.
+enum RfqStatus {
+  OPEN      // accepting quotes
+  QUOTED    // at least one quote received
+  AWARDED   // a quote accepted
+  CLOSED
+  CANCELLED
+}
+
+/// Request for quotation: a buyer describes what they want and sellers bid.
+///
+/// Structurally identical to a freight Load — one side posts a need, the other
+/// quotes, the poster accepts one — which is why Quote serves both rather than
+/// there being two parallel bidding implementations.
+model Rfq {
+  id          String    @id @default(cuid())
+  reference   String    @unique
+  buyerOrgId  String
+  categoryId  String?
+
+  title       String
+  spec        String?   @db.Text        // free-form requirements
+  attributes  Json?                     // category-shaped fields, same as Product
+  qty         Int       @default(1)
+  unit        String?                   // piece | kg | litre …
+
+  targetMinor Int?                      // optional budget, minor units
+  currency    String    @default("TZS")
+  deliverToId String?                   // Address, when the buyer has pinned one
+
+  closesAt    DateTime
+  status      RfqStatus @default(OPEN)
+  awardedQuoteId String?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  buyer    Organization @relation("BuyerRfqs", fields: [buyerOrgId], references: [id], onDelete: Cascade)
+  category Category?    @relation(fields: [categoryId], references: [id])
+  quotes   Quote[]
+
+  @@index([status, closesAt])
+  @@index([buyerOrgId, status])
+  @@index([categoryId, status])
+}
+
+/// A bid — on a freight Load, or on a product Rfq.
+///
+/// Exactly one of loadId/rfqId is set. Both are nullable so the model can serve
+/// both markets; the service layer enforces that precisely one is present, since
+/// a database check constraint is not expressible in Prisma schema.
 model Quote {
   id           String      @id @default(cuid())
-  loadId       String
+  loadId       String?
+  rfqId        String?
   bidderOrgId  String
 
   amountMinor  Int
@@ -1204,13 +1256,18 @@ model Quote {
   createdAt    DateTime    @default(now())
   decidedAt    DateTime?
 
-  load   Load         @relation(fields: [loadId],      references: [id], onDelete: Cascade)
+  load   Load?        @relation(fields: [loadId], references: [id], onDelete: Cascade)
+  rfq    Rfq?         @relation(fields: [rfqId],  references: [id], onDelete: Cascade)
   bidder Organization @relation("CarrierQuotes", fields: [bidderOrgId], references: [id], onDelete: Cascade)
 
-  // One live bid per carrier per load — re-bidding updates rather than stacks.
+  // One live bid per bidder per load, and per bidder per RFQ — re-bidding
+  // updates rather than stacks. Postgres treats NULLs as distinct, so the unused
+  // side of each pair never collides.
   @@unique([loadId, bidderOrgId])
+  @@unique([rfqId, bidderOrgId])
   @@index([bidderOrgId, status])
   @@index([loadId, amountMinor])
+  @@index([rfqId, amountMinor])
 }
 
 /// A carrier's vehicle. Capacity is what makes freight matching possible at all.
