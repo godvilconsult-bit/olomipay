@@ -410,19 +410,29 @@ Each step is independently deployable and reversible. **The gas flow is the regr
 baseline at every step**: if a household in Dar can still order a 15 kg Oryx refill and
 watch the rider arrive, the step is green.
 
-| Phase | Work | Risk |
+| Phase | Work | Status |
 |---|---|---|
-| **0. Baseline** ✅ | Characterization tests over the live order flow on a real Postgres | none |
-| **1. Expand** | Add `Organization`, `Membership`, `Category`, `Offer`, `Shipment`, `ShipmentLeg` alongside existing tables. Nothing reads them yet | none — additive |
-| **2. Backfill** | Auto-create an org per user; map `SupplierProfile`→RETAILER, `DistributorProfile`→WHOLESALER; `Inventory`+`DistributorStock`→`Offer`; gas products → categories + attributes | reversible |
-| **3. Dual-read** | Order/catalog code reads new models, writes both. Money migrates to minor units behind helpers | medium — full test pass |
-| **4. Cut over** | `Order` becomes party-to-party; `RestockOrder` folds in with `parentOrderId`; `Delivery`→single-leg `Shipment` | highest — feature-flagged |
-| **5. Storefront** | Public catalog browse, product pages with multi-seller offers, seller storefronts, SEO | additive, new surface |
-| **6. Freight** | `Load`, `Quote`, `Vehicle`, `CarrierRoute` + matcher + screens | additive, new surface |
-| **7. Map** | `RoutingProvider`, server-side route caching, multi-leg chain rendering on both engines | additive |
-| **8. Contract** | Drop `brand`/`sizeKg`/`ProductType`/`Cylinder`/`PriceCap`/restock tables | cleanup |
+| **0. Baseline** | Characterization tests over the live order flow on a real Postgres | ✅ done |
+| **1. Expand** | `Organization`, `Membership`, `Category`, `Offer`, `Shipment`, `ShipmentLeg` added alongside existing tables | ✅ done |
+| **2. Backfill** | Org per user; `SupplierProfile`→RETAILER, `DistributorProfile`→WHOLESALER; `Inventory`+`DistributorStock`→`Offer`; gas products → categories + attributes | ✅ done, run on production |
+| **3. Dual-read** | Money in minor units on all new rows (`src/lib/money.ts`); legacy `Float` columns still live | ◐ partial |
+| **4. Cut over** | `Order` becomes party-to-party; `RestockOrder` folds in; `Delivery`→single-leg `Shipment` | ✗ not started |
+| **5. Storefront** | Public catalog, multi-seller product pages, seller storefronts, seller listing flow, images + descriptions, marketplace header with category mega-menu | ✅ done |
+| **6. Freight** | `Load`, `Quote`, `Vehicle`, `CarrierRoute`, backhaul matcher, driver-position search, load board UI | ✅ done |
+| **7. Map** | `RoutingProvider` + server-side route caching, multi-leg journey with provenance chain, polylines on both engines | ✅ done |
+| **8. Contract** | Drop `brand`/`sizeKg`/`ProductType`/`Cylinder`/`PriceCap`/restock tables | ✗ blocked on 4 |
 
-Phases 5, 6 and 7 are independent of each other and can run in parallel once 4 lands.
+Phases 5, 6 and 7 turned out **not** to require 4: they read `Offer`/`Product`/`Category`/`Organization`, which phase 2 populates. Building them first delivered the marketplace without touching the money path — the cut-over remains the one genuinely risky step, and it is still outstanding.
+
+Also delivered outside the original plan: pre-order `Conversation`/`Message` and `Invoice` (§4's RFQ sibling), buyer↔seller chat, adaptive desktop/phone layout, and `services/orgs.ts`.
+
+### As-built deviations worth knowing
+
+**This document ran ahead of the schema three times.** `ownerOrgId`, `gtin` and `parentOrderId` were all specified here but created by no phase, so each surfaced as a runtime failure when the code that needed them was written. If you extend this doc, add the column in the same change as the prose.
+
+**Registration had no org.** Phase 2 created an `Organization` per existing user, but a backfill runs once — every account made afterwards had `primaryOrgId` null and was refused by every org-scoped feature. `services/orgs.ts` now creates one at registration *and* on demand, so accounts already broken heal without a migration. A one-off migration that a live signup path does not maintain is a bug waiting for its first new user.
+
+**Money is only half migrated.** New tables store integer minor units; `Order`, `Payment`, `Wallet` and `Inventory` still hold `Float`. The conservation invariant in `src/test/integration/placeOrder.test.ts` is the guard for finishing it.
 
 ---
 
