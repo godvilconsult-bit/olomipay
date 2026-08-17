@@ -366,6 +366,30 @@ export const freight = {
     apiFetch<{ carriers: { route: any; detourKm: number }[] }>(`/api/freight/loads/${loadId}/carriers`),
 };
 
+// ── Journey tracking ──────────────────────────────────────────────────────────
+// Routes arrive as encoded polylines computed and cached server-side, so the
+// browser never queries a routing service itself.
+export interface JourneyLeg {
+  seq: number; label: string;
+  from: { lat: number; lng: number; label?: string | null };
+  to:   { lat: number; lng: number; label?: string | null };
+  status: 'DONE' | 'ACTIVE' | 'PENDING';
+  polyline: string; distanceM: number; durationS: number; snapped: boolean;
+}
+export interface Journey {
+  orderNo: string; status: string;
+  legs: JourneyLeg[];
+  rider: { lat: number; lng: number; at?: string | null } | null;
+  etaMinutes: number | null;
+  chainLength: number;
+  routeQuality: 'road' | 'approximate';
+  warning?: string;
+}
+
+export const tracking = {
+  order: (orderId: string) => apiFetch<Journey>(`/api/tracking/orders/${orderId}`),
+};
+
 export const orders = {
   place:   (body: { supplierId: string; addressId: string; items: { inventoryId: string; qty: number }[]; note?: string }) =>
     apiFetch('/api/orders', { method: 'POST', body: JSON.stringify(body) }),

@@ -23,10 +23,26 @@ export interface MapMarker {
   vehicle?: string; // rider vehicle type → motorbike vs car icon
 }
 
+/**
+ * A leg of the journey, drawn as a road-snapped line.
+ *
+ * The polyline is computed and cached server-side (backend services/routing.ts).
+ * When `routes` is supplied the map draws exactly these and does no routing of
+ * its own — which is the point: the browser used to re-query OSRM's demo server
+ * every time the rider moved.
+ */
+export interface MapRoute {
+  polyline: string;
+  status?: 'DONE' | 'ACTIVE' | 'PENDING';
+  label?: string;
+}
+
 export interface MapProps {
   markers: MapMarker[];
   height?: number;
   onMarkerClick?: (id: string) => void;
+  /** Omit to keep the legacy single-leg behaviour. */
+  routes?: MapRoute[];
 }
 
 // Real Google Maps when NEXT_PUBLIC_GOOGLE_MAPS_API_KEY is configured (Uber/Bolt
