@@ -55,7 +55,7 @@ export function DistributorHome({ user }: { user: JikoUser }) {
       <AppHeader title={t('Distributor', 'Msambazaji')} subtitle={profile?.businessName ?? user.name ?? undefined}
         right={<button onClick={toggleActive} className={cn('flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold', profile?.isActive ? 'bg-leaf/15 text-leaf-dark' : 'bg-black/10 text-ink/50')}><Power size={13} /> {profile?.isActive ? t('Open', 'Wazi') : t('Closed', 'Imefungwa')}</button>} />
 
-      <div className="mx-auto max-w-md space-y-4 px-5 pt-4">
+      <div className="mx-auto max-w-md space-y-4 px-5 pt-4 lg:max-w-5xl lg:px-8">
         <Link href="/distributor/stock"><Card className="flex items-center justify-between !p-3.5">
           <span className="flex items-center gap-2 font-semibold"><Boxes size={18} className="text-flame" /> {t('Wholesale stock & prices', 'Bidhaa na bei za jumla')}</span>
           <ChevronRight size={18} className="text-ink/30" />

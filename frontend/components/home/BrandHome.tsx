@@ -69,7 +69,7 @@ export function BrandHome({ user }: { user: JikoUser }) {
     <div className="min-h-screen pb-24">
       <AppHeader title={me.profile?.brandName ?? t('Brand', 'Kampuni')} subtitle={t('Advertiser portal', 'Mlango wa matangazo')} />
 
-      <div className="mx-auto max-w-md space-y-4 px-5 pt-4">
+      <div className="mx-auto max-w-md space-y-4 px-5 pt-4 lg:max-w-5xl lg:px-8">
         <div className="grid grid-cols-4 gap-2">
           <Stat label={t('Ads', 'Matangazo')} value={me.totals.ads} />
           <Stat label={t('Views', 'Mionekano')} value={me.totals.impressions} />

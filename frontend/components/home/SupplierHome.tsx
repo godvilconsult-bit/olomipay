@@ -105,7 +105,7 @@ export function SupplierHome({ user }: { user: JikoUser }) {
       <AppHeader title={p.businessName} subtitle={t('Supplier dashboard', 'Dashibodi ya muuzaji')}
         right={<button onClick={toggleOpen} className={cn('rounded-full px-3 py-1.5 text-xs font-bold', p.isOpen ? 'bg-leaf/15 text-leaf-dark' : 'bg-black/10 text-ink/50')}>{p.isOpen ? t('OPEN', 'WAZI') : t('CLOSED', 'IMEFUNGWA')}</button>} />
 
-      <div className="mx-auto max-w-md space-y-3 px-5 pt-4">
+      <div className="mx-auto max-w-md space-y-3 px-5 pt-4 lg:max-w-5xl lg:px-8">
         {!user.supplierProfile?.isVerified && (user.kycStatus === 'SUBMITTED' ? (
           <Card className="flex items-center gap-3 border-warning/40 !bg-warning/5">
             <Clock className="text-warning flex-shrink-0" size={22} />

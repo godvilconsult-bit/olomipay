@@ -14,7 +14,7 @@ import { Search, Store, PackageSearch, SlidersHorizontal, BadgeCheck } from 'luc
 import { catalog, getAccessToken, type CatalogProduct, type CatalogCategory } from '../../lib/api';
 import { formatCatalogMoney } from '../../lib/money';
 import { Card, Pill, Spinner, EmptyState, Button, cn } from '../../components/ui';
-import StoreHeader from '../../components/StoreHeader';
+import MarketplaceHeader from '../../components/MarketplaceHeader';
 import { useT } from '../../lib/i18n';
 
 type Sort = 'price_asc' | 'price_desc' | 'newest' | 'name';
@@ -41,6 +41,19 @@ export default function ShopPage() {
     catalog.categories()
       .then(r => setCategories(r.flat.filter(c => c.productCount > 0)))
       .catch(() => setCategories([]));
+  }, []);
+
+  // The mega-menu links here as /shop?category=key, and verified sellers as
+  // ?verified=1. Read from window rather than useSearchParams, which would force
+  // this prerendered page behind a Suspense boundary.
+  useEffect(() => {
+    try {
+      const p = new URLSearchParams(window.location.search);
+      const cat = p.get('category');
+      if (cat) setCategory(cat);
+      const q0 = p.get('q');
+      if (q0) { setQ(q0); setSearch(q0); }
+    } catch {}
   }, []);
 
   // Debounce so a search doesn't fire a request per keystroke.
@@ -74,8 +87,8 @@ export default function ShopPage() {
 
   return (
     <>
-      <StoreHeader />
-      <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-4">
+      <MarketplaceHeader />
+      <div className="mx-auto w-full max-w-7xl px-4 pb-16 pt-5 lg:px-6">
       {/* Hero — the first thing a visitor sees, so it states what this is and
           gives one honest number rather than a marketing claim. */}
       <div className="mb-5">
