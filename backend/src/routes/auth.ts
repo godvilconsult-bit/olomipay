@@ -100,6 +100,21 @@ router.post('/register', authLimiter, async (req, res) => {
     },
   });
 
+  // Give every new account its trading Organization.
+  //
+  // Without this a seller could not list a product, a buyer could not message
+  // one, and nobody could post a load: all of those resolve through the user's
+  // primaryOrgId, and only the one-off phase 2 backfill had ever set it.
+  //
+  // Best-effort so a failure here cannot block a signup — actingOrgId() creates
+  // it on first use if this misses.
+  try {
+    const { ensureOrgForUser } = await import('../services/orgs');
+    await ensureOrgForUser(user.id);
+  } catch (e: any) {
+    console.error('[register] org creation deferred:', e?.message);
+  }
+
   // Link a referral if a valid invite code was supplied (rewarded on first completed order).
   if (parse.data.referralCode) {
     const referrer = await prisma.user.findUnique({ where: { referralCode: parse.data.referralCode.toUpperCase() }, select: { id: true } });

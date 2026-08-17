@@ -13,16 +13,22 @@
 import { prisma } from '../lib/prisma';
 import { projectOntoPath, haversineKm } from '../lib/geo';
 import { makeOrderNo } from '../lib/ids';
+import { ensureOrgForUser } from './orgs';
 
 function fail(message: string, http: number): never {
   throw Object.assign(new Error(message), { http });
 }
 
-/** Resolve the org a user acts as. Set by the phase 2 backfill. */
+/**
+ * The org a user acts as, created on demand.
+ *
+ * This used to fail with 409 when `primaryOrgId` was null, which was every
+ * account registered after the phase 2 backfill — so sellers could not list,
+ * buyers could not message, and nobody could post a load. Creating it here
+ * heals those accounts without a migration.
+ */
 export async function actingOrgId(userId: string): Promise<string> {
-  const u = await prisma.user.findUnique({ where: { id: userId }, select: { primaryOrgId: true } });
-  if (!u?.primaryOrgId) fail('Your account is not linked to an organization yet', 409);
-  return u.primaryOrgId;
+  return ensureOrgForUser(userId);
 }
 
 // ── Shipper side ────────────────────────────────────────────────────────────
