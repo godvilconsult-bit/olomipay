@@ -20,6 +20,7 @@ import {
 } from '../../lib/api';
 import { formatMoney } from '../../lib/money';
 import { Button, Card, Field, Spinner, EmptyState, cn } from '../../components/ui';
+import AppShell from '../../components/AppShell';
 import { useT } from '../../lib/i18n';
 
 export default function SellPage() {
@@ -73,12 +74,15 @@ export default function SellPage() {
   if (loading) return <Spinner />;
 
   return (
+    <AppShell
+      title={t('My listings', 'Bidhaa zangu')}
+      subtitle={t('Sell anything', 'Uza chochote')}
+    >
     <div className="mx-auto w-full max-w-3xl px-4 pb-24 pt-4">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-extrabold text-ink dark:text-sand">{t('My listings', 'Bidhaa zangu')}</h1>
-          <p className="mt-1 text-sm text-ink/60 dark:text-sand/60">
-            {t('Sell anything — pick a category and add your product.', 'Uza chochote — chagua kundi na ongeza bidhaa yako.')}
+          <p className="text-sm text-ink/60 dark:text-sand/60">
+            {t('Pick a category and add your product.', 'Chagua kundi na ongeza bidhaa yako.')}
           </p>
         </div>
         <div className="mt-1 flex shrink-0 flex-col items-end gap-1">
@@ -159,6 +163,7 @@ export default function SellPage() {
         </>
       )}
     </div>
+    </AppShell>
   );
 }
 

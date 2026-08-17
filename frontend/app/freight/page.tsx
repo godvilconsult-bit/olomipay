@@ -22,6 +22,7 @@ import {
 } from '../../lib/api';
 import { formatMinor } from '../../lib/money';
 import { Button, Card, Field, Spinner, EmptyState, Pill, cn } from '../../components/ui';
+import AppShell from '../../components/AppShell';
 import { useT } from '../../lib/i18n';
 
 type Tab = 'board' | 'mine' | 'lanes';
@@ -53,9 +54,12 @@ export default function FreightPage() {
   if (loading) return <Spinner />;
 
   return (
+    <AppShell
+      title={t('Freight', 'Usafirishaji')}
+      subtitle={t('Load board', 'Mizigo')}
+    >
     <div className="mx-auto w-full max-w-3xl px-4 pb-24 pt-4">
-      <h1 className="text-2xl font-extrabold text-ink dark:text-sand">{t('Freight', 'Usafirishaji')}</h1>
-      <p className="mt-1 text-sm text-ink/60 dark:text-sand/60">
+      <p className="text-sm text-ink/60 dark:text-sand/60">
         {t('Post cargo, or find loads that fit a trip you are already making.', 'Weka mzigo, au tafuta mizigo inayolingana na safari uliyonayo.')}
       </p>
 
@@ -127,6 +131,7 @@ export default function FreightPage() {
         </div>
       )}
     </div>
+    </AppShell>
   );
 }
 

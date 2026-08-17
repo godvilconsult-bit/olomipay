@@ -13,6 +13,7 @@ import Link from 'next/link';
 import { MessageSquare, Store, Receipt, ChevronRight } from 'lucide-react';
 import { messaging, type ConversationSummary } from '../../lib/api';
 import { Card, Spinner, EmptyState, cn } from '../../components/ui';
+import AppShell from '../../components/AppShell';
 import { useT } from '../../lib/i18n';
 
 function timeAgo(iso: string, t: (en: string, sw: string) => string): string {
@@ -41,9 +42,12 @@ export default function MessagesPage() {
   if (loading) return <Spinner />;
 
   return (
+    <AppShell
+      title={t('Messages', 'Ujumbe')}
+      subtitle={t('Buyers and sellers', 'Wanunuzi na wauzaji')}
+    >
     <div className="mx-auto w-full max-w-2xl px-4 pb-24 pt-4">
-      <h1 className="text-2xl font-extrabold text-ink dark:text-sand">{t('Messages', 'Ujumbe')}</h1>
-      <p className="mt-1 text-sm text-ink/60 dark:text-sand/60">
+      <p className="text-sm text-ink/60 dark:text-sand/60">
         {t('Talk to sellers and buyers before you order.', 'Ongea na wauzaji na wanunuzi kabla ya kuagiza.')}
       </p>
 
@@ -108,5 +112,6 @@ export default function MessagesPage() {
         </div>
       )}
     </div>
+    </AppShell>
   );
 }
