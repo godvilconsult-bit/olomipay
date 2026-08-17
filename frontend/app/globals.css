@@ -667,3 +667,14 @@ table { max-width: 100%; }
 @media (prefers-reduced-motion: reduce) {
   .ad-fx-slide, .ad-fx-up, .ad-fx-fade, .ad-fx-zoom, .ad-fx-pop, .ad-fx-flip { animation: none; }
 }
+
+/* ── Desktop side navigation offset ───────────────────────────────────────────
+   RoleNav renders a fixed 15rem sidebar from the lg breakpoint up. It adds
+   .has-sidenav to <body> while mounted, so only pages that actually have a
+   sidebar are offset — the public storefront and the auth screens, which render
+   no RoleNav, keep the full width.
+
+   Below lg the same component is a bottom tab bar, which needs no offset. */
+@media (min-width: 1024px) {
+  body.has-sidenav { padding-left: 15rem; }
+}
