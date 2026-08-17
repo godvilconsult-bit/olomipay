@@ -11,9 +11,11 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { Search, Store, PackageSearch, SlidersHorizontal, BadgeCheck } from 'lucide-react';
-import { catalog, type CatalogProduct, type CatalogCategory } from '../../lib/api';
+import { catalog, getAccessToken, type CatalogProduct, type CatalogCategory } from '../../lib/api';
 import { formatCatalogMoney } from '../../lib/money';
 import { Card, Pill, Spinner, EmptyState, Button, cn } from '../../components/ui';
+import StoreHeader from '../../components/StoreHeader';
+import { useT } from '../../lib/i18n';
 
 type Sort = 'price_asc' | 'price_desc' | 'newest' | 'name';
 
@@ -70,7 +72,9 @@ export default function ShopPage() {
   const pages = Math.max(1, Math.ceil(total / LIMIT));
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-4">
+    <>
+      <StoreHeader />
+      <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-4">
       {/* Header */}
       <div className="mb-4">
         <h1 className="text-2xl font-extrabold text-ink dark:text-sand">Marketplace</h1>
@@ -79,8 +83,10 @@ export default function ShopPage() {
         </p>
       </div>
 
+      <SellerCallout />
+
       {/* Search */}
-      <div className="sticky top-0 z-10 -mx-4 mb-3 bg-sand/80 px-4 py-2 backdrop-blur dark:bg-ink/80">
+      <div className="sticky top-[53px] z-10 -mx-4 mb-3 bg-sand/80 px-4 py-2 backdrop-blur dark:bg-ink/80">
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink/40" size={18} />
@@ -165,6 +171,41 @@ export default function ShopPage() {
           <Button variant="ghost" disabled={page >= pages} onClick={() => setPage(p => Math.min(pages, p + 1))}>Next</Button>
         </div>
       )}
+      </div>
+    </>
+  );
+}
+
+/**
+ * The seller's way in.
+ *
+ * Shown only to signed-out visitors: someone already logged in has Sell in the
+ * header and the nav, so repeating it here would just be clutter.
+ */
+function SellerCallout() {
+  const { t } = useT();
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
+  useEffect(() => { setSignedIn(!!getAccessToken()); }, []);
+
+  if (signedIn !== false) return null;
+
+  return (
+    <div className="mb-4 flex flex-wrap items-center gap-3 rounded-ds-xl border border-flame/20 bg-flame/5 p-3">
+      <Store className="shrink-0 text-flame" size={20} />
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-bold text-ink dark:text-sand">
+          {t('Have something to sell?', 'Una kitu cha kuuza?')}
+        </div>
+        <div className="text-xs text-ink/60 dark:text-sand/60">
+          {t('List your products and reach buyers near and far — free to start.', 'Orodhesha bidhaa zako ufikie wanunuzi — ni bure kuanza.')}
+        </div>
+      </div>
+      <Link
+        href="/auth/register?role=SUPPLIER"
+        className="inline-flex min-h-touch shrink-0 items-center gap-1.5 rounded-2xl bg-grad-brand px-4 text-sm font-semibold text-white shadow-ds-btn"
+      >
+        <Store size={15} /> {t('Start selling', 'Anza kuuza')}
+      </Link>
     </div>
   );
 }

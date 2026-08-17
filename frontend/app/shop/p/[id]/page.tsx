@@ -16,6 +16,8 @@ import { BadgeCheck, Store, Star, ArrowLeft } from 'lucide-react';
 import { getProduct } from '../../../../lib/catalogServer';
 import { formatMoney } from '../../../../lib/money';
 import ContactSellerButton from '../../../../components/ContactSellerButton';
+import BuyCta from '../../../../components/BuyCta';
+import StoreHeader from '../../../../components/StoreHeader';
 
 interface Props { params: { id: string } }
 
@@ -55,6 +57,8 @@ export default async function ProductPage({ params }: Props) {
   const description: string | null = (p as any).description ?? null;
 
   return (
+    <>
+    <StoreHeader compact />
     <div className="mx-auto w-full max-w-4xl px-4 pb-16 pt-4">
       <Link href="/shop" className="mb-3 inline-flex items-center gap-1 text-sm text-ink/60 hover:text-flame">
         <ArrowLeft size={16} /> Back to marketplace
@@ -183,10 +187,11 @@ export default async function ProductPage({ params }: Props) {
             browsing, because a conversation has two identified parties. */}
         <ContactSellerButton productId={p.id} productName={p.name} />
 
-        <p className="mt-4 text-xs text-ink/50">
-          Sign in to place an order or message a seller. Browsing is open to everyone.
-        </p>
+        {/* Signed-out visitors get the account choice here rather than hitting
+            the requirement only after tapping buy. Renders nothing once in. */}
+        <BuyCta productId={p.id} />
       </section>
     </div>
+    </>
   );
 }

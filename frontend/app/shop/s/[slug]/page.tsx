@@ -12,6 +12,7 @@ import { notFound } from 'next/navigation';
 import { BadgeCheck, Store, Star, ArrowLeft, MapPin, Phone } from 'lucide-react';
 import { getSeller } from '../../../../lib/catalogServer';
 import { formatMoney } from '../../../../lib/money';
+import StoreHeader from '../../../../components/StoreHeader';
 
 interface Props {
   params: { slug: string };
@@ -56,6 +57,8 @@ export default async function SellerPage({ params, searchParams }: Props) {
   const contact = [s.contactPhone, s.contactEmail].filter(Boolean).join(' · ');
 
   return (
+    <>
+    <StoreHeader compact />
     <div className="mx-auto w-full max-w-5xl px-4 pb-16 pt-4">
       <Link href="/shop" className="mb-3 inline-flex items-center gap-1 text-sm text-ink/60 hover:text-flame">
         <ArrowLeft size={16} /> Back to marketplace
@@ -155,5 +158,6 @@ export default async function SellerPage({ params, searchParams }: Props) {
         </div>
       )}
     </div>
+    </>
   );
 }
