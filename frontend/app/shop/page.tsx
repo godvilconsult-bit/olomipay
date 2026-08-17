@@ -10,7 +10,7 @@
  */
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { Search, Store, PackageSearch, SlidersHorizontal, BadgeCheck } from 'lucide-react';
+import { Search, Store, PackageSearch, SlidersHorizontal, BadgeCheck, Package } from 'lucide-react';
 import { catalog, getAccessToken, type CatalogProduct, type CatalogCategory } from '../../lib/api';
 import { formatCatalogMoney } from '../../lib/money';
 import { Card, Pill, Spinner, EmptyState, Button, cn } from '../../components/ui';
@@ -119,6 +119,15 @@ export default function ShopPage() {
 
       <SellerCallout />
 
+      {/* Tiles only on the unfiltered home — above someone's search results they
+          would just push the results they asked for off the screen. */}
+      {!search && !category && (
+        <CategoryTiles
+          categories={categories}
+          onPick={(key) => { setCategory(key); setPage(1); }}
+        />
+      )}
+
       {/* Search */}
       <div className="sticky top-[53px] z-10 -mx-4 mb-3 bg-sand/80 px-4 py-2 backdrop-blur dark:bg-ink/80">
         <div className="flex gap-2">
@@ -208,6 +217,78 @@ export default function ShopPage() {
       </div>
     </>
   );
+}
+
+/**
+ * "Categories for you" — the tile grid a marketplace home opens with.
+ *
+ * Shown only on the unfiltered view: once someone has picked a category or
+ * typed a search, tiles are just noise above their results.
+ *
+ * Categories carry no imagery yet, so each tile gets a deterministic tint
+ * derived from its key. That keeps the grid visually varied and stable across
+ * renders without inventing stock photos that would misrepresent stock.
+ */
+const TINTS = [
+  'from-orange-500/15 to-amber-400/10 text-orange-600',
+  'from-emerald-500/15 to-teal-400/10 text-emerald-600',
+  'from-sky-500/15 to-cyan-400/10 text-sky-600',
+  'from-violet-500/15 to-fuchsia-400/10 text-violet-600',
+  'from-rose-500/15 to-pink-400/10 text-rose-600',
+  'from-lime-500/15 to-green-400/10 text-lime-700',
+  'from-indigo-500/15 to-blue-400/10 text-indigo-600',
+  'from-amber-600/15 to-yellow-400/10 text-amber-700',
+];
+
+function CategoryTiles(
+  { categories, onPick }: { categories: CatalogCategory[]; onPick: (key: string) => void },
+) {
+  const { t } = useT();
+  if (categories.length === 0) return null;
+
+  return (
+    <section className="mb-6">
+      <div className="mb-2.5 flex items-baseline justify-between">
+        <h2 className="text-base font-extrabold text-ink dark:text-sand">
+          {t('Categories for you', 'Makundi kwako')}
+        </h2>
+        <span className="text-xs text-ink/45">
+          {categories.length} {t('with stock', 'zenye bidhaa')}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-4 lg:grid-cols-7">
+        {categories.map((c, i) => {
+          const tint = TINTS[Math.abs(hashKey(c.key)) % TINTS.length];
+          return (
+            <button
+              key={c.id}
+              onClick={() => onPick(c.key)}
+              className="group flex flex-col items-center gap-1.5 rounded-ds-xl p-2 transition hover:bg-black/[0.03] dark:hover:bg-white/5"
+            >
+              <span className={cn(
+                'grid h-16 w-16 place-items-center rounded-full bg-gradient-to-br transition duration-200 group-hover:scale-105',
+                tint,
+              )}>
+                <Package size={24} strokeWidth={1.8} />
+              </span>
+              <span className="line-clamp-2 text-center text-[11px] font-semibold leading-tight text-ink/80 dark:text-sand/80">
+                {c.name}
+              </span>
+              <span className="text-[10px] text-ink/40">{c.productCount}</span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+/** Stable per-key tint so a category keeps its colour between renders. */
+function hashKey(key: string): number {
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h << 5) - h + key.charCodeAt(i);
+  return h;
 }
 
 /**
