@@ -56,6 +56,13 @@ export default async function ProductPage({ params }: Props) {
   const gallery: string[] = Array.isArray((p as any).images) ? (p as any).images : (p.imageUrl ? [p.imageUrl] : []);
   const description: string | null = (p as any).description ?? null;
 
+  // Offers arrive cheapest-first from the API.
+  const best = offers[0];
+  const dearest = offers[offers.length - 1];
+  const spread = best && dearest && dearest.price > 0
+    ? ((dearest.price - best.price) / dearest.price) * 100
+    : 0;
+
   return (
     <>
     <MarketplaceHeader />
@@ -91,13 +98,46 @@ export default async function ProductPage({ params }: Props) {
           )}
           <h1 className="mt-1 text-2xl font-extrabold text-ink dark:text-sand">{p.name}</h1>
 
+          {/* Price block. The unit and any minimum order sit with the number,
+              because "19,000" means something different per bag than per pallet
+              — and a wholesale listing that hides its MOQ wastes everyone's time. */}
           {p.from && (
-            <div className="mt-2">
-              <span className="text-3xl font-extrabold tabular-nums text-flame">
-                {formatMoney(p.from.price, p.from.currency)}
-              </span>
-              {offers.length > 1 && (
-                <span className="ml-2 text-sm text-ink/50">lowest of {offers.length} offers</span>
+            <div className="mt-3 rounded-ds-xl bg-gradient-to-br from-flame/[0.07] to-amber-400/[0.04] p-4">
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-[32px] font-extrabold leading-none tabular-nums text-flame">
+                  {formatMoney(p.from.price, p.from.currency)}
+                </span>
+                {p.category?.unitType && (
+                  <span className="text-sm font-medium text-ink/50">/ {p.category.unitType}</span>
+                )}
+              </div>
+
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink/60 dark:text-sand/60">
+                {offers.length > 1 && (
+                  <span className="font-semibold text-leaf-dark">
+                    Lowest of {offers.length} sellers
+                  </span>
+                )}
+                {best?.moq && best.moq > 1 && (
+                  <span>Minimum order <strong className="text-ink dark:text-sand">{best.moq}</strong></span>
+                )}
+                {best && (
+                  <span className={best.inStock ? 'text-leaf-dark' : 'text-danger'}>
+                    {best.inStock ? `${best.stock} in stock` : 'Out of stock'}
+                  </span>
+                )}
+              </div>
+
+              {/* Price spread is the single most useful fact on a marketplace
+                  product page: it tells a buyer whether comparing is worth it. */}
+              {offers.length > 1 && spread > 0 && (
+                <div className="mt-2 text-[11px] text-ink/50">
+                  Sellers range {formatMoney(offers[0].price, offers[0].currency)} –{' '}
+                  {formatMoney(offers[offers.length - 1].price, offers[offers.length - 1].currency)}
+                  <span className="ml-1 font-semibold text-flame">
+                    (save up to {Math.round(spread)}%)
+                  </span>
+                </div>
               )}
             </div>
           )}
