@@ -67,10 +67,31 @@
   }
 
   /* ── Global overflow protection — nothing escapes the screen ──────────────── */
-  html, body {
+  /*
+   * `overflow-x: clip` rather than `hidden`, and only on <html>.
+   *
+   * `hidden` forces the other axis to compute as `auto` instead of `visible`,
+   * which turns the element into a scroll container. Setting it on BOTH html and
+   * body therefore created two nested scroll containers, and with
+   * overscroll-behavior-y stopping chaining between them, a wheel event landing
+   * on the wrong one had nowhere to go — the reported "cannot scroll with a
+   * mouse on desktop".
+   *
+   * `clip` gives the same horizontal protection without creating a scroll
+   * container, so vertical scrolling stays on the viewport where it belongs.
+   */
+  html {
     max-width: 100%;
-    overflow-x: hidden;       /* never allow horizontal scroll */
-    overscroll-behavior-y: none;
+    overflow-x: clip;
+  }
+
+  body {
+    max-width: 100%;
+    overflow-x: clip;
+    /* Kept off the vertical axis: it was contributing to the trapped-wheel
+       behaviour, and its only real value was suppressing pull-to-refresh, which
+       matters on phones and is handled by the viewport meta. */
+    overscroll-behavior-x: none;
   }
 
   /* Every element respects its box; media never overflows its container */
