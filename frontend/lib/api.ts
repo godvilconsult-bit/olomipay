@@ -238,7 +238,7 @@ export const listings = {
   saveStore: (body: Record<string, any>) =>
     apiFetch<{ store: any }>('/api/listings/store', { method: 'PUT', body: JSON.stringify(body) }),
 
-  createOffer: (body: { productId: string; price: number; currency?: string; stock: number; moq?: number; isAvailable?: boolean }) =>
+  createOffer: (body: { productId: string; price: number; currency?: string; stock: number; moq?: number; isAvailable?: boolean; tiers?: { minQty: number; price: number }[] }) =>
     apiFetch<{ offer: MyListing }>('/api/listings/offers', { method: 'POST', body: JSON.stringify(body) }),
 
   mine: () => apiFetch<{ sellerSlug: string; listings: MyListing[] }>('/api/listings/mine'),

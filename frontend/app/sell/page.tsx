@@ -183,6 +183,9 @@ function NewListingForm(
   const [description, setDescription] = useState('');
   const [images, setImages] = useState<string[]>([]);
   const [imgBusy, setImgBusy] = useState(false);
+  // Quantity price breaks. Empty by default — a retail listing needs none, and
+  // an offer without tiers keeps the plain single price it always had.
+  const [priceTiers, setPriceTiers] = useState<{ minQty: string; price: string }[]>([]);
   const [saving, setSaving] = useState(false);
 
   const imagesBytes = images.reduce((n, s) => n + dataUrlBytes(s), 0);
@@ -236,11 +239,16 @@ function NewListingForm(
         description: description.trim() || undefined,
         images,
       });
+      const cleanTiers = priceTiers
+        .filter(t => Number(t.minQty) > 1 && Number(t.price) > 0)
+        .map(t => ({ minQty: Math.floor(Number(t.minQty)), price: Number(t.price) }));
+
       await listings.createOffer({
         productId: product.id,
         price: priceNum,
         stock: Number(stock) || 0,
         moq: Math.max(1, Number(moq) || 1),
+        ...(cleanTiers.length ? { tiers: cleanTiers } : {}),
       });
       toast.success(t('Listed! It is live in the marketplace.', 'Imeorodheshwa! Ipo sokoni sasa.'));
       onCreated();
@@ -364,6 +372,41 @@ function NewListingForm(
           </div>
           <p className="mt-1.5 text-xs text-ink/45">
             {t('Up to 4 photos. Large photos are shrunk automatically before upload.', 'Hadi picha 4. Picha kubwa hupunguzwa kabla ya kupakia.')}
+          </p>
+        </div>
+
+        {/* Quantity breaks. Optional: most retail listings want none, and
+            leaving this empty keeps the single price the offer always had. */}
+        <div>
+          <span className="mb-1.5 block text-sm font-medium text-ink/70 dark:text-sand/70">
+            {t('Bulk price breaks', 'Bei za jumla')}{' '}
+            <span className="font-normal text-ink/45">{t('optional', 'hiari')}</span>
+          </span>
+
+          {priceTiers.map((tier, i) => (
+            <div key={i} className="mb-1.5 grid grid-cols-[1fr_1fr_28px] items-end gap-1.5">
+              <Field label={i === 0 ? t('From qty', 'Kuanzia') : undefined} type="number" inputMode="numeric"
+                value={tier.minQty}
+                onChange={e => setPriceTiers(ts => ts.map((x, j) => j === i ? { ...x, minQty: e.target.value } : x))} />
+              <Field label={i === 0 ? t('Unit price', 'Bei kwa kimoja') : undefined} type="number" inputMode="decimal"
+                value={tier.price}
+                onChange={e => setPriceTiers(ts => ts.map((x, j) => j === i ? { ...x, price: e.target.value } : x))} />
+              <button type="button" aria-label={t('Remove break', 'Ondoa')}
+                onClick={() => setPriceTiers(ts => ts.filter((_, j) => j !== i))}
+                className="mb-2.5 grid h-8 w-7 place-items-center text-ink/35 hover:text-danger">
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ))}
+
+          {priceTiers.length < 4 && (
+            <button type="button" onClick={() => setPriceTiers(ts => [...ts, { minQty: '', price: '' }])}
+              className="inline-flex items-center gap-1 text-xs font-semibold text-flame">
+              <Plus size={13} /> {t('Add a bulk price', 'Ongeza bei ya jumla')}
+            </button>
+          )}
+          <p className="mt-1 text-[11px] text-ink/45">
+            {t('e.g. from 10 units the price drops. Buyers see the full table.', 'mfano: kuanzia vipande 10 bei hupungua.')}
           </p>
         </div>
 
