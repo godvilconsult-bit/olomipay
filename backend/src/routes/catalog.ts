@@ -60,9 +60,33 @@ router.get('/categories', async (_req, res) => {
   const counts = await prisma.product.groupBy({ by: ['categoryId'], _count: { _all: true } });
   const countBy = new Map(counts.map(c => [c.categoryId, c._count._all]));
 
+  /**
+   * A representative photo per category, taken from a product actually listed
+   * in it.
+   *
+   * Category.imageUrl exists but is empty, and stock photography would show
+   * goods no seller has. Deriving the tile from real inventory keeps it honest
+   * and self-maintaining: list the first phone and the Phones tile stops being
+   * a generic icon, with nobody having to curate anything.
+   */
+  const withPhotos = await prisma.product.findMany({
+    where:  { imageUrl: { not: null }, categoryId: { not: null } },
+    select: { categoryId: true, imageUrl: true },
+    orderBy: { createdAt: 'desc' },
+    take: 500,
+  });
+  const sampleBy = new Map<string, string>();
+  for (const row of withPhotos) {
+    if (row.categoryId && row.imageUrl && !sampleBy.has(row.categoryId)) {
+      sampleBy.set(row.categoryId, row.imageUrl);
+    }
+  }
+
   const nodes = cats.map(c => ({
     id: c.id, key: c.key, name: c.name, parentId: c.parentId,
-    unitType: c.unitType, imageUrl: c.imageUrl,
+    unitType: c.unitType,
+    // A curated image wins if one is ever set; otherwise a real listing stands in.
+    imageUrl: c.imageUrl ?? sampleBy.get(c.id) ?? null,
     attributeSchema: c.attributeSchema,
     productCount: countBy.get(c.id) ?? 0,
   }));

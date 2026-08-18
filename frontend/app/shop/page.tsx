@@ -345,11 +345,16 @@ function CategoryTiles(
               onClick={() => onPick(c.key)}
               className="group flex flex-col items-center gap-1.5 rounded-ds-xl p-2 transition hover:bg-black/[0.03] dark:hover:bg-white/5"
             >
+              {/* A real product photo from this category when one exists; the
+                  tinted icon is the fallback for a branch nobody has listed in
+                  yet. Stock imagery would advertise goods no seller has. */}
               <span className={cn(
-                'grid h-16 w-16 place-items-center rounded-full bg-gradient-to-br transition duration-200 group-hover:scale-105',
-                tint,
+                'grid h-16 w-16 place-items-center overflow-hidden rounded-full transition duration-200 group-hover:scale-105',
+                c.imageUrl ? 'bg-black/5 dark:bg-white/10' : cn('bg-gradient-to-br', tint),
               )}>
-                <Package size={24} strokeWidth={1.8} />
+                {c.imageUrl
+                  ? <img src={c.imageUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+                  : <Package size={24} strokeWidth={1.8} />}
               </span>
               <span className="line-clamp-2 text-center text-[11px] font-semibold leading-tight text-ink/80 dark:text-sand/80">
                 {c.name}
