@@ -17,6 +17,7 @@ import { getProduct } from '../../../../lib/catalogServer';
 import { formatMoney } from '../../../../lib/money';
 import ContactSellerButton from '../../../../components/ContactSellerButton';
 import BuyCta from '../../../../components/BuyCta';
+import ProductGallery from '../../../../components/ProductGallery';
 import MarketplaceHeader from '../../../../components/MarketplaceHeader';
 
 interface Props { params: { id: string } }
@@ -72,25 +73,7 @@ export default async function ProductPage({ params }: Props) {
       </Link>
 
       <div className="grid gap-6 sm:grid-cols-2">
-        <div>
-          <div className="flex aspect-square items-center justify-center overflow-hidden rounded-ds-xl bg-black/5 dark:bg-white/5">
-            {gallery.length > 0
-              ? <img src={gallery[0]} alt={p.name} className="h-full w-full object-cover" />
-              : <Store className="text-ink/20" size={64} />}
-          </div>
-
-          {/* Remaining shots. Kept static so the page still renders on the
-              server and stays indexable; a lightbox would cost that. */}
-          {gallery.length > 1 && (
-            <div className="mt-2 grid grid-cols-4 gap-2">
-              {gallery.slice(0, 4).map((src, i) => (
-                <div key={i} className="aspect-square overflow-hidden rounded-xl bg-black/5 dark:bg-white/5">
-                  <img src={src} alt={`${p.name} — ${i + 1}`} className="h-full w-full object-cover" loading="lazy" />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <ProductGallery images={gallery} alt={p.name} />
 
         <div>
           {p.category?.name && (
