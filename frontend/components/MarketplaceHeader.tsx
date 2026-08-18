@@ -15,7 +15,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
-  Flame, ShoppingCart, User, ChevronDown, Menu, X, Search,
+  FileText, Flame, ShoppingCart, User, ChevronDown, Menu, X, Search,
   BadgeCheck, Truck, Store, LogIn, UserPlus, MessageSquare, LayoutDashboard, Globe,
 } from 'lucide-react';
 import { catalog, getAccessToken, type CatalogCategory } from '../lib/api';
@@ -179,6 +179,9 @@ export default function MarketplaceHeader() {
 
         <Link href="/shop?verified=1" className="hidden items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold text-ink/75 hover:bg-black/5 lg:flex dark:text-sand/75">
           <BadgeCheck size={16} className="text-leaf-dark" /> {t('Verified sellers', 'Wauzaji halali')}
+        </Link>
+        <Link href="/rfq" className="hidden items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold text-ink/75 hover:bg-black/5 lg:flex dark:text-sand/75">
+          <FileText size={16} /> {t('Request quotes', 'Omba bei')}
         </Link>
         <Link href="/freight" className="hidden items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold text-ink/75 hover:bg-black/5 lg:flex dark:text-sand/75">
           <Truck size={16} /> {t('Freight', 'Usafirishaji')}

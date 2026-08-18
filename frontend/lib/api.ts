@@ -581,3 +581,46 @@ export const kyc = {
   submit: (body: { name: string; idType: string; idNumber: string; selfieUrl: string; idUrl: string; plateNo?: string; vehicleType?: string; businessName?: string; description?: string; payProvider?: string; payNumber?: string; payName?: string }) =>
     apiFetch('/api/kyc/submit', { method: 'POST', body: JSON.stringify(body) }),
 };
+
+// ── Request for quotation ─────────────────────────────────────────────────────
+// Shares the bidding model with freight: a Quote carries either an rfqId or a
+// loadId. Money arrives as both minor units and major.
+export interface RfqQuote {
+  id: string; rfqId?: string | null; bidderOrgId: string;
+  amountMinor: number; amount: number; currency: string;
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'WITHDRAWN';
+  message?: string | null; etaDrop?: string | null;
+  bidder?: { id: string; name: string; slug: string; isVerified: boolean; rating: number };
+}
+export interface Rfq {
+  id: string; reference: string; title: string;
+  spec?: string | null; qty: number; unit?: string | null;
+  targetMinor?: number | null; target?: number | null; currency: string;
+  closesAt: string; status: 'OPEN' | 'QUOTED' | 'AWARDED' | 'CLOSED' | 'CANCELLED';
+  buyerOrgId: string;
+  buyer?: { id: string; name: string; slug: string; isVerified: boolean; countryCode?: string };
+  category?: { key: string; name: string; unitType: string } | null;
+  quotes?: RfqQuote[];
+  _count?: { quotes: number };
+}
+
+export const rfq = {
+  create: (body: {
+    title: string; categoryId?: string; spec?: string; qty: number;
+    unit?: string; target?: number; closesInDays?: number;
+  }) => apiFetch<{ rfq: Rfq }>('/api/rfq', { method: 'POST', body: JSON.stringify(body) }),
+
+  list: (q: { mine?: boolean; category?: string; status?: string } = {}) => {
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries(q)) if (v != null && v !== '') params.set(k, String(v));
+    return apiFetch<{ rfqs: Rfq[]; total: number; orgId: string }>(`/api/rfq?${params}`);
+  },
+
+  get: (id: string) => apiFetch<{ rfq: Rfq; isBuyer: boolean; quoteCount: number }>(`/api/rfq/${id}`),
+
+  quote: (id: string, body: { amount: number; leadDays?: number; message?: string }) =>
+    apiFetch<{ quote: RfqQuote }>(`/api/rfq/${id}/quotes`, { method: 'POST', body: JSON.stringify(body) }),
+
+  award: (quoteId: string) =>
+    apiFetch<{ rfq: Rfq; quote: RfqQuote }>(`/api/rfq/quotes/${quoteId}/accept`, { method: 'POST' }),
+};
