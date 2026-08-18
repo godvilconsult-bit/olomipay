@@ -14,6 +14,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { fromMinor, toMinor } from '../lib/money';
+import { priceBands } from '../lib/pricing';
 
 const router = Router();
 
@@ -30,6 +31,8 @@ function offerView(o: any) {
     ...money(o.priceMinor, o.currency),
     stock:   o.stock,
     moq:     o.moq,
+    // Quantity breaks, always an array so a client needs no null handling.
+    bands:   priceBands(o.priceMinor, o.tiers).map(b => ({ ...b, price: fromMinor(b.priceMinor, o.currency) })),
     inStock: o.isAvailable && o.stock > 0,
     seller: o.seller && {
       id:         o.seller.id,

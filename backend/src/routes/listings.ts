@@ -16,6 +16,7 @@ import { prisma } from '../lib/prisma';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 import { actingOrgId } from '../services/freight';
 import { toMinor, fromMinor } from '../lib/money';
+import { normaliseTiers } from '../lib/pricing';
 
 const router = Router();
 
@@ -161,11 +162,12 @@ router.post('/offers', requireAuth, async (req: AuthRequest, res) => {
     stock:     z.coerce.number().int().nonnegative().default(0),
     moq:       z.coerce.number().int().min(1).default(1),
     isAvailable: z.boolean().default(true),
+    // [{ minQty, price }] in major units; converted below like every other price.
+    tiers: z.array(z.object({ minQty: z.coerce.number().int().min(1), price: z.coerce.number().nonnegative() })).max(8).optional(),
   }).safeParse(req.body);
   if (!parse.success) return res.status(400).json({ error: parse.error.errors[0].message });
-  const { productId, price, stock, moq, isAvailable } = parse.data as {
-    productId: string; price: number; currency?: string; stock: number; moq: number; isAvailable: boolean;
-  };
+  const { productId, price, stock, moq, isAvailable } = parse.data as any;
+  const rawTiers = (parse.data as any).tiers as { minQty: number; price: number }[] | undefined;
 
   try {
     const org = await sellerOrg(req.userId!);
@@ -174,10 +176,15 @@ router.post('/offers', requireAuth, async (req: AuthRequest, res) => {
     const product = await prisma.product.findUnique({ where: { id: productId } });
     if (!product) return res.status(404).json({ error: 'Product not found' });
 
+    // Sorted and validated before storage so readers never have to.
+    const tierData = rawTiers?.length
+      ? (normaliseTiers(rawTiers.map(t => ({ minQty: t.minQty, priceMinor: toMinor(t.price, currency) }))) as any)
+      : undefined;
+
     const offer = await prisma.offer.upsert({
       where:  { sellerOrgId_productId: { sellerOrgId: org.id, productId } },
-      update: { priceMinor: toMinor(price, currency), currency, stock, moq, isAvailable },
-      create: { sellerOrgId: org.id, productId, priceMinor: toMinor(price, currency), currency, stock, moq, isAvailable },
+      update: { priceMinor: toMinor(price, currency), currency, stock, moq, isAvailable, tiers: tierData },
+      create: { sellerOrgId: org.id, productId, priceMinor: toMinor(price, currency), currency, stock, moq, isAvailable, tiers: tierData },
     });
     res.status(201).json({ offer: { ...offer, price: fromMinor(offer.priceMinor, offer.currency) } });
   } catch (e) { handle(res, e); }

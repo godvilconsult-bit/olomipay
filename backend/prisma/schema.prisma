@@ -1035,6 +1035,12 @@ model Offer {
   currency    String   @default("TZS")
   stock       Int      @default(0)
   moq         Int      @default(1)       // minimum order qty — wholesale tiers
+
+  /// Quantity price breaks: [{ minQty, priceMinor }] ascending by minQty.
+  /// OPTIONAL and additive — priceMinor above stays the base (qty 1) price that
+  /// every existing display already reads, so an offer without tiers behaves
+  /// exactly as before.
+  tiers       Json?
   isAvailable Boolean  @default(true)
 
   createdAt   DateTime @default(now())
