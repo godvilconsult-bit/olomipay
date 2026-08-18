@@ -12,7 +12,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { BadgeCheck, Store, Star, ArrowLeft } from 'lucide-react';
+import { BadgeCheck, Store, Star, ArrowLeft, ShieldCheck, Truck, Wallet } from 'lucide-react';
 import { getProduct } from '../../../../lib/catalogServer';
 import { formatMoney } from '../../../../lib/money';
 import ContactSellerButton from '../../../../components/ContactSellerButton';
@@ -67,12 +67,12 @@ export default async function ProductPage({ params }: Props) {
   return (
     <>
     <MarketplaceHeader />
-    <div className="mx-auto w-full max-w-4xl px-4 pb-16 pt-4">
+    <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-4 lg:px-6">
       <Link href="/shop" className="mb-3 inline-flex items-center gap-1 text-sm text-ink/60 hover:text-flame">
         <ArrowLeft size={16} /> Back to marketplace
       </Link>
 
-      <div className="grid gap-6 sm:grid-cols-2">
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_290px]">
         <ProductGallery images={gallery} alt={p.name} />
 
         <div>
@@ -139,6 +139,67 @@ export default async function ProductPage({ params }: Props) {
             </dl>
           )}
         </div>
+
+        {/* Action rail. Seller identity and the ways to reach them sit together,
+            because on a marketplace a buyer is judging both at once — the price
+            means little until they know who is behind it. */}
+        <aside className="lg:sticky lg:top-24 lg:self-start">
+          <div className="rounded-ds-xl border border-black/10 bg-white p-4 dark:border-white/10 dark:bg-ink-2">
+            {best?.seller && (
+              <>
+                <Link href={"/shop/s/" + best.seller.slug} className="flex items-center gap-2.5">
+                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-black/5 dark:bg-white/10">
+                    <Store size={19} className="text-ink/40" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="flex items-center gap-1 truncate text-sm font-bold text-ink hover:text-flame dark:text-sand">
+                      {best.seller.name}
+                      {best.seller.isVerified && <BadgeCheck size={14} className="shrink-0 text-leaf-dark" />}
+                    </span>
+                    {/* Verification status is stated either way. Silence on an
+                        unverified seller reads as endorsement. */}
+                    <span className="block text-[11px] text-ink/50">
+                      {best.seller.isVerified ? "Verified supplier" : "Not yet verified"}
+                      {best.seller.ratingCount > 0
+                        ? " · " + best.seller.rating.toFixed(1) + "★ (" + best.seller.ratingCount + ")"
+                        : ""}
+                    </span>
+                  </span>
+                </Link>
+
+                <Link
+                  href={"/shop/s/" + best.seller.slug}
+                  className="mt-2 block rounded-xl border border-black/10 py-2 text-center text-xs font-semibold text-ink/70 hover:border-flame hover:text-flame dark:border-white/10 dark:text-sand/70"
+                >
+                  View company profile
+                </Link>
+
+                <div className="my-3 h-px bg-black/5 dark:bg-white/10" />
+              </>
+            )}
+
+            <ContactSellerButton productId={p.id} productName={p.name} />
+            <BuyCta productId={p.id} />
+
+            <div className="mt-4 space-y-2 border-t border-black/5 pt-3 text-[11px] dark:border-white/10">
+              <div className="font-bold text-ink/80 dark:text-sand/80">Buyer protection</div>
+              {/* Only claims this platform actually honours — borrowed
+                  guarantees are worse than none once a buyer tests them. */}
+              <div className="flex items-start gap-1.5 text-ink/60 dark:text-sand/60">
+                <ShieldCheck size={13} className="mt-0.5 shrink-0 text-leaf-dark" />
+                <span>Confirm delivery before payment is released.</span>
+              </div>
+              <div className="flex items-start gap-1.5 text-ink/60 dark:text-sand/60">
+                <Truck size={13} className="mt-0.5 shrink-0 text-flame" />
+                <span>Track it on a live map to your door.</span>
+              </div>
+              <div className="flex items-start gap-1.5 text-ink/60 dark:text-sand/60">
+                <Wallet size={13} className="mt-0.5 shrink-0 text-ink/40" />
+                <span>Mobile money, bank transfer or cash on delivery.</span>
+              </div>
+            </div>
+          </div>
+        </aside>
       </div>
 
       {description && (
@@ -206,13 +267,9 @@ export default async function ProductPage({ params }: Props) {
           </div>
         )}
 
-        {/* Ask before you buy — the Alibaba pattern. Needs an account, unlike
-            browsing, because a conversation has two identified parties. */}
-        <ContactSellerButton productId={p.id} productName={p.name} />
-
-        {/* Signed-out visitors get the account choice here rather than hitting
-            the requirement only after tapping buy. Renders nothing once in. */}
-        <BuyCta productId={p.id} />
+        {/* Contact and account CTAs now live in the action rail above, beside
+            the seller they apply to. Repeating them here would give a buyer two
+            competing "Message seller" buttons on one page. */}
       </section>
     </div>
     </>
