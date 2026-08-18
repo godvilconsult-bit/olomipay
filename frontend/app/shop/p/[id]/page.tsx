@@ -56,6 +56,7 @@ export default async function ProductPage({ params }: Props) {
   // The API always returns an array, falling back to the legacy single image.
   const gallery: string[] = Array.isArray((p as any).images) ? (p as any).images : (p.imageUrl ? [p.imageUrl] : []);
   const description: string | null = (p as any).description ?? null;
+  const soldCount: number = (p as any).soldCount ?? 0;
 
   // Offers arrive cheapest-first from the API.
   const best = offers[0];
@@ -93,6 +94,32 @@ export default async function ProductPage({ params }: Props) {
             <div className="text-xs font-semibold uppercase tracking-wide text-ink/50">{p.category.name}</div>
           )}
           <h1 className="mt-1 text-2xl font-extrabold text-ink dark:text-sand">{p.name}</h1>
+
+          {/* Trust line, the way a trading marketplace leads: what other buyers
+              have done, and who stands behind it. Every figure here is real —
+              units sold comes from delivered orders, the rating is the seller's
+              own. A product star score would have to be invented, since reviews
+              are recorded against sellers rather than products. */}
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]">
+            {soldCount > 0 && (
+              <span className="font-semibold text-ink/70 dark:text-sand/70">
+                {soldCount.toLocaleString()} sold
+              </span>
+            )}
+            {best?.seller && best.seller.ratingCount > 0 && (
+              <span className="inline-flex items-center gap-1 text-ink/60 dark:text-sand/60">
+                <Star size={13} className="fill-amber-400 text-amber-400" />
+                {best.seller.rating.toFixed(1)}
+                <span className="text-ink/40">({best.seller.ratingCount} seller reviews)</span>
+              </span>
+            )}
+            {offers.length > 1 && (
+              <span className="text-ink/50">{offers.length} sellers competing</span>
+            )}
+            {soldCount === 0 && (
+              <span className="text-ink/45">New listing</span>
+            )}
+          </div>
 
           {/* Price block. The unit and any minimum order sit with the number,
               because "19,000" means something different per bag than per pallet

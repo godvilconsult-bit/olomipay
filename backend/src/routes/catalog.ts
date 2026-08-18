@@ -198,10 +198,28 @@ router.get('/products/:id', async (req, res) => {
   });
   if (!product) return res.status(404).json({ error: 'Product not found' });
 
+  /**
+   * Units actually sold, from completed orders.
+   *
+   * Deliberately NOT a product review score: Review records ratings for the
+   * SELLER, not the product, so a per-product star rating would be invented.
+   * Units sold is real, verifiable from order history, and is the number a B2B
+   * buyer is actually reading when they scan "8024 sold".
+   *
+   * Counts only orders that reached delivery — pending and cancelled ones are
+   * not sales, and inflating this would be the same dishonesty as a borrowed
+   * guarantee.
+   */
+  const sold = await prisma.orderItem.aggregate({
+    where: { productId: product.id, order: { status: { in: ['DELIVERED', 'COMPLETED'] } } },
+    _sum:  { qty: true },
+  });
+
   // The competing-offers list is the point of a marketplace product page: one
   // product, many sellers, cheapest first.
   res.json({
     product: {
+      soldCount: sold._sum.qty ?? 0,
       id: product.id, name: product.name, imageUrl: product.imageUrl,
       description: product.description,
       // Always an array so the gallery has one shape; falls back to the single
