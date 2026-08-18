@@ -193,7 +193,10 @@ export default function ShopPage() {
       {/* The search input lives in the hero now; this row is filters only, and
           shows what is currently narrowing the results so it can be cleared. */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <Button variant="ghost" onClick={() => setShowFilters(v => !v)} aria-expanded={showFilters}>
+        {/* Hidden from lg up, where the panel below is always open — a filter
+            behind a button costs a click on every refinement, and on desktop
+            there is room to just show them. */}
+        <Button className="lg:hidden" variant="ghost" onClick={() => setShowFilters(v => !v)} aria-expanded={showFilters}>
           <SlidersHorizontal size={16} /> {t('Filters', 'Vichujio')}
         </Button>
         {(search || category || brand) && (
@@ -219,7 +222,9 @@ export default function ShopPage() {
       )}
 
       {/* Filters */}
-      {showFilters && (
+      {/* Always rendered on desktop, toggled on phone. */}
+      <div className={cn(showFilters ? 'block' : 'hidden', 'lg:block')}>
+      {(
         <Card className="mb-3">
           <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink/50">Sort</div>
           <div className="mb-3 flex flex-wrap gap-2">
@@ -248,6 +253,7 @@ export default function ShopPage() {
           )}
         </Card>
       )}
+      </div>
 
       {/* Results. Skeletons rather than a spinner: they hold the grid's shape so
           the page does not jump when results arrive, and they read as "nearly
