@@ -68,9 +68,22 @@ export default async function ProductPage({ params }: Props) {
     <>
     <MarketplaceHeader />
     <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-4 lg:px-6">
-      <Link href="/shop" className="mb-3 inline-flex items-center gap-1 text-sm text-ink/60 hover:text-flame">
-        <ArrowLeft size={16} /> Back to marketplace
-      </Link>
+      {/* Breadcrumbs rather than a lone Back link: they show where the product
+          sits in the catalog, give a one-click route into its category, and are
+          read by crawlers on a page that already renders server-side. */}
+      <nav aria-label="Breadcrumb" className="mb-3 flex flex-wrap items-center gap-1 text-[13px] text-ink/50">
+        <Link href="/shop" className="hover:text-flame">Marketplace</Link>
+        {p.category?.name && (
+          <>
+            <span aria-hidden className="text-ink/25">›</span>
+            <Link href={`/shop?category=${p.category.key}`} className="hover:text-flame">
+              {p.category.name}
+            </Link>
+          </>
+        )}
+        <span aria-hidden className="text-ink/25">›</span>
+        <span className="truncate text-ink/70 dark:text-sand/70" aria-current="page">{p.name}</span>
+      </nav>
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_290px]">
         <ProductGallery images={gallery} alt={p.name} />

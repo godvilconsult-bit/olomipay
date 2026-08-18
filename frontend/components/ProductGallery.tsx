@@ -45,7 +45,11 @@ export default function ProductGallery({ images, alt }: { images: string[]; alt:
 
   return (
     <>
-      <div className="flex gap-2.5">
+      {/* self-start matters: this is a grid item, and grid items stretch to the
+          tallest row by default. The main image is aspect-square so it sizes to
+          its width, leaving the stretched box taller than the photo — which put
+          a dead band under the gallery and pushed the counter far below it. */}
+      <div className="flex gap-2.5 self-start">
         {/* Thumbnail rail — vertical on desktop, the Alibaba arrangement. */}
         {shots.length > 1 && (
           <div className="flex w-14 shrink-0 flex-col gap-1.5">
