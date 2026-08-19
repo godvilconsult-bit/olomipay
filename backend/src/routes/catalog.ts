@@ -126,9 +126,17 @@ router.get('/products', async (req, res) => {
 
   // Offer-level filters decide which products are visible at all: a product with
   // nobody selling it is not merchandise, it is a catalog entry.
-  const offerWhere: any = { isAvailable: true };
+  //
+  // The seller filter ALWAYS carries isActive. Suspending an organization used
+  // to hide only its storefront page and its directory entry — its products
+  // stayed in browse and on product pages, so a suspension did not actually
+  // remove a bad seller from the marketplace. Moderation has to bite here, at
+  // the offer level, because this is where merchandise becomes visible.
+  const offerWhere: any = {
+    isAvailable: true,
+    seller: { isActive: true, ...(seller ? { slug: seller } : {}) },
+  };
   if (inStock) offerWhere.stock = { gt: 0 };
-  if (seller)  offerWhere.seller = { slug: seller };
   if (min != null || max != null) {
     // Converted through the currency's own exponent, never a hardcoded x100 —
     // the filter must mean the same thing in yen and in dinar. Comparing across
@@ -217,7 +225,14 @@ router.get('/products/:id', async (req, res) => {
     where:   { id: req.params.id },
     include: {
       category: true,
-      offers:   { where: { isAvailable: true }, orderBy: { priceMinor: 'asc' }, include: { seller: true } },
+      // Same moderation rule as browse: a suspended seller's offer must not
+      // appear here either, or the product page becomes a back door to a
+      // seller who has been removed from the marketplace.
+      offers: {
+        where:   { isAvailable: true, seller: { isActive: true } },
+        orderBy: { priceMinor: 'asc' },
+        include: { seller: true },
+      },
     },
   });
   if (!product) return res.status(404).json({ error: 'Product not found' });

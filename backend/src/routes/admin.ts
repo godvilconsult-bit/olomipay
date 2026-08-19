@@ -435,4 +435,125 @@ router.post('/cylinder-returns/:id/reject', requireAdmin, async (req: AuthReques
   res.json({ ok: true });
 });
 
+// ── Seller moderation ────────────────────────────────────────────────────────
+//
+// Anyone who registers as a seller publishes to the public catalog immediately.
+// That is workable with a handful of known sellers and becomes a liability the
+// week there are fifty. These endpoints give an operator the two controls that
+// matter: vouch for a seller, or take them off the marketplace.
+//
+// Suspension (isActive = false) now genuinely removes a seller's merchandise —
+// the catalog filters offers by seller.isActive in browse and on product pages,
+// not just on the storefront route.
+
+// ── GET /api/admin/sellers ─ the review queue ────────────────────────────────
+router.get('/sellers', requireAdmin, async (req: AuthRequest, res) => {
+  const parse = z.object({
+    filter: z.enum(['all', 'unverified', 'suspended']).default('unverified'),
+    limit:  z.coerce.number().int().min(1).max(200).default(50),
+  }).safeParse(req.query);
+  if (!parse.success) return res.status(400).json({ error: parse.error.errors[0].message });
+  const { filter, limit } = parse.data;
+
+  const where: any = { canSell: true };
+  if (filter === 'unverified') { where.isVerified = false; where.isActive = true; }
+  if (filter === 'suspended')  { where.isActive = false; }
+
+  const orgs = await prisma.organization.findMany({
+    where,
+    // Newest first: a review queue is worked from the most recent arrival.
+    orderBy: { createdAt: 'desc' },
+    take: limit,
+    include: {
+      _count: { select: { offers: true } },
+      memberships: {
+        where:  { role: 'OWNER' },
+        take:   1,
+        select: { user: { select: { id: true, name: true, phone: true, kycStatus: true } } },
+      },
+    },
+  });
+
+  res.json({
+    filter,
+    total: orgs.length,
+    sellers: orgs.map(o => ({
+      id: o.id, name: o.name, slug: o.slug, kind: o.kind,
+      isVerified: o.isVerified, isActive: o.isActive,
+      countryCode: o.countryCode, createdAt: o.createdAt,
+      listingCount: o._count.offers,
+      // KYC status is the evidence an operator actually reviews before
+      // vouching for someone, so it travels with the queue entry.
+      owner: o.memberships[0]?.user ?? null,
+    })),
+  });
+});
+
+// ── POST /api/admin/sellers/:id/verify ───────────────────────────────────────
+router.post('/sellers/:id/verify', requireAdmin, async (req: AuthRequest, res) => {
+  const parse = z.object({ verified: z.boolean().default(true) }).safeParse(req.body ?? {});
+  if (!parse.success) return res.status(400).json({ error: parse.error.errors[0].message });
+
+  const org = await prisma.organization.findUnique({ where: { id: req.params.id } });
+  if (!org) return res.status(404).json({ error: 'Seller not found' });
+
+  const updated = await prisma.organization.update({
+    where: { id: org.id },
+    data:  { isVerified: parse.data.verified! },
+  });
+
+  // Tell the seller: the badge changes how buyers read their listings, so it
+  // should not appear or vanish silently.
+  const owners = await prisma.membership.findMany({ where: { orgId: org.id }, select: { userId: true } });
+  for (const m of owners) {
+    await notify(m.userId, {
+      title: parse.data.verified ? 'Your shop is verified ✅' : 'Verification removed',
+      body:  parse.data.verified
+        ? 'Buyers now see a verified badge on your listings.'
+        : 'Your listings no longer show the verified badge.',
+      type:  'account',
+    });
+  }
+
+  res.json({ seller: { id: updated.id, name: updated.name, isVerified: updated.isVerified } });
+});
+
+// ── POST /api/admin/sellers/:id/suspend ──────────────────────────────────────
+router.post('/sellers/:id/suspend', requireAdmin, async (req: AuthRequest, res) => {
+  const parse = z.object({
+    suspended: z.boolean().default(true),
+    reason:    z.string().trim().max(300).optional(),
+  }).safeParse(req.body ?? {});
+  if (!parse.success) return res.status(400).json({ error: parse.error.errors[0].message });
+
+  const org = await prisma.organization.findUnique({
+    where:   { id: req.params.id },
+    include: { _count: { select: { offers: true } } },
+  });
+  if (!org) return res.status(404).json({ error: 'Seller not found' });
+
+  const updated = await prisma.organization.update({
+    where: { id: org.id },
+    data:  { isActive: !parse.data.suspended },
+  });
+
+  const owners = await prisma.membership.findMany({ where: { orgId: org.id }, select: { userId: true } });
+  for (const m of owners) {
+    await notify(m.userId, {
+      title: parse.data.suspended ? 'Your shop has been suspended' : 'Your shop is active again',
+      body:  parse.data.suspended
+        ? `Your listings are hidden from the marketplace.${parse.data.reason ? ` Reason: ${parse.data.reason}` : ''}`
+        : 'Your listings are visible in the marketplace again.',
+      type:  'account',
+    });
+  }
+
+  res.json({
+    seller: { id: updated.id, name: updated.name, isActive: updated.isActive },
+    // Say how much merchandise this affected — a suspension that silently
+    // removes forty listings should not look the same as one removing none.
+    listingsAffected: org._count.offers,
+  });
+});
+
 export { router as adminRouter };
